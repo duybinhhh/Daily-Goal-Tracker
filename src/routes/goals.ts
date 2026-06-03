@@ -1,0 +1,25 @@
+// src/routes/goals.ts
+import { Router } from "express";
+import { authMiddleware } from "../middleware/auth";
+import {
+  getGoals,
+  createGoal,
+  getGoalById,
+  updateGoal,
+  deleteGoal,
+  completeGoal,
+} from "../controllers/goalController";
+
+const router = Router();
+
+// Apply auth middleware globally on Goals
+router.use(authMiddleware as any);
+
+router.get("/", getGoals);
+router.post("/", createGoal);
+router.get("/:id", getGoalById);
+router.put("/:id", updateGoal);
+router.delete("/:id", deleteGoal);
+router.post("/:id/complete", completeGoal);
+
+export default router;
