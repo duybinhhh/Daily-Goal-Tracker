@@ -1,0 +1,94 @@
+{
+  "users": [
+    {
+      "id": "1f148c56-267e-49a6-aac4-52c1f60cec48",
+      "email": "duybinh01122005@gmail.com",
+      "password_hash": "$2b$10$5zxoCA8yzvVgQYO9EshsEeBNanIWbSLbanXATw0O3IoOGlCHi1gDe",
+      "name": "aea",
+      "timezone": "Asia/Saigon",
+      "created_at": "2026-06-03T08:39:49.272Z",
+      "updated_at": "2026-06-03T08:39:49.272Z"
+    }
+  ],
+  "goals": [
+    {
+      "id": "6237ac2a-5196-42ca-af1b-148533e2ce67",
+      "user_id": "1f148c56-267e-49a6-aac4-52c1f60cec48",
+      "title": "Read a Tech Book",
+      "description": "Read 15 pages of structural architecture",
+      "category": "Learning",
+      "target_count": 1,
+      "current_count": 0,
+      "frequency": "daily",
+      "status": "active",
+      "due_date": null,
+      "created_at": "2026-06-03T08:39:49.297Z",
+      "updated_at": "2026-06-03T08:39:49.297Z"
+    },
+    {
+      "id": "54edbb87-0ed4-4d59-8be1-3a66b6613a04",
+      "user_id": "1f148c56-267e-49a6-aac4-52c1f60cec48",
+      "title": "Morning Plank exercise",
+      "description": "Hold standard plank for 3 minutes",
+      "category": "Fitness",
+      "target_count": 2,
+      "current_count": 0,
+      "frequency": "daily",
+      "status": "active",
+      "due_date": null,
+      "created_at": "2026-06-03T08:39:49.298Z",
+      "updated_at": "2026-06-03T08:39:49.298Z"
+    },
+    {
+      "id": "e1dda426-1338-443f-af58-8ad8f987844f",
+      "user_id": "1f148c56-267e-49a6-aac4-52c1f60cec48",
+      "title": "Drink Water 2L",
+      "description": "Stay hydrated by drinking at least 8 cups",
+      "category": "Health",
+      "target_count": 1,
+      "current_count": 0,
+      "frequency": "daily",
+      "status": "active",
+      "due_date": null,
+      "created_at": "2026-06-03T08:39:49.299Z",
+      "updated_at": "2026-06-03T08:39:49.299Z"
+    }
+  ],
+  "logs": [],
+  "streaks": [
+    {
+      "id": "4672db07-a06d-43b9-a31e-222f5b5f66b3",
+      "user_id": "1f148c56-267e-49a6-aac4-52c1f60cec48",
+      "goal_id": "6237ac2a-5196-42ca-af1b-148533e2ce67",
+      "current_streak": 0,
+      "longest_streak": 0,
+      "last_completed_at": null
+    },
+    {
+      "id": "e3bbeb68-f9b8-4c95-bba9-1bfa1e44f357",
+      "user_id": "1f148c56-267e-49a6-aac4-52c1f60cec48",
+      "goal_id": "54edbb87-0ed4-4d59-8be1-3a66b6613a04",
+      "current_streak": 0,
+      "longest_streak": 0,
+      "last_completed_at": null
+    },
+    {
+      "id": "deb4f936-6209-4f76-89e0-d7a0ee41aef8",
+      "user_id": "1f148c56-267e-49a6-aac4-52c1f60cec48",
+      "goal_id": "e1dda426-1338-443f-af58-8ad8f987844f",
+      "current_streak": 0,
+      "longest_streak": 0,
+      "last_completed_at": null
+    }
+  ],
+  "notifications": [
+    {
+      "id": "48342f3a-5beb-4b8b-b88c-1df0e9f74750",
+      "user_id": "1f148c56-267e-49a6-aac4-52c1f60cec48",
+      "type": "welcome",
+      "message": "Welcome aea! Start defining your daily goals and build consistent habits.",
+      "is_read": false,
+      "created_at": "2026-06-03T08:39:49.273Z"
+    }
+  ]
+}
