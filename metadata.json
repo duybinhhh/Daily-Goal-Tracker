@@ -1,0 +1,6 @@
+{
+  "name": "Daily Goal Tracker",
+  "description": "A beautiful, productive web application to set daily goals, track progress, and build long-term positive habits.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
