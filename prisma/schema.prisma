@@ -1,0 +1,82 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  password_hash String
+  name          String
+  timezone      String         @default("UTC")
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+  goals         Goal[]
+  logs          GoalLog[]
+  notifications Notification[]
+}
+
+model Goal {
+  id            String     @id @default(uuid())
+  user_id       String
+  user          User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  category      String
+  target_count  Int        @default(1)
+  current_count Int        @default(0)
+  frequency     String     @default("daily") // daily, weekly, monthly
+  status        String     @default("active") // active, paused, completed
+  due_date      DateTime?
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+  logs          GoalLog[]
+  streaks       Streak[]
+
+  @@index([user_id])
+}
+
+model GoalLog {
+  id           String   @id @default(uuid())
+  goal_id      String
+  goal         Goal     @relation(fields: [goal_id], references: [id], onDelete: Cascade)
+  user_id      String
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  completed_at DateTime @default(now())
+  note         String?
+  created_at   DateTime @default(now())
+
+  @@index([goal_id])
+  @@index([user_id])
+}
+
+model Streak {
+  id                String    @id @default(uuid())
+  user_id           String
+  goal_id           String
+  goal              Goal      @relation(fields: [goal_id], references: [id], onDelete: Cascade)
+  current_streak    Int       @default(0)
+  longest_streak    Int       @default(0)
+  last_completed_at DateTime?
+
+  @@index([user_id])
+  @@index([goal_id])
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  user_id    String
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  type       String   @default("info")
+  message    String
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+}
