@@ -1,35 +1,7 @@
 // server/db.ts
 import { PrismaClient } from "@prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import fs from "fs";
-import path from "path";
 
-let dbUrl = "file:./dev.db";
-
-if (process.env.VERCEL) {
-  const srcPath = path.join(process.cwd(), "dev.db");
-  const destPath = "/tmp/dev.db";
-  
-  try {
-    if (!fs.existsSync(destPath)) {
-      if (fs.existsSync(srcPath)) {
-        fs.copyFileSync(srcPath, destPath);
-        console.log("Successfully copied dev.db to /tmp/dev.db");
-      } else {
-        console.log("Source dev.db not found at", srcPath);
-      }
-    }
-    dbUrl = `file:${destPath}`;
-  } catch (error) {
-    console.error("Failed to copy database to /tmp:", error);
-  }
-}
-
-// Create SQLite adapter
-const adapter = new PrismaBetterSqlite3({
-  url: dbUrl,
-});
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 
 // Helper mappers to match the previous local DB model representation (which used string dates)
