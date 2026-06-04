@@ -4,6 +4,10 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 
 const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL is required. Set it in your local .env file and in Vercel Environment Variables.");
+}
+
 const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
