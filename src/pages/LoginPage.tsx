@@ -92,13 +92,7 @@ export const LoginPage: React.FC = () => {
       />
 
       <div
-        className="glass-card animate-fade-in"
-        style={{
-          width: "100%",
-          maxWidth: "420px",
-          padding: "40px 36px",
-          position: "relative",
-        }}
+        className="glass-card animate-fade-in w-full max-w-[420px] p-6 sm:p-9 relative"
       >
         {/* Brand */}
         <div style={{ textAlign: "center", marginBottom: "32px" }}>

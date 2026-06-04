@@ -43,7 +43,7 @@ export default function Sidebar() {
   return (
     <aside
       id="app-sidebar"
-      className="shrink-0 flex flex-col h-screen sticky top-0"
+      className="shrink-0 hidden md:flex flex-col h-screen sticky top-0"
       style={{
         width: "220px",
         borderRight: "1px solid var(--border-subtle)",

@@ -372,25 +372,18 @@ export const Stats: React.FC = () => {
     <div style={{ minHeight: "100vh" }} className="flex flex-col bg-background text-on-background antialiased font-sans">
       {/* ── Sticky Header with Search and Actions ── */}
       <header
+        className="sticky top-0 z-40 flex flex-col lg:flex-row lg:items-center justify-between gap-4 py-3.5 px-4 md:px-6"
         style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 40,
-          padding: "14px 24px",
           borderBottom: "1px solid var(--border-subtle)",
           background: "var(--header-bg)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "24px", flex: 1 }}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full lg:w-auto">
           <h2
             style={{
-              fontSize: "22px",
+              fontSize: "20px",
               fontWeight: 700,
               letterSpacing: "-0.03em",
               color: "var(--color-on-surface)",
@@ -398,7 +391,7 @@ export const Stats: React.FC = () => {
           >
             Statistics
           </h2>
-          <div className="relative" style={{ maxWidth: "320px", width: "100%" }}>
+          <div className="relative w-full sm:max-w-[240px]">
             <span
               className="material-symbols-outlined text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2"
               style={{ fontSize: "18px" }}
@@ -416,9 +409,9 @@ export const Stats: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
           {bestStreak > 0 && (
-            <div className="streak-badge shrink-0">
+            <div className="streak-badge shrink-0 py-1 px-2.5 text-[11px] sm:text-xs">
               <span className="material-symbols-outlined ms-filled" style={{ fontSize: "14px" }}>
                 local_fire_department
               </span>
@@ -427,37 +420,37 @@ export const Stats: React.FC = () => {
           )}
           <button
             onClick={handleExportCSV}
-            className="btn-ghost text-xs shrink-0 py-2"
+            className="btn-ghost text-xs shrink-0 py-2 px-2.5 sm:px-3"
             style={{ display: "flex", alignItems: "center", gap: "6px" }}
             title="Export CSV Report"
           >
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
               download
             </span>
-            Export CSV
+            <span className="hidden sm:inline">Export CSV</span>
           </button>
           <button
             onClick={handleRefresh}
-            className="btn-ghost text-xs shrink-0 py-2"
+            className="btn-ghost text-xs shrink-0 py-2 px-2.5 sm:px-3"
             style={{ display: "flex", alignItems: "center", gap: "6px" }}
             title="Update Stats"
           >
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
               refresh
             </span>
-            Update Data
+            <span className="hidden sm:inline">Update Data</span>
           </button>
-          <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2">
+          <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4">
             <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>
               add
             </span>
-            New Goal
+            <span className="hidden sm:inline">New Goal</span>
           </Link>
         </div>
       </header>
 
       {/* ── Main Content Canvas ── */}
-      <main className="p-8 flex-1 space-y-8 max-w-[1200px] mx-auto w-full">
+      <main className="p-4 md:p-8 flex-1 space-y-6 md:space-y-8 max-w-[1200px] mx-auto w-full">
         {/* Header Section */}
         <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>

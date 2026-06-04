@@ -430,30 +430,21 @@ export const DashboardPage: React.FC = () => {
   const totalCompleted = goals.reduce((sum, g) => sum + g.current_count, 0);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <div className="flex flex-col min-h-screen">
       {/* ── Sticky Header ── */}
       <header
         id="dashboard-header"
+        className="sticky top-0 z-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3.5 px-4 md:px-6"
         style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-          padding: "14px 24px",
           borderBottom: "1px solid var(--border-subtle)",
           background: "var(--header-bg)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
         }}
       >
         <h1
+          className="text-lg md:text-xl font-bold tracking-tight"
           style={{
-            fontSize: "22px",
-            fontWeight: 700,
-            letterSpacing: "-0.03em",
             color: "var(--color-on-surface)",
           }}
         >
@@ -464,22 +455,22 @@ export const DashboardPage: React.FC = () => {
           ✦
         </h1>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div className="flex items-center gap-2 self-end sm:self-auto">
           {/* Streak badge in header */}
           {bestCurrentStreak > 0 && (
-            <div className="streak-badge">
+            <div className="streak-badge py-1 px-2.5 text-[11px] sm:text-xs">
               <span
                 className="material-symbols-outlined ms-filled"
-                style={{ fontSize: "15px" }}
+                style={{ fontSize: "14px" }}
               >
                 local_fire_department
               </span>
-              {bestCurrentStreak} Day Streak
+              <span>{bestCurrentStreak} Day Streak</span>
             </div>
           )}
           <button onClick={refreshAll} className="btn-ghost" title="Refresh">
             <RefreshCw size={14} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           <Link to="/new-goal" className="btn-primary">
             <span
@@ -488,20 +479,14 @@ export const DashboardPage: React.FC = () => {
             >
               add
             </span>
-            Add Goal
+            <span className="hidden sm:inline">Add Goal</span>
           </Link>
         </div>
       </header>
 
       {/* ── Main Content ── */}
       <main
-        style={{
-          flex: 1,
-          padding: "24px 24px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "20px",
-        }}
+        className="flex-1 flex flex-col gap-5 py-5 px-4 md:p-6"
       >
         {/* Error Banner */}
         {error && (
@@ -525,11 +510,7 @@ export const DashboardPage: React.FC = () => {
 
         {/* ── Bento Stats Row ── */}
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "16px",
-          }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
           {/* Today's Progress */}
           <div className="glass-card glass-card-glow stat-card">
@@ -724,13 +705,7 @@ export const DashboardPage: React.FC = () => {
 
         {/* ── Two-Column Layout: Goals + Right Panel ── */}
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) 300px",
-            gap: "20px",
-            alignItems: "start",
-            flex: 1,
-          }}
+          className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start flex-1"
         >
           {/* ── LEFT: Goal List ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -977,13 +952,7 @@ export const DashboardPage: React.FC = () => {
 
           {/* ── RIGHT PANEL: Calendar + Milestones ── */}
           <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-              position: "sticky",
-              top: "72px",
-            }}
+            className="flex flex-col gap-4 lg:sticky lg:top-[72px]"
           >
             <MiniCalendar />
             <UpcomingMilestones

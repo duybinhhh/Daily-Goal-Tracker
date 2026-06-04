@@ -233,25 +233,18 @@ export default function TimelinePage() {
 
       {/* Sticky Header with Search */}
       <header
+        className="sticky top-0 z-40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3.5 px-4 md:px-6"
         style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 40,
-          padding: "14px 24px",
           borderBottom: "1px solid var(--border-subtle)",
           background: "var(--header-bg)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "24px", flex: 1 }}>
+        <div className="flex flex-col xs:flex-row xs:items-center gap-4 w-full sm:w-auto">
           <h2
             style={{
-              fontSize: "22px",
+              fontSize: "20px",
               fontWeight: 700,
               letterSpacing: "-0.03em",
               color: "var(--color-on-surface)",
@@ -259,7 +252,7 @@ export default function TimelinePage() {
           >
             Activity Timeline
           </h2>
-          <div className="relative" style={{ maxWidth: "320px", width: "100%" }}>
+          <div className="relative w-full xs:w-[240px]">
             <span
               className="material-symbols-outlined text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2"
               style={{ fontSize: "18px" }}
@@ -277,26 +270,26 @@ export default function TimelinePage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
           {bestCurrentStreak > 0 && (
-            <div className="streak-badge shrink-0">
+            <div className="streak-badge shrink-0 py-1 px-2.5 text-[11px] sm:text-xs">
               <span className="material-symbols-outlined ms-filled" style={{ fontSize: "14px" }}>
                 local_fire_department
               </span>
               <span>{bestCurrentStreak} Day Streak</span>
             </div>
           )}
-          <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2">
+          <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4">
             <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>
               add
             </span>
-            New Goal
+            <span className="hidden sm:inline">New Goal</span>
           </Link>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main style={{ flex: 1, padding: "24px" }}>
+      <main className="flex-1 py-5 px-4 md:p-6">
         <div className="grid grid-cols-12 gap-6">
           
           {/* Left Column: Calendar & Monthly Summary */}

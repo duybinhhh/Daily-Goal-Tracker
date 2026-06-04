@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import Sidebar from "./components/Sidebar";
+import BottomNav from "./components/BottomNav";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { GoalFormPage } from "./pages/GoalFormPage";
@@ -63,8 +64,8 @@ function AppLayout() {
   return (
     <div
       id="app-wrapper"
+      className="flex flex-col md:flex-row"
       style={{
-        display: "flex",
         width: "100vw",
         height: "100vh",
         background: "var(--color-background)",
@@ -77,12 +78,8 @@ function AppLayout() {
       {/* Scrollable main area — fills remaining width */}
       <div
         id="main-scroll-area"
+        className="flex-1 min-h-0 flex flex-col md:h-screen"
         style={{
-          flex: 1,
-          minWidth: 0,
-          display: "flex",
-          flexDirection: "column",
-          height: "100vh",
           overflowY: "auto",
           overflowX: "hidden",
         }}
@@ -98,6 +95,9 @@ function AppLayout() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
+
+      {/* Bottom Nav for Mobile */}
+      <BottomNav />
     </div>
   );
 }

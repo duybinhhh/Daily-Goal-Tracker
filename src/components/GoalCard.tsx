@@ -167,12 +167,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
 
       {/* ── Row 1: Icon + Info + Actions ── */}
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
-        }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         {/* Left: Icon + title + meta */}
         <div
@@ -261,12 +256,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
 
         {/* Right: Progress % + Actions */}
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "20px",
-            flexShrink: 0,
-          }}
+          className="flex items-center justify-between sm:justify-end gap-5 w-full sm:w-auto"
         >
           {/* Progress column */}
           <div style={{ textAlign: "right" }}>

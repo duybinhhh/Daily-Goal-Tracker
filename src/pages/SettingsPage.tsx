@@ -471,7 +471,7 @@ export function SettingsPage() {
           </div>
 
           {/* Bottom Action Footer (Sticky Floating Bar) */}
-          <div className="glass-card sticky bottom-4 md:bottom-6 z-30 flex justify-end items-center gap-4 p-4 mt-8 shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
+          <div className="glass-card sticky bottom-[76px] md:bottom-6 z-30 flex justify-end items-center gap-4 p-4 mt-8 shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
             <button
               type="button"
               onClick={handleDiscard}

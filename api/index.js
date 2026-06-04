@@ -870,12 +870,13 @@ var getDashboardStats = async (req, res, next) => {
     const goals = await db.goals.findMany({ user_id: userId });
     const streaks = await db.streaks.findMany({ user_id: userId });
     const totalGoals = goals.length;
-    const activeGoals = goals.filter((g) => g.status === "active").length;
+    const activeGoals = goals.filter((g) => g.status !== "paused").length;
     const completedGoalsToday = goals.filter((g) => g.current_count >= g.target_count).length;
     let overallCompletionRate = 0;
-    if (goals.length > 0) {
-      const totalProgress = goals.reduce((acc, g) => acc + g.current_count, 0);
-      const totalTargets = goals.reduce((acc, g) => acc + g.target_count, 0);
+    const activeGoalsList = goals.filter((g) => g.status !== "paused");
+    if (activeGoalsList.length > 0) {
+      const totalProgress = activeGoalsList.reduce((acc, g) => acc + g.current_count, 0);
+      const totalTargets = activeGoalsList.reduce((acc, g) => acc + g.target_count, 0);
       overallCompletionRate = totalTargets > 0 ? Math.round(totalProgress / totalTargets * 100) : 0;
     }
     const bestCurrentStreak = streaks.length > 0 ? Math.max(...streaks.map((s) => s.current_streak)) : 0;

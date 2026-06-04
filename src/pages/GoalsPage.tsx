@@ -159,33 +159,26 @@ export default function GoalsPage() {
       {/* ── Sticky Header ── */}
       <header
         id="goals-header"
+        className="sticky top-0 z-40 flex flex-col md:flex-row md:items-center justify-between gap-4 py-3.5 px-4 md:px-6"
         style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 40,
-          padding: "14px 24px",
           borderBottom: "1px solid var(--border-subtle)",
           background: "var(--header-bg)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
-          <h2 style={{ fontSize: "22px", fontWeight: 800, color: "var(--color-primary)", letterSpacing: "-0.03em" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full md:w-auto">
+          <h2 style={{ fontSize: "20px", fontWeight: 800, color: "var(--color-primary)", letterSpacing: "-0.03em" }}>
             My Goals
           </h2>
-          <div style={{ position: "relative" }}>
+          <div className="relative w-full sm:w-[240px]">
             <span className="material-symbols-outlined" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--color-outline)", fontSize: "18px" }}>
               search
             </span>
             <input
               type="text"
               className="m-input"
-              style={{ paddingLeft: "36px", paddingRight: "16px", paddingTop: "8px", paddingBottom: "8px", width: "260px", borderRadius: "9999px", fontSize: "13px" }}
+              style={{ paddingLeft: "36px", paddingRight: "16px", paddingTop: "8px", paddingBottom: "8px", width: "100%", borderRadius: "9999px", fontSize: "13px" }}
               placeholder="Search goals..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -193,30 +186,30 @@ export default function GoalsPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
           {bestCurrentStreak > 0 && (
-            <div className="streak-badge">
+            <div className="streak-badge py-1 px-2.5 text-[11px] sm:text-xs">
               <span className="material-symbols-outlined ms-filled" style={{ fontSize: "15px" }}>
                 local_fire_department
               </span>
-              {bestCurrentStreak} Day Streak
+              <span>{bestCurrentStreak} Day Streak</span>
             </div>
           )}
           <button onClick={refreshAll} className="btn-ghost" title="Refresh">
             <RefreshCw size={14} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           <Link to="/new-goal" className="btn-primary">
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
               add
             </span>
-            New Goal
+            <span className="hidden sm:inline">New Goal</span>
           </Link>
         </div>
       </header>
 
       {/* ── Main Canvas ── */}
-      <main style={{ flex: 1, padding: "24px 24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+      <main className="flex-1 flex flex-col gap-6 py-5 px-4 md:p-6">
         
         {/* Error Banner */}
         {error && (
@@ -239,8 +232,8 @@ export default function GoalsPage() {
         )}
 
         {/* Filters & Status Section */}
-        <section style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
-          <div style={{ display: "flex", gap: "8px" }}>
+        <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <button
               onClick={() => setStatusFilter("all")}
               className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
@@ -273,7 +266,7 @@ export default function GoalsPage() {
             </button>
           </div>
 
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div className="flex gap-2 w-full sm:w-auto justify-start sm:justify-end">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
