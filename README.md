@@ -125,6 +125,7 @@ Truy cập vào ứng dụng tại địa chỉ: `http://localhost:5173`.
 
 Để hiểu rõ hơn về các khía cạnh thiết kế và lịch trình của dự án, vui lòng đọc các tài liệu chi tiết trong thư mục `docs/`:
 
+* [USER_GUIDE.md](file:///d:/Download/daily-goal-tracker/docs/USER_GUIDE.md) - Hướng dẫn chi tiết cách sử dụng các tính năng của ứng dụng dành cho người dùng cuối.
 * [ARCHITECTURE.md](file:///d:/Download/daily-goal-tracker/docs/ARCHITECTURE.md) - Sơ đồ cấu trúc cơ sở dữ liệu, API flow và luồng hoạt động.
 * [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md) - Yêu cầu chi tiết tính năng, User Stories và tiêu chí chấp nhận (AC).
 * [CHANGELOG.md](file:///d:/Download/daily-goal-tracker/docs/CHANGELOG.md) - Tiến trình phát triển sản phẩm qua từng giai đoạn/Sprint.
