@@ -416,9 +416,9 @@ export const DashboardPage: React.FC = () => {
     else setGreeting("Good evening");
   }, []);
 
-  const totalActCount = goals.filter((g) => g.status === "active").length;
+  const totalActCount = goals.filter((g) => g.status !== "paused").length;
   const doneTodayCount = goals.filter(
-    (g) => g.current_count >= g.target_count
+    (g) => g.status !== "paused" && g.current_count >= g.target_count
   ).length;
   const completionRate =
     totalActCount > 0 ? Math.round((doneTodayCount / totalActCount) * 100) : 0;

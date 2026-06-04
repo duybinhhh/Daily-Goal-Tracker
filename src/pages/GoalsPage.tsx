@@ -149,7 +149,7 @@ export default function GoalsPage() {
 
   // Overall Statistics logic
   const bestCurrentStreak = Math.max(0, ...goals.map((g) => g.streak?.current_streak || 0));
-  const activeGoals = goals.filter((g) => g.status === "active");
+  const activeGoals = goals.filter((g) => g.status !== "paused");
   const totalProgress = activeGoals.reduce((acc, g) => acc + (g.current_count / g.target_count), 0);
   const overallCompletionRate = activeGoals.length > 0 ? Math.round((totalProgress / activeGoals.length) * 100) : 0;
   const strokeDashoffset = 440 - (440 * overallCompletionRate) / 100;
