@@ -94,7 +94,7 @@ model Notification {
 
 ### 3.1 Cấu trúc thư mục chính (Key Directory)
 *   `src/components/`: Chứa các component dùng chung (ví dụ: `Sidebar`, `GoalCard`, các UI components như `Button`, `Input`, `Card`, `ProgressBar`).
-*   `src/pages/`: Các trang màn hình chính (`DashboardPage`, `Stats`, `SettingsPage`, `LoginPage`, `GoalFormPage`, `TimelinePage`).
+*   `src/pages/`: Các trang màn hình chính (`DashboardPage`, `GoalsPage`, `Stats`, `SettingsPage`, `LoginPage`, `GoalFormPage`, `TimelinePage`).
 *   `src/store/`: Zustand stores quản lý trạng thái client-side (`authStore`, `goalStore`).
 *   `src/services/api.ts`: Cấu hình Axios instance kèm cơ chế bắt lỗi 401 tự động refresh session.
 *   `server/db.ts`: Lớp wrapper Prisma Client giả lập mô hình dữ liệu cũ và đóng gói các API tương tác DB.
@@ -118,3 +118,7 @@ model Notification {
     *   Calendar Grid hiển thị các chấm xanh nếu ngày đó có ít nhất 1 log, và hiển thị ngôi sao lấp lánh nếu có từ 3 logs trở lên (cột mốc đột phá).
     *   Nhấp chọn một ngày bất kỳ trên lưới để lọc nhanh danh sách feed hoạt động bên phải, hoặc bấm lại để hủy lọc (xem toàn bộ log trong tháng).
     *   Tính năng xuất báo cáo định dạng CSV cho phép trích xuất trực tiếp toàn bộ log hoàn thành của tháng hiện tại ra file bảng tính qua cơ chế URI mã hóa.
+6.  **Danh sách mục tiêu chi tiết (My Goals)**:
+    *   Trang Goals (`GoalsPage.tsx`) kết nối với kho dữ liệu thói quen qua `useGoals` hook.
+    *   Hỗ trợ tương tác tạm dừng/hoạt động lại thông qua API cập nhật trạng thái mục tiêu (`PUT /api/goals/:id` truyền tham số `status`).
+    *   Thực hiện tính toán tỷ lệ hoàn thành trung bình của các mục tiêu hoạt động ở Client-side và biểu diễn bằng vòng tròn SVG động cùng các danh hiệu khích lệ năng suất.

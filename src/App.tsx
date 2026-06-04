@@ -9,6 +9,7 @@ import { GoalFormPage } from "./pages/GoalFormPage";
 import { Stats } from "./pages/Stats";
 import { SettingsPage } from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
+import GoalsPage from "./pages/GoalsPage";
 
 // Auth Guard for protected workspace screens
 interface ProtectedRouteProps {
@@ -91,6 +92,7 @@ function AppLayout() {
           <Route path="/new-goal" element={<GoalFormPage />} />
           <Route path="/edit-goal/:id" element={<GoalFormPage />} />
           <Route path="/stats" element={<Stats />} />
+          <Route path="/goals" element={<GoalsPage />} />
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

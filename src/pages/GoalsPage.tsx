@@ -1,0 +1,545 @@
+// src/pages/GoalsPage.tsx
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useGoals } from "../hooks/useGoals";
+import { useAuthStore } from "../store/authStore";
+import { AlertCircle, RefreshCw } from "lucide-react";
+
+const CATEGORY_ICONS: Record<string, string> = {
+  health: "water_drop",
+  fitness: "fitness_center",
+  work: "work",
+  learning: "menu_book",
+  finance: "savings",
+  routine: "repeat",
+  wellness: "spa",
+  hobby: "music_note",
+  product: "business_center",
+  development: "code",
+};
+
+const getCategoryIcon = (category: string) => {
+  return CATEGORY_ICONS[category.toLowerCase()] || "flag";
+};
+
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  health: { bg: "rgba(255, 180, 171, 0.1)", text: "var(--color-error)", border: "rgba(255, 180, 171, 0.2)" },
+  fitness: { bg: "rgba(78, 222, 163, 0.1)", text: "var(--color-secondary)", border: "rgba(78, 222, 163, 0.2)" },
+  work: { bg: "rgba(192, 193, 255, 0.1)", text: "var(--color-primary)", border: "rgba(192, 193, 255, 0.2)" },
+  learning: { bg: "rgba(192, 193, 255, 0.12)", text: "var(--color-primary)", border: "rgba(192, 193, 255, 0.25)" },
+  finance: { bg: "rgba(255, 182, 144, 0.1)", text: "var(--color-tertiary)", border: "rgba(255, 182, 144, 0.2)" },
+  routine: { bg: "rgba(199, 196, 215, 0.08)", text: "var(--color-on-surface-variant)", border: "rgba(199, 196, 215, 0.2)" },
+  wellness: { bg: "rgba(78, 222, 163, 0.1)", text: "var(--color-secondary)", border: "rgba(78, 222, 163, 0.2)" },
+  hobby: { bg: "rgba(199, 196, 215, 0.08)", text: "var(--color-on-surface-variant)", border: "rgba(199, 196, 215, 0.2)" },
+  product: { bg: "rgba(192, 193, 255, 0.1)", text: "var(--color-primary)", border: "rgba(192, 193, 255, 0.2)" },
+  development: { bg: "rgba(192, 193, 255, 0.1)", text: "var(--color-primary)", border: "rgba(192, 193, 255, 0.2)" },
+};
+
+const getCategoryStyles = (category: string) => {
+  return CATEGORY_COLORS[category.toLowerCase()] || { bg: "rgba(192, 193, 255, 0.1)", text: "var(--color-primary)", border: "rgba(192, 193, 255, 0.2)" };
+};
+
+export default function GoalsPage() {
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const {
+    goals,
+    loading,
+    error,
+    refreshAll,
+    completeGoalProgress,
+    deleteGoal,
+    updateGoal,
+  } = useGoals();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused">("all");
+  const [sortBy, setSortBy] = useState<"priority" | "recent" | "streak">("priority");
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setActiveMenuId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "paused" ? "active" : "paused";
+    try {
+      await updateGoal(id, { status: nextStatus });
+      setActiveMenuId(null);
+    } catch (err) {
+      console.error("Failed to toggle goal status:", err);
+    }
+  };
+
+  const handleDelete = async (id: string, title: string) => {
+    if (window.confirm(`Delete goal "${title}"?`)) {
+      try {
+        await deleteGoal(id);
+        setActiveMenuId(null);
+      } catch (err) {
+        console.error("Failed to delete goal:", err);
+      }
+    }
+  };
+
+  const handleLogProgress = async (id: string) => {
+    try {
+      await completeGoalProgress(id);
+    } catch (err) {
+      console.error("Failed to log progress:", err);
+    }
+  };
+
+  // Get distinct categories
+  const categories = ["All", ...Array.from(new Set(goals.map((g) => g.category)))];
+
+  // Counts for tabs
+  const totalCount = goals.length;
+  const activeCount = goals.filter((g) => g.status === "active").length;
+  const pausedCount = goals.filter((g) => g.status === "paused").length;
+
+  // Filter & Search Logic
+  const filteredAndSearchedGoals = goals.filter((goal) => {
+    // 1. Status Filter
+    if (statusFilter === "active" && goal.status !== "active") return false;
+    if (statusFilter === "paused" && goal.status !== "paused") return false;
+
+    // 2. Category Filter
+    if (activeCategory !== "All" && goal.category.toLowerCase() !== activeCategory.toLowerCase()) return false;
+
+    // 3. Search Query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const titleMatch = goal.title.toLowerCase().includes(query);
+      const descMatch = goal.description?.toLowerCase().includes(query) || false;
+      return titleMatch || descMatch;
+    }
+
+    return true;
+  });
+
+  // Sorting Logic
+  const sortedGoals = [...filteredAndSearchedGoals].sort((a, b) => {
+    if (sortBy === "priority") {
+      if (a.due_date && !b.due_date) return -1;
+      if (!a.due_date && b.due_date) return 1;
+      if (a.due_date && b.due_date) {
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      }
+      return b.target_count - a.target_count;
+    } else if (sortBy === "recent") {
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    } else if (sortBy === "streak") {
+      return (b.streak?.current_streak || 0) - (a.streak?.current_streak || 0);
+    }
+    return 0;
+  });
+
+  // Overall Statistics logic
+  const bestCurrentStreak = Math.max(0, ...goals.map((g) => g.streak?.current_streak || 0));
+  const activeGoals = goals.filter((g) => g.status === "active");
+  const totalProgress = activeGoals.reduce((acc, g) => acc + (g.current_count / g.target_count), 0);
+  const overallCompletionRate = activeGoals.length > 0 ? Math.round((totalProgress / activeGoals.length) * 100) : 0;
+  const strokeDashoffset = 440 - (440 * overallCompletionRate) / 100;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      {/* ── Sticky Header ── */}
+      <header
+        id="goals-header"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+          padding: "14px 24px",
+          borderBottom: "1px solid var(--border-subtle)",
+          background: "var(--header-bg)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <h2 style={{ fontSize: "22px", fontWeight: 800, color: "var(--color-primary)", letterSpacing: "-0.03em" }}>
+            My Goals
+          </h2>
+          <div style={{ position: "relative" }}>
+            <span className="material-symbols-outlined" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--color-outline)", fontSize: "18px" }}>
+              search
+            </span>
+            <input
+              type="text"
+              className="m-input"
+              style={{ paddingLeft: "36px", paddingRight: "16px", paddingTop: "8px", paddingBottom: "8px", width: "260px", borderRadius: "9999px", fontSize: "13px" }}
+              placeholder="Search goals..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {bestCurrentStreak > 0 && (
+            <div className="streak-badge">
+              <span className="material-symbols-outlined ms-filled" style={{ fontSize: "15px" }}>
+                local_fire_department
+              </span>
+              {bestCurrentStreak} Day Streak
+            </div>
+          )}
+          <button onClick={refreshAll} className="btn-ghost" title="Refresh">
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+          <Link to="/new-goal" className="btn-primary">
+            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
+              add
+            </span>
+            New Goal
+          </Link>
+        </div>
+      </header>
+
+      {/* ── Main Canvas ── */}
+      <main style={{ flex: 1, padding: "24px 24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+        
+        {/* Error Banner */}
+        {error && (
+          <div
+            style={{
+              padding: "12px 16px",
+              background: "rgba(255, 180, 171, 0.08)",
+              border: "1px solid rgba(255, 180, 171, 0.2)",
+              borderRadius: "0.75rem",
+              color: "var(--color-error)",
+              fontSize: "13px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
+        {/* Filters & Status Section */}
+        <section style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              onClick={() => setStatusFilter("all")}
+              className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
+                statusFilter === "all"
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
+              }`}
+            >
+              All Goals ({totalCount})
+            </button>
+            <button
+              onClick={() => setStatusFilter("active")}
+              className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
+                statusFilter === "active"
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
+              }`}
+            >
+              Active ({activeCount})
+            </button>
+            <button
+              onClick={() => setStatusFilter("paused")}
+              className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
+                statusFilter === "paused"
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
+              }`}
+            >
+              Paused ({pausedCount})
+            </button>
+          </div>
+
+          <div style={{ display: "flex", gap: "8px" }}>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-surface-container-low border-none rounded-full text-xs font-semibold text-on-surface-variant focus:ring-1 focus:ring-primary py-2 px-4 cursor-pointer"
+            >
+              <option value="priority">Sort: Priority</option>
+              <option value="recent">Sort: Recently Active</option>
+              <option value="streak">Sort: Streak</option>
+            </select>
+
+            <select
+              value={activeCategory}
+              onChange={(e) => setActiveCategory(e.target.value)}
+              className="bg-surface-container-low border-none rounded-full text-xs font-semibold text-on-surface-variant focus:ring-1 focus:ring-primary py-2 px-4 cursor-pointer"
+            >
+              <option value="All">Category: All</option>
+              {categories.filter(c => c !== "All").map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </section>
+
+        {/* Goals Bento Grid */}
+        {loading ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px", padding: "64px 0" }}>
+            <div className="spinner" style={{ width: "32px", height: "32px", color: "var(--color-primary)" }} />
+            <p style={{ fontSize: "13px", color: "var(--color-on-surface-variant)" }}>Loading goals grid...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            
+            {sortedGoals.map((goal) => {
+              const isCompleted = goal.current_count >= goal.target_count;
+              const isPaused = goal.status === "paused";
+              const percentage = goal.target_count > 0 ? Math.min(100, Math.round((goal.current_count / goal.target_count) * 100)) : 0;
+              const currentStreak = goal.streak?.current_streak || 0;
+              const catStyle = getCategoryStyles(goal.category);
+              
+              return (
+                <div
+                  key={goal.id}
+                  className={`glass-card p-6 flex flex-col justify-between relative overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
+                    isPaused ? "opacity-60 grayscale-[0.5] hover:grayscale-0 hover:opacity-100" : ""
+                  } ${
+                    isCompleted && !isPaused ? "border-secondary/30 neon-glow-success" : ""
+                  }`}
+                  style={{ minHeight: "220px" }}
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-[60px] -mr-16 -mt-16 pointer-events-none"></div>
+                  
+                  {/* Card Header */}
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      {isPaused ? (
+                        <span className="px-3 py-1 bg-surface-variant text-on-surface-variant text-[10px] font-black uppercase tracking-widest rounded-full">
+                          Paused
+                        </span>
+                      ) : isCompleted ? (
+                        <span className="px-3 py-1 bg-secondary/10 text-secondary text-[10px] font-black uppercase tracking-widest rounded-full border border-secondary/20 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[12px] ms-filled">check_circle</span>
+                          Completed Today
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 bg-secondary/10 text-secondary text-[10px] font-black uppercase tracking-widest rounded-full border border-secondary/20">
+                          Active
+                        </span>
+                      )}
+
+                      <div className="relative" ref={activeMenuId === goal.id ? menuRef : null}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuId(activeMenuId === goal.id ? null : goal.id);
+                          }}
+                          className="text-on-surface-variant hover:text-on-surface p-1 rounded-full hover:bg-white/5 transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                        </button>
+
+                        {activeMenuId === goal.id && (
+                          <div
+                            className="absolute right-0 top-8 glass-card py-2 px-3 z-30 flex flex-col gap-1 shadow-2xl"
+                            style={{ minWidth: "130px", background: "var(--color-surface-container-high)" }}
+                          >
+                            <button
+                              onClick={() => handleToggleStatus(goal.id, goal.status)}
+                              className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">
+                                {isPaused ? "play_arrow" : "pause"}
+                              </span>
+                              {isPaused ? "Resume" : "Pause"}
+                            </button>
+                            <Link
+                              to={`/edit-goal/${goal.id}`}
+                              className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">edit</span>
+                              Edit
+                            </Link>
+                            <button
+                              onClick={() => handleDelete(goal.id, goal.title)}
+                              className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-rose-500/10 hover:text-rose-400 rounded text-left w-full text-rose-400"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">delete</span>
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <h3 className="text-lg font-bold text-on-surface mb-1 line-clamp-1">{goal.title}</h3>
+                    <p className="text-xs text-on-surface-variant mb-4 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px]" style={{ color: catStyle.text }}>
+                        {getCategoryIcon(goal.category)}
+                      </span>
+                      <span>{goal.category}</span>
+                    </p>
+                  </div>
+
+                  {/* Card Content & Stats */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Progress</span>
+                          <span className="text-xs font-extrabold text-primary">{percentage}%</span>
+                        </div>
+                        <div className="h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isPaused
+                                ? "bg-outline-variant"
+                                : isCompleted
+                                ? "bg-secondary shadow-[0_0_8px_rgba(78,222,163,0.5)]"
+                                : "bg-gradient-to-r from-primary to-secondary"
+                            }`}
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Streak badge */}
+                      <div className="flex items-center gap-0.5 px-2.5 py-1.5 bg-tertiary-container/20 rounded-lg -rotate-2">
+                        <span className="material-symbols-outlined text-tertiary text-[18px] ms-filled">local_fire_department</span>
+                        <span className="text-tertiary font-bold text-xs">{currentStreak}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Footer */}
+                  <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                    <div className="flex items-center gap-1.5 text-on-surface-variant">
+                      {goal.due_date ? (
+                        <>
+                          <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider">
+                            Due: {new Date(goal.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[16px]">repeat</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider">{goal.frequency}</span>
+                        </>
+                      )}
+                    </div>
+
+                    {!isCompleted && !isPaused && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLogProgress(goal.id);
+                        }}
+                        className="btn-primary"
+                        style={{ padding: "4px 10px", fontSize: "11px", borderRadius: "8px" }}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">add</span>
+                        Log
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Create New Goal button card */}
+            <button
+              onClick={() => navigate("/new-goal")}
+              className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-on-surface-variant hover:border-primary/50 hover:bg-white/5 transition-all group active:scale-95 duration-200"
+              style={{ minHeight: "220px" }}
+            >
+              <div className="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
+                <span className="material-symbols-outlined text-[28px] group-hover:text-primary">add_circle</span>
+              </div>
+              <p className="text-md font-bold mb-1">Create New Goal</p>
+              <p className="text-xs opacity-60">Set a target and start tracking</p>
+            </button>
+
+          </div>
+        )}
+
+        {/* Featured Achievement Overlay */}
+        <div className="mt-6 glass-card rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none"></div>
+          
+          {/* Progress Ring Widget */}
+          <div className="relative w-36 h-36 shrink-0">
+            <svg className="progress-ring w-36 h-36">
+              <circle className="text-surface-container-highest" cx="72" cy="72" fill="transparent" r="62" stroke="currentColor" strokeWidth="10"></circle>
+              <circle
+                className="text-primary transition-all duration-700"
+                cx="72"
+                cy="72"
+                fill="transparent"
+                r="62"
+                stroke="currentColor"
+                strokeDasharray="390"
+                strokeDashoffset={390 - (390 * overallCompletionRate) / 100}
+                strokeLinecap="round"
+                strokeWidth="10"
+              ></circle>
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-black text-on-surface">{overallCompletionRate}%</span>
+              <span className="text-[9px] font-black uppercase tracking-tighter text-on-surface-variant">Overall</span>
+            </div>
+          </div>
+
+          <div className="flex-1 text-center md:text-left">
+            <h2 className="text-lg font-bold text-on-surface mb-2">Momentum Peak Reached!</h2>
+            <p className="text-sm text-on-surface-variant mb-4 max-w-lg">
+              You've maintained a {bestCurrentStreak > 0 ? `${bestCurrentStreak}-day` : "steady"} streak across active goals. You are currently within the top 3% of Achiever Pro members this month.
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+              <div className="flex items-center gap-1.5 bg-surface-container-highest px-3 py-1.5 rounded-full border border-white/10">
+                <span className="material-symbols-outlined text-secondary text-[16px]">military_tech</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface">Elite Strategist</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-surface-container-highest px-3 py-1.5 rounded-full border border-white/10">
+                <span className="material-symbols-outlined text-tertiary text-[16px]">trending_up</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface">+12% Velocity</span>
+              </div>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => navigate("/stats")}
+            className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-on-surface rounded-xl font-bold border border-white/10 transition-all backdrop-blur-md text-xs"
+          >
+            View Insights
+          </button>
+        </div>
+
+      </main>
+
+      {/* Floating Action Button (FAB) */}
+      <button
+        onClick={() => navigate("/new-goal")}
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary text-on-primary shadow-[0_0_24px_rgba(192,193,255,0.4)] flex items-center justify-center group hover:scale-110 active:scale-95 transition-all duration-300 z-40"
+      >
+        <span className="material-symbols-outlined text-[28px]">add</span>
+        <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-20 group-hover:opacity-40 pointer-events-none"></div>
+      </button>
+    </div>
+  );
+}

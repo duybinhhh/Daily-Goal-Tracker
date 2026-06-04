@@ -86,6 +86,18 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * **Cột mốc vinh danh (Milestone Achievements):** Bento cards tự động tính toán để mở khóa danh hiệu "Consistent Leader" (khi chuỗi ngày hiện tại &ge; 10) và "Goal Crusher" (khi tổng check-in tháng hiện tại &ge; 15).
     * **Xuất báo cáo hàng tháng:** Tải file `.csv` chứa danh sách chi tiết các check-in gồm ID log, ID mục tiêu, Tên mục tiêu, Phân loại, Thời gian và Ghi chú đi kèm.
 
+#### US-10: Màn hình danh sách mục tiêu chi tiết (My Goals Page)
+* **Độ ưu tiên:** High
+* **Story Point:** 4.0
+* **Tiêu chí chấp nhận (AC):**
+    * **Giao diện Bento Grid & Glassmorphism:** Hiển thị toàn bộ mục tiêu của người dùng trong một lưới bento sang trọng tương tự thiết kế Momentum.
+    * **Tìm kiếm & Phân loại linh hoạt:** Bộ lọc tìm kiếm thời gian thực theo tiêu đề hoặc mô tả mục tiêu. Tích hợp các tab lọc nhanh theo trạng thái (Tất cả / Hoạt động / Tạm dừng) đi kèm số đếm số lượng mục tiêu tự động.
+    * **Sắp xếp nâng cao:** Sắp xếp danh sách mục tiêu linh hoạt theo: Độ ưu tiên (ngày đến hạn / số lượng chỉ tiêu), Mới nhất (thời gian cập nhật), hoặc Chuỗi Streak cao nhất.
+    * **Tương tác nhanh trên thẻ:**
+        * Hỗ trợ nút Đăng ký tiến độ nhanh (Log) trực tiếp trên từng thẻ mục tiêu đang hoạt động.
+        * Popup Menu hành động (Tạm dừng/Kích hoạt lại, Chỉnh sửa, Xóa) cho từng thẻ mục tiêu. Khi tạm dừng (Paused), thẻ mục tiêu sẽ giảm độ mờ (`opacity-60`) và chuyển sang trạng thái tạm dừng, cho phép người dùng kích hoạt lại bất cứ lúc nào.
+    * **Vòng tròn tổng quan (Overall Progress Ring):** Vòng tròn tiến độ lớn tự động tính toán và hiển thị Tỷ lệ hoàn thành trung bình của tất cả các mục tiêu đang hoạt động, kèm các thành tích/danh hiệu (Elite Strategist) để gia tăng động lực.
+
 ### 📦 Module 4: Settings & Appearance Customization (Sprint 4 — 6.0 SP)
 
 #### US-07: Quản lý hồ sơ và Cấu hình cá nhân

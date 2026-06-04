@@ -1,6 +1,6 @@
-# 🛡️ VIBE PROCESS VERIFICATION: SETTINGS, LIGHT MODE & TIMELINE INTEGRATION
+# 🛡️ VIBE PROCESS VERIFICATION: SETTINGS, LIGHT MODE, TIMELINE & MY GOALS INTEGRATION
 
-Tài liệu này chứng minh và ghi nhận chi tiết quá trình phát triển tính năng mới (**Trang Cài đặt**, **Giao diện Light Mode**, **Đồng bộ Thống kê** và **Trục thời gian hoạt động (Activity Timeline)**) tuân thủ nghiêm ngặt theo quy trình 4 bước chuẩn hóa: **Plan (Lập kế hoạch) -> Doc (Tài liệu hóa) -> Build (Xây dựng) -> Test (Kiểm thử & Nghiệm thu)**.
+Tài liệu này chứng minh và ghi nhận chi tiết quá trình phát triển các tính năng mới (**Trang Cài đặt**, **Giao diện Light Mode**, **Đồng bộ Thống kê**, **Trục thời gian hoạt động (Activity Timeline)** và **Màn hình danh sách mục tiêu chi tiết (My Goals)**) tuân thủ nghiêm ngặt theo quy trình 4 bước chuẩn hóa: **Plan (Lập kế hoạch) -> Doc (Tài liệu hóa) -> Build (Xây dựng) -> Test (Kiểm thử & Nghiệm thu)**.
 
 ---
 
@@ -18,13 +18,16 @@ Giai đoạn này xác định mục tiêu, giải pháp kỹ thuật và sơ đ
 *   **Trục thời gian hoạt động (Activity Timeline)**:
     *   Yêu cầu: Thiết kế màn hình dòng thời gian hoàn thành mục tiêu, hiển thị lưới ô lịch hiệu năng tháng, feed log tiến độ kèm bộ lọc ngày và tìm kiếm text, cùng chức năng xuất báo cáo CSV.
     *   Tương tác: Lưới lịch ô có phản hồi nhanh, hỗ trợ click chọn ngày để lọc danh sách log và nút xuất CSV tải xuống tức thì.
+*   **Màn hình danh sách mục tiêu chi tiết (My Goals)**:
+    *   Yêu cầu: Thiết kế màn hình bento-grid hiển thị toàn bộ mục tiêu, tích hợp bộ tìm kiếm, bộ lọc trạng thái (Active/Paused/All) và danh mục, sắp xếp nâng cao, đăng ký tiến độ nhanh trực tiếp và popup menu thao tác. Hiển thị Widget vòng tròn tiến độ tổng thể của thói quen đang hoạt động.
+    *   Tương tác: Nhấn Log để cập nhật nhanh, menu popup xử lý Tạm dừng/Kích hoạt lại (Pause/Resume), chuyển đổi trạng thái giao diện trực quan theo trạng thái của mục tiêu.
 
 ---
 
 ## 2. Doc (Tài liệu hóa kỹ thuật)
 Các tính năng và luồng xử lý mới được mô tả chi tiết trong hệ thống tài liệu dự án trước khi lập trình:
-1.  **Định nghĩa User Stories**: Bổ sung ba câu chuyện người dùng mới (`US-07: Quản lý hồ sơ và Cấu hình cá nhân`, `US-08: Tùy biến giao diện (Theme & Opacity)` và `US-09: Màn hình Trục thời gian hoạt động`) vào tệp [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md).
-2.  **Định nghĩa API Endpoints**: Thêm mới các endpoint `PUT /api/auth/profile` và `DELETE /api/auth/profile` vào danh mục API trong tệp [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md), đồng thời đăng ký màn hình `/timeline` nâng tổng số màn hình lên 6.
+1.  **Định nghĩa User Stories**: Bổ sung các câu chuyện người dùng mới (`US-07: Quản lý hồ sơ và Cấu hình cá nhân`, `US-08: Tùy biến giao diện (Theme & Opacity)`, `US-09: Màn hình Trục thời gian hoạt động` và `US-10: Màn hình danh sách mục tiêu chi tiết`) vào tệp [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md).
+2.  **Định nghĩa API Endpoints**: Thêm mới các endpoint `PUT /api/auth/profile` và `DELETE /api/auth/profile` vào danh mục API trong tệp [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md), đồng thời đăng ký các màn hình mới (Goals và Timeline) nâng tổng số màn hình lên 7.
 3.  **Nhật ký phát triển**: Ghi nhận chi tiết lịch sử hoàn thành các tính năng với mốc thời gian cụ thể (GMT+7) trong tệp [CHANGELOG.md](file:///d:/Download/daily-goal-tracker/docs/CHANGELOG.md).
 
 ---
@@ -44,8 +47,9 @@ Quá trình lập trình được tiến hành tuần tự từ cơ sở dữ li
 4.  **UI Components & Routing**:
     *   Tạo trang [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx) với đầy đủ các bento cards và tương tác.
     *   Tạo trang [TimelinePage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/TimelinePage.tsx) hiển thị chi tiết lịch sử hoàn thành, bento streak, achievements, và bộ lọc dynamic.
-    *   Cấu hình định tuyến và tự động nhận diện theme trên [App.tsx](file:///d:/Download/daily-goal-tracker/src/App.tsx) khi khởi động, đồng thời đăng ký route `/timeline`.
-    *   Đồng bộ hóa biến màu nền và viền ở [Sidebar.tsx](file:///d:/Download/daily-goal-tracker/src/components/Sidebar.tsx) và [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx), và thêm menu "Timeline" trong Sidebar.
+    *   Tạo trang [GoalsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/GoalsPage.tsx) hiển thị danh sách mục tiêu bento grid, tích hợp tìm kiếm, bộ lọc trạng thái, sắp xếp và vòng tròn tiến độ tổng thể.
+    *   Cấu hình định tuyến và tự động nhận diện theme trên [App.tsx](file:///d:/Download/daily-goal-tracker/src/App.tsx) khi khởi động, đồng thời đăng ký các route `/timeline` và `/goals`.
+    *   Đồng bộ hóa biến màu nền và viền ở [Sidebar.tsx](file:///d:/Download/daily-goal-tracker/src/components/Sidebar.tsx) và [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx), thêm các liên kết menu "Goals" và "Timeline" trong Sidebar.
     *   Cấu trúc lại toàn bộ trang [Stats.tsx](file:///d:/Download/daily-goal-tracker/src/pages/Stats.tsx) sang màu sắc ngữ nghĩa và heatmap theme-aware.
 
 ---
@@ -62,3 +66,8 @@ Quá trình kiểm thử đã được chạy trực tiếp trên môi trường
 *   **Timeline Search Query Test (Đạt)**: Gõ từ khóa vào ô tìm kiếm trên header Timeline, danh sách log lọc tức thời theo tên mục tiêu hoặc nội dung ghi chú đi kèm.
 *   **Milestone Unlock Visuals Test (Đạt)**: Danh hiệu "Consistent Leader" và "Goal Crusher" hiển thị trạng thái "Unlocked" màu xanh lá và dấu check khi đạt mốc, và hướng dẫn nhiệm vụ khi chưa đạt.
 *   **CSV Report Generation Test (Đạt)**: Bấm nút "Export Monthly Report" tải xuống trực tiếp file bảng tính `.csv` chứa chính xác danh sách log hoàn thành cùng ghi chú của tháng được chọn.
+*   **My Goals Live Search Test (Đạt)**: Nhập từ khóa vào ô tìm kiếm trên trang Goals, danh sách tự động lọc ra các mục tiêu có tiêu đề hoặc mô tả chứa từ khóa ngay lập tức.
+*   **My Goals Status Tab Filter Test (Đạt)**: Click chọn các tab "Active" hay "Paused" hiển thị chính xác các thói quen thuộc trạng thái tương ứng kèm theo cập nhật số đếm trên các nhãn tab.
+*   **My Goals Sorting Test (Đạt)**: Lựa chọn sắp xếp theo Streak, Priority hoặc Recent sắp đặt chính xác thứ tự hiển thị của các thẻ mục tiêu.
+*   **My Goals Card Action Toggle Test (Đạt)**: Bấm vào ba chấm trên Goal Card, mở ra popup Menu. Chọn "Pause" tự động đổi trạng thái mục tiêu sang paused, làm mờ thẻ (`opacity-60`), và chuyển thẻ sang tab Paused. Bấm "Resume" kích hoạt lại bình thường.
+*   **My Goals Quick Log Test (Đạt)**: Click Log trên các card thói quen đang hoạt động, tiến độ của mục tiêu tăng ngay lập tức và đồng bộ cập nhật lên vòng tròn Overall Completion SVG.

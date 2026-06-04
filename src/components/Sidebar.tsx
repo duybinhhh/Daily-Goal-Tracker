@@ -100,6 +100,7 @@ export default function Sidebar() {
       <nav className="flex-1 px-3 space-y-1">
         <NavItem to="/" icon="home" label="Dashboard" end />
         <NavItem to="/stats" icon="query_stats" label="Statistics" />
+        <NavItem to="/goals" icon="checklist" label="Goals" />
         <NavItem to="/timeline" icon="timeline" label="Timeline" />
         <NavItem to="/settings" icon="settings" label="Settings" />
       </nav>
