@@ -68,13 +68,17 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * Khi người dùng bấm nút tương tác trực tiếp trên `GoalCard`, chỉ số tiến độ hiện tại (`current count`) tăng lên.
     * Hệ thống tự động bắn một bản ghi log vào bảng dữ liệu `GoalLog` để lưu vết thời gian kèm timestamp chính xác của Client phục vụ cho việc tính toán thống kê.
 
-#### US-06: Dashboard & Biểu đồ thống kê
+#### US-06: Dashboard & Biểu đồ thống kê (Premium Statistics Overhaul)
 * **Độ ưu tiên:** Medium
 * **Story Point:** 4.0
 * **Tiêu chí chấp nhận (AC):**
-    * Dashboard hiển thị trực quan Tiến độ ngày hôm nay (Tỷ lệ phần trăm `%` các mục tiêu đã hoàn thành xuất sắc).
-    * Hiển thị danh sách lịch sử hoàn thành dưới dạng trục thời gian (`Timeline`) theo ngày/tháng cụ thể.
-    * Render biểu đồ cột/đường trực quan cho Tỷ lệ hoàn thành (`Completion Rate Chart`) và Chuỗi ngày liên tục (`Streak Chart`).
+    * **Thanh điều hướng đỉnh đồng bộ (Aligned Header):** Tích hợp thanh tiêu đề sticky đồng bộ với Timeline/Dashboard, chứa ô Tìm kiếm milestone thời gian thực, huy hiệu chuỗi ngày Streak động, nút xuất dữ liệu nhanh CSV, và nút làm mới dữ liệu nhanh (Refresh).
+    * **Bento Grid chỉ số tổng quan:** Hiển thị tỷ lệ hoàn thành thói quen toàn cục kèm theo tính toán so sánh xu hướng tăng trưởng (+/- %) so với tháng trước một cách trực quan, và bảng phân loại 3 cột thói quen hàng đầu.
+    * **Consistency Heatmap (Lịch hoạt động 180 ngày):** Truy vấn lịch sử 182 ngày và tự động căn chỉnh ngày bắt đầu về Chủ Nhật để tạo lưới lịch tuần hoàn hảo (7 dòng x 26 cột) hỗ trợ tooltip chi tiết khi di chuột qua.
+    * **Biểu đồ xu hướng hiệu suất 10 tuần:** Phân nhóm tiến độ 70 ngày gần nhất thành 10 tuần gần nhất, vẽ biểu đồ cột CSS động tự điều chỉnh chiều cao và hiển thị chi tiết khi rê chuột.
+    * **Biểu đồ tròn Goal Distribution:** Xây dựng biểu đồ tròn Donut động sử dụng `conic-gradient` chia tỉ lệ mục tiêu theo từng danh mục thói quen kết hợp bảng chú thích màu sắc tương ứng.
+    * **Milestone Feed:** Hiển thị dòng mốc thành tựu thói quen động (ví dụ: "Achiever Elite Tier Unlocked") và bộ lọc theo từ khóa tìm kiếm.
+    * **Seed Dữ liệu mẫu:** Tích hợp tùy chọn Seed Goal từ Backend khi cơ sở dữ liệu trống giúp người dùng nhanh chóng trải nghiệm dashboard thống kê đầy đủ.
 
 #### US-09: Màn hình Trục thời gian hoạt động (Activity Timeline Page)
 * **Độ ưu tiên:** Medium

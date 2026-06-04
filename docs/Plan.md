@@ -22,7 +22,7 @@
 2. **Chi tiết danh sách mục tiêu (`/goals`)**: Giao diện bento-grid hiển thị toàn bộ danh sách mục tiêu chi tiết, tích hợp tìm kiếm, bộ lọc trạng thái (Active/Paused/All), danh mục và sắp xếp (Priority/Recent/Streak). Hỗ trợ Log tiến độ nhanh, Popup Menu hành động (Pause/Resume, Edit, Delete) và Vòng tròn tổng quan (Overall Completion SVG Ring).
 3. **Tạo mục tiêu (`/new-goal`)**: Form tạo thói quen trong 30 giây (Nhị phân hoặc Số lượng định lượng như cốc nước, km).
 4. **Chỉnh sửa mục tiêu (`/edit-goal/:id`)**: Giao diện cập nhật thông tin mục tiêu thói quen.
-5. **Lịch sử & Thống kê (`/stats`)**: Bento metrics (Tỷ lệ %, Chuỗi cực đại) + Biểu đồ cột 7 ngày + GitHub-style Activity Heatmap (28 ngày).
+5. **Lịch sử & Thống kê (`/stats`)**: Bento metrics (Tỷ lệ hoàn thành %, so sánh xu hướng tăng trưởng tháng trước) + Biểu đồ cột hiệu năng 10 tuần gần nhất + GitHub-style Activity Heatmap (180 ngày) + Biểu đồ tròn Donut chia tỉ lệ thói quen + Milestones feed và xuất dữ liệu CSV nhanh trên header.
 6. **Trục thời gian hoạt động (`/timeline`)**: Lưới ô hiệu năng tháng (Performance Grid) tích hợp chấm xanh/sao vàng, feed hoạt động lọc động và xuất báo cáo CSV.
 7. **Cài đặt (`/settings`)**: Hồ sơ cá nhân (Múi giờ, Tên), công tắc bật hiệu ứng chúc mừng (Confetti) và Danger Zone (Xóa dữ liệu).
 

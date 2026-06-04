@@ -110,9 +110,12 @@ model Notification {
 3.  **Ghi nhận mục tiêu & Tính Streak**:
     *   Khi người dùng check-in mục tiêu, frontend gọi `POST /api/goals/:id/complete`.
     *   Backend ghi nhận log trong bảng `GoalLog`, đồng thời gọi `Streak Engine` để tính toán chuỗi ngày liên tục và lưu trữ vào bảng `Streak` (tránh việc tính toán quét bảng tốn tài nguyên).
-4.  **Bảng thống kê và Heatmap**:
-    *   Trang thống kê gọi API `GET /api/stats/dashboard` và `GET /api/stats/history`.
-    *   Màu sắc của các ô heatmap trong Activity Calendar grid được hiển thị linh hoạt theo các lớp CSS `.heatmap-cell-0` đến `.heatmap-cell-3` sử dụng hàm `color-mix` để tự tương thích với cả 2 giao diện sáng/tối.
+4.  **Bảng thống kê và Heatmap (Premium Statistics Dashboard)**:
+    *   Trang thống kê gọi API `GET /api/stats/dashboard` và `GET /api/stats/history` (với phạm vi 182 ngày để hiển thị 26 tuần thói quen).
+    *   Căn chỉnh ngày bắt đầu của lịch hoạt động về Chủ Nhật để tạo lưới ô lịch hoàn hảo (7 dòng x 26 cột). Màu sắc các ô được điều khiển linh hoạt qua các lớp màu chủ đề `bg-primary`, `bg-primary/20`, v.v. thích ứng tự động với Light/Dark theme.
+    *   Biểu đồ xu hướng hiệu năng nhóm tiến độ 70 ngày gần nhất thành 10 tuần, hiển thị cột CSS trực quan với hiệu ứng hover tooltip.
+    *   Sử dụng CSS `conic-gradient` tạo biểu đồ tròn Donut động biểu diễn tỉ lệ phân loại thói quen của người dùng.
+    *   Các hành động như tải file báo cáo CSV (`Export CSV`) và làm mới nhanh dữ liệu được tích hợp trực tiếp trên thanh tiêu đề sticky chuẩn hóa.
 5.  **Trục thời gian hoạt động (Activity Timeline)**:
     *   Trang Timeline (`TimelinePage.tsx`) tự động tính toán ngày bắt đầu và kết thúc của tháng đang chọn để gọi API `GET /api/stats/history?from=&to=` lấy toàn bộ lịch sử log.
     *   Calendar Grid hiển thị các chấm xanh nếu ngày đó có ít nhất 1 log, và hiển thị ngôi sao lấp lánh nếu có từ 3 logs trở lên (cột mốc đột phá).

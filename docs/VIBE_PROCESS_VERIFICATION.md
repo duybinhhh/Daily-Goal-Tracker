@@ -13,8 +13,9 @@ Giai đoạn này xác định mục tiêu, giải pháp kỹ thuật và sơ đ
 *   **Giao diện Light Mode**:
     *   Ý tưởng: Kế thừa triết lý thiết kế Momentum cao cấp. Sử dụng nền sáng xám dịu mắt (`#f4f6fa`), chữ đen/xám đậm có tương phản cao để khắc phục hoàn toàn hiện tượng chữ bị chìm.
     *   Giải pháp: Tận dụng cơ chế kế thừa biến CSS của Tailwind v4, định nghĩa ghi đè biến trên class `.light` ở tầng gốc `html`.
-*   **Trang Thống kê**:
-    *   Yêu cầu: Đồng bộ hóa toàn bộ chữ sáng cố định sang chữ ngữ nghĩa. Thiết kế lại lịch hoạt động (heatmap grid) thích ứng nền sáng.
+*   **Trang Thống kê Thói quen cao cấp (Premium Statistics Dashboard)**:
+    *   Yêu cầu: Thiết kế bảng thống kê Momentum cao cấp với Bento Grid chỉ số toàn cục (tỷ lệ hoàn thành kèm so sánh xu hướng tăng trưởng tháng trước), danh mục thói quen hàng đầu, Consistency Heatmap lịch hoạt động 180 ngày căn lề Chủ Nhật, biểu đồ xu hướng hiệu năng 10 tuần gần nhất, và biểu đồ tròn Donut chia tỉ lệ sử dụng `conic-gradient` tương thích sáng/tối.
+    *   Tương tác: Hover xem tooltip trên ô lịch heatmap và các cột biểu đồ tuần, tìm kiếm lọc nhanh milestone, xuất báo cáo CSV và Seed dữ liệu thói quen khi tài khoản trống trực tiếp từ thanh tiêu đề sticky đồng bộ.
 *   **Trục thời gian hoạt động (Activity Timeline)**:
     *   Yêu cầu: Thiết kế màn hình dòng thời gian hoàn thành mục tiêu, hiển thị lưới ô lịch hiệu năng tháng, feed log tiến độ kèm bộ lọc ngày và tìm kiếm text, cùng chức năng xuất báo cáo CSV.
     *   Tương tác: Lưới lịch ô có phản hồi nhanh, hỗ trợ click chọn ngày để lọc danh sách log và nút xuất CSV tải xuống tức thì.
@@ -26,8 +27,8 @@ Giai đoạn này xác định mục tiêu, giải pháp kỹ thuật và sơ đ
 
 ## 2. Doc (Tài liệu hóa kỹ thuật)
 Các tính năng và luồng xử lý mới được mô tả chi tiết trong hệ thống tài liệu dự án trước khi lập trình:
-1.  **Định nghĩa User Stories**: Bổ sung các câu chuyện người dùng mới (`US-07: Quản lý hồ sơ và Cấu hình cá nhân`, `US-08: Tùy biến giao diện (Theme & Opacity)`, `US-09: Màn hình Trục thời gian hoạt động` và `US-10: Màn hình danh sách mục tiêu chi tiết`) vào tệp [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md).
-2.  **Định nghĩa API Endpoints**: Thêm mới các endpoint `PUT /api/auth/profile` và `DELETE /api/auth/profile` vào danh mục API trong tệp [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md), đồng thời đăng ký các màn hình mới (Goals và Timeline) nâng tổng số màn hình lên 7.
+1.  **Định nghĩa User Stories**: Bổ sung các câu chuyện người dùng mới (`US-06: Dashboard & Biểu đồ thống kê (Premium Statistics Overhaul)`, `US-07: Quản lý hồ sơ và Cấu hình cá nhân`, `US-08: Tùy biến giao diện (Theme & Opacity)`, `US-09: Màn hình Trục thời gian hoạt động` và `US-10: Màn hình danh sách mục tiêu chi tiết`) vào tệp [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md).
+2.  **Định nghĩa API Endpoints**: Thêm mới các endpoint `PUT /api/auth/profile` và `DELETE /api/auth/profile` vào danh mục API trong tệp [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md), đồng thời đăng ký các màn hình mới (Goals và Timeline) và cập nhật thông số màn hình Statistics nâng tổng số màn hình lên 7.
 3.  **Nhật ký phát triển**: Ghi nhận chi tiết lịch sử hoàn thành các tính năng với mốc thời gian cụ thể (GMT+7) trong tệp [CHANGELOG.md](file:///d:/Download/daily-goal-tracker/docs/CHANGELOG.md).
 
 ---
@@ -50,7 +51,7 @@ Quá trình lập trình được tiến hành tuần tự từ cơ sở dữ li
     *   Tạo trang [GoalsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/GoalsPage.tsx) hiển thị danh sách mục tiêu bento grid, tích hợp tìm kiếm, bộ lọc trạng thái, sắp xếp và vòng tròn tiến độ tổng thể.
     *   Cấu hình định tuyến và tự động nhận diện theme trên [App.tsx](file:///d:/Download/daily-goal-tracker/src/App.tsx) khi khởi động, đồng thời đăng ký các route `/timeline` và `/goals`.
     *   Đồng bộ hóa biến màu nền và viền ở [Sidebar.tsx](file:///d:/Download/daily-goal-tracker/src/components/Sidebar.tsx) và [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx), thêm các liên kết menu "Goals" và "Timeline" trong Sidebar.
-    *   Cấu trúc lại toàn bộ trang [Stats.tsx](file:///d:/Download/daily-goal-tracker/src/pages/Stats.tsx) sang màu sắc ngữ nghĩa và heatmap theme-aware.
+    *   Cấu trúc lại toàn bộ trang [Stats.tsx](file:///d:/Download/daily-goal-tracker/src/pages/Stats.tsx) sang màu sắc ngữ nghĩa, bổ sung biểu đồ xu hướng hiệu suất 10 tuần, biểu đồ Donut phân bố thói quen dạng `conic-gradient`, feed cột mốc thành tựu lọc động và tích hợp thanh tiêu đề sticky chuẩn hóa đồng bộ cùng các nút Export CSV / Update Data.
 
 ---
 
@@ -70,4 +71,10 @@ Quá trình kiểm thử đã được chạy trực tiếp trên môi trường
 *   **My Goals Status Tab Filter Test (Đạt)**: Click chọn các tab "Active" hay "Paused" hiển thị chính xác các thói quen thuộc trạng thái tương ứng kèm theo cập nhật số đếm trên các nhãn tab.
 *   **My Goals Sorting Test (Đạt)**: Lựa chọn sắp xếp theo Streak, Priority hoặc Recent sắp đặt chính xác thứ tự hiển thị của các thẻ mục tiêu.
 *   **My Goals Card Action Toggle Test (Đạt)**: Bấm vào ba chấm trên Goal Card, mở ra popup Menu. Chọn "Pause" tự động đổi trạng thái mục tiêu sang paused, làm mờ thẻ (`opacity-60`), và chuyển thẻ sang tab Paused. Bấm "Resume" kích hoạt lại bình thường.
-*   **My Goals Quick Log Test (Đạt)**: Click Log trên các card thói quen đang hoạt động, tiến độ của mục tiêu tăng ngay lập tức và đồng bộ cập nhật lên vòng tròn Overall Completion SVG.
+*   **Premium Statistics Dashboard Integration Test (Đạt)**: Truy cập trang `/stats` xác nhận tải đầy đủ các khối Bento chỉ số, biểu đồ tròn phân phối thói quen và danh sách thành tựu.
+*   **Heatmap Sunday-Alignment Grid Test (Đạt)**: Lưới ô lịch hoạt động heatmap 182 ngày tự động lùi về Chủ Nhật gần nhất ở cột đầu tiên, màu sắc các ô biến đổi theo mức độ hoàn thành và hiển thị tooltip chính xác ngày/số lượng log khi di chuột qua.
+*   **10-Week Performance Trend Chart Test (Đạt)**: Các cột biểu đồ xu hướng hiển thị đúng tỉ lệ phần trăm, làm nổi bật viền tuần hiện tại và hiển thị tooltip số lượng log chi tiết.
+*   **Conic Donut Chart Legend Test (Đạt)**: Biểu đồ tròn hiển thị đúng góc quay theo tỷ lệ thực của các mục tiêu và đồng bộ màu sắc tương ứng với danh mục thói quen ở legend.
+*   **Milestones Search & Filter Test (Đạt)**: Gõ từ khóa trên thanh tiêu đề lọc tức thì các mốc thành tựu tương ứng trong bảng Milestones.
+*   **CSV Data Export Test (Đạt)**: Bấm "Export CSV" tải về file chứa chính xác lịch sử check-in của 180 ngày gần nhất.
+*   **Demo Goals Seeding Test (Đạt)**: Khi người dùng mới chưa có mục tiêu, bảng gợi ý hiển thị nút "Seed Demo Goals". Bấm nút gửi yêu cầu backend khởi tạo thành công thói quen và refresh giao diện tức thời.
