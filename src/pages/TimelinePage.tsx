@@ -6,7 +6,7 @@ import { useAuthStore } from "../store/authStore";
 
 export default function TimelinePage() {
   const { user } = useAuthStore();
-  const { goals, history, stats, fetchHistory, fetchGoals, fetchStats } = useGoalStore();
+  const { goals, history, stats, fetchHistory, fetchGoals, fetchStats, deleteLogProgress } = useGoalStore();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -209,6 +209,19 @@ export default function TimelinePage() {
       console.error("CSV Export failed", err);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleDeleteLog = async (logId: string, goalTitle: string) => {
+    if (window.confirm(`Delete check-in log for "${goalTitle}"?`)) {
+      try {
+        const fromDate = new Date(year, month, 1).toISOString().split("T")[0];
+        const toDate = new Date(year, month + 1, 0).toISOString().split("T")[0];
+        await deleteLogProgress(logId);
+        await fetchHistory(fromDate, toDate);
+      } catch (err) {
+        console.error("Failed to delete log:", err);
+      }
     }
   };
 
@@ -533,15 +546,23 @@ export default function TimelinePage() {
                         </div>
 
                         {/* Inner Log Card details */}
-                        <div className="bg-surface-container-low/40 rounded-xl p-3 border border-white/5 hover:border-white/10 hover:bg-surface-container-low/60 transition-all duration-200 group">
-                          <div>
-                            <p className="font-bold text-xs text-on-surface group-hover:text-primary transition-colors">
+                        <div className="bg-surface-container-low/40 rounded-xl p-3 border border-white/5 hover:border-white/10 hover:bg-surface-container-low/60 transition-all duration-200 group flex items-center justify-between gap-4">
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p className="font-bold text-xs text-on-surface group-hover:text-primary transition-colors truncate">
                               {log.goalTitle}
                             </p>
-                            <p className="text-[10px] text-on-surface-variant mt-0.5 italic">
+                            <p className="text-[10px] text-on-surface-variant mt-0.5 italic truncate">
                               {log.note ? `"${log.note}"` : "Completed checked-in"}
                             </p>
                           </div>
+                          <button
+                            onClick={() => handleDeleteLog(log.logId, log.goalTitle)}
+                            className="btn-danger-ghost shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded-lg"
+                            title="Delete log"
+                            style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
                         </div>
 
                       </div>

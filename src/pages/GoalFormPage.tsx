@@ -90,39 +90,39 @@ export const GoalFormPage: React.FC = () => {
   const categories = ["Learning", "Fitness", "Work", "Health", "Finance", "Routine"];
 
   return (
-    <div className="min-h-screen bg-slate-950 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background text-on-background py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Back Link */}
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400 hover:text-white transition-all"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-on-surface-variant hover:text-on-surface transition-all"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
         </Link>
-
+ 
         {/* Content Card Form */}
         <Card>
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800/60">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-outline-variant/30">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary/15 text-secondary">
               <Target className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">
+              <h1 className="text-xl font-bold text-on-surface tracking-tight">
                 {isEdit ? "Edit your Goal" : "Create a Target Goal"}
               </h1>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-on-surface-variant">
                 Define actionable micro-goals with distinct target frequencies.
               </p>
             </div>
           </div>
-
+ 
           {error && (
             <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold rounded-lg text-center">
               {error}
             </div>
           )}
-
+ 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Title */}
             <div className="relative">
@@ -136,12 +136,12 @@ export const GoalFormPage: React.FC = () => {
                 required
               />
             </div>
-
+ 
             {/* Description */}
             <div className="flex flex-col">
               <label
                 htmlFor="description"
-                className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5"
+                className="block text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-1.5"
               >
                 Description (Optional)
               </label>
@@ -151,45 +151,45 @@ export const GoalFormPage: React.FC = () => {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
-                className="w-full bg-slate-900 border border-slate-800 text-slate-100 placeholder-slate-500 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 hover:border-slate-700"
+                className="m-input min-h-[100px] resize-y"
               />
             </div>
-
+ 
             {/* Category selection and Frequency */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="flex flex-col">
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-1.5 flex items-center gap-1">
                   <Tag className="w-3 w-[12px]" /> Category
                 </label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 hover:border-slate-700"
+                  className="m-input cursor-pointer"
                 >
                   {categories.map((cat) => (
-                    <option key={cat} value={cat}>
+                    <option key={cat} value={cat} className="bg-surface-container-high text-on-surface">
                       {cat}
                     </option>
                   ))}
                 </select>
               </div>
-
+ 
               <div className="flex flex-col">
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-1.5 flex items-center gap-1">
                   <Clock className="w-3 w-[12px]" /> Frequency
                 </label>
                 <select
                   value={formData.frequency}
                   onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 hover:border-slate-700"
+                  className="m-input cursor-pointer"
                 >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
+                  <option value="daily" className="bg-surface-container-high text-on-surface">Daily</option>
+                  <option value="weekly" className="bg-surface-container-high text-on-surface">Weekly</option>
+                  <option value="monthly" className="bg-surface-container-high text-on-surface">Monthly</option>
                 </select>
               </div>
             </div>
-
+ 
             {/* Target count and Due Date */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
@@ -204,24 +204,24 @@ export const GoalFormPage: React.FC = () => {
                   required
                 />
               </div>
-
+ 
               <div className="flex flex-col">
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
+                <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-1.5">
                   Due Date (Optional)
                 </label>
                 <input
                   type="date"
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 hover:border-slate-700"
+                  className="m-input"
                 />
               </div>
             </div>
-
+ 
             {/* Buttons panel */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800/60">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-outline-variant/30">
               <Link to="/">
-                <Button variant="ghost" type="button" disabled={loading} className="text-slate-400 hover:text-white">
+                <Button variant="ghost" type="button" disabled={loading} className="text-on-surface-variant hover:text-on-surface">
                   Cancel
                 </Button>
               </Link>

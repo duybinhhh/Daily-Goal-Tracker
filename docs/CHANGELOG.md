@@ -6,6 +6,27 @@
 
 Tất cả các thay đổi lớn của dự án sẽ được ghi nhận và cập nhật theo từng Sprint tại đây.
 
+## [Đã hoàn thành] - Undo Progress Log, Disappearing Goals & UX Optimization - 2026-06-04 13:30 (GMT+7)
+### Đã thêm & Cải tiến (Added & Improved)
+* **Tính năng Hủy ghi nhận tiến độ thói quen (Undo Progress Log):**
+  - Thêm hiệu ứng biến mất (disappearing animation) kéo dài 5 giây trên thẻ mục tiêu [GoalCard.tsx](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx) tại trang Dashboard khi người dùng bấm hoàn thành (Log progress).
+  - Thiết lập hiển thị đếm ngược 5 giây kèm nút "Undo" để người dùng hoàn tác tức thì hành động log tiến độ trong trường hợp bấm nhầm.
+  - Tự động ẩn các thói quen đã hoàn thành ra khỏi Dashboard sau khi kết thúc đếm ngược nhằm tối ưu sự tập trung và tối giản hóa không gian làm việc.
+* **Xóa Log lịch sử từ Trục thời gian (Timeline Log Deletion):**
+  - Thêm nút "Xóa log" (Delete log) bên cạnh mỗi bản ghi check-in tại trang [TimelinePage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/TimelinePage.tsx).
+  - Khi người dùng xóa một log check-in cũ, thói quen tương ứng sẽ tự động hiển thị lại trên Dashboard nếu nó chưa đạt chỉ tiêu hoàn thành.
+* **Thuật toán tính toán lại Chuỗi Streak (Streak Recalculation Engine):**
+  - Triển khai logic tính toán lại chuỗi ngày liên tục (`recalculateStreak`) trong [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts) khi có hành động xóa/hủy log tiến độ.
+  - Tự động nhóm log theo ngày địa phương dựa trên múi giờ (`timezone`) được thiết lập của người dùng, cập nhật lại chuỗi ngày hiện tại (`current_streak`), chuỗi ngày kỷ lục (`longest_streak`), và ngày hoàn thành cuối cùng (`last_completed_at`) chính xác.
+* **Tối ưu hóa Giao diện và Trải nghiệm Người dùng:**
+  - **Sửa lỗi hiển thị Đăng ký/Đăng nhập:** Thêm thuộc tính `width: 100%` cho khung bao trang đăng nhập trong [LoginPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/LoginPage.tsx) giúp căn giữa chuẩn xác trên mọi độ phân giải.
+  - **Cải thiện Form tạo mục tiêu:** Thay thế các mã màu cố định của Tailwind CSS bằng các lớp màu ngữ nghĩa tương thích động (`text-on-surface-variant`, `m-input`) trong [GoalFormPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/GoalFormPage.tsx) để hiển thị đồng bộ trên cả Light và Dark Theme.
+  - **Thanh tác vụ Cố định trong Cài đặt (Sticky Action Bar):** Chuyển đổi khu vực nút Lưu/Hủy thay đổi trong [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx) thành thanh điều khiển kính mờ nổi cố định (Sticky Floating Bar) ở cuối màn hình giúp người dùng dễ dàng thao tác mà không cần cuộn trang xuống dưới.
+  - **Mặc định Theme Sáng:** Thiết lập chế độ giao diện ban đầu mặc định là màu trắng (Light Theme) thay vì màu tối khi người dùng truy cập lần đầu tiên.
+* **API Backend & Database Wrapper:**
+  - Thêm API route `DELETE /api/goals/logs/:logId` trong [goals.ts](file:///d:/Download/daily-goal-tracker/src/routes/goals.ts).
+  - Bổ sung các hàm helper `delete` và `findUnique` cho bảng GoalLog trong [db.ts](file:///d:/Download/daily-goal-tracker/server/db.ts) để quản lý cơ sở dữ liệu.
+
 ## [Đã hoàn thành] - Premium Statistics Dashboard Overhaul - 2026-06-04 11:00 (GMT+7)
 ### Đã thêm & Cải tiến (Added & Improved)
 * **Trang Thống kê Thói quen cao cấp (Premium Statistics Dashboard):**

@@ -29,7 +29,7 @@ export default function App() {
 
   useEffect(() => {
     checkAuth();
-    const savedTheme = localStorage.getItem("setting_theme") || "dark";
+    const savedTheme = localStorage.getItem("setting_theme") || "light";
     if (savedTheme === "light") {
       document.documentElement.classList.add("light");
       document.documentElement.classList.remove("dark");

@@ -1,7 +1,7 @@
 // src/components/GoalCard.tsx
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Flame, Edit2, Trash2, CheckCircle, Plus, MessageSquare } from "lucide-react";
+import { Flame, Edit2, Trash2, CheckCircle, Plus, MessageSquare, Undo2 } from "lucide-react";
 import { Goal } from "../types";
 import { motion } from "motion/react";
 
@@ -9,6 +9,11 @@ interface GoalCardProps {
   goal: Goal;
   onComplete: (id: string, note?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  disappearing?: {
+    secondsLeft: number;
+    logId: string;
+  };
+  onUndo?: () => Promise<void> | void;
 }
 
 const CATEGORY_CONFIG: Record<
@@ -31,7 +36,7 @@ const DEFAULT_CONFIG = {
   progressColor: "var(--color-primary)",
 };
 
-export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete }) => {
+export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, disappearing, onUndo }) => {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [completing, setCompleting] = useState(false);
@@ -41,6 +46,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete }
   const config = CATEGORY_CONFIG[catKey] || DEFAULT_CONFIG;
 
   const isCompleted = goal.current_count >= goal.target_count;
+  const isDisappearing = Boolean(disappearing);
   const percentage =
     goal.target_count > 0
       ? Math.min(100, Math.round((goal.current_count / goal.target_count) * 100))
@@ -87,7 +93,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete }
           : {}),
       }}
       onMouseEnter={(e) => {
-        if (!isCompleted)
+        if (!isCompleted && !isDisappearing)
           (e.currentTarget as HTMLDivElement).style.boxShadow =
             "0 8px 32px rgba(192,193,255,0.1)";
       }}
@@ -108,6 +114,55 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete }
               "linear-gradient(90deg, var(--color-secondary) 0%, transparent 80%)",
           }}
         />
+      )}
+
+      {isDisappearing && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            marginBottom: "14px",
+            padding: "10px 12px",
+            borderRadius: "10px",
+            border: "1px solid rgba(78,222,163,0.24)",
+            background:
+              "linear-gradient(90deg, rgba(78,222,163,0.12), rgba(192,193,255,0.08))",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+            <CheckCircle size={16} style={{ color: "var(--color-secondary)", flexShrink: 0 }} />
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "var(--color-on-surface)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Completed. Disappearing in {disappearing?.secondsLeft}s
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onUndo}
+            className="btn-ghost"
+            style={{
+              padding: "6px 10px",
+              fontSize: "11px",
+              borderRadius: "8px",
+              border: "1px solid var(--color-outline-variant)",
+              flexShrink: 0,
+            }}
+            title="Undo progress log"
+          >
+            <Undo2 size={12} />
+            Undo
+          </button>
+        </div>
       )}
 
       {/* ── Row 1: Icon + Info + Actions ── */}
@@ -260,66 +315,67 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete }
             </p>
           </div>
 
-          {/* Action buttons */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <div style={{ display: "flex", gap: "2px" }}>
-              <Link
-                to={`/edit-goal/${goal.id}`}
-                className="btn-ghost"
-                style={{ padding: "5px", borderRadius: "8px" }}
-                title="Edit"
-              >
-                <Edit2 size={13} />
-              </Link>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="btn-danger-ghost"
-                style={{ padding: "5px", borderRadius: "8px" }}
-                title="Delete"
-              >
-                {deleting ? (
-                  <div
-                    className="spinner"
-                    style={{ width: "13px", height: "13px" }}
-                  />
-                ) : (
-                  <Trash2 size={13} />
-                )}
-              </button>
-            </div>
-
-            {isCompleted ? (
-              <div className="goal-met-badge" style={{ fontSize: "10px", padding: "3px 8px" }}>
-                <CheckCircle size={11} />
-                <span>Met</span>
+          {!isDisappearing && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <div style={{ display: "flex", gap: "2px" }}>
+                <Link
+                  to={`/edit-goal/${goal.id}`}
+                  className="btn-ghost"
+                  style={{ padding: "5px", borderRadius: "8px" }}
+                  title="Edit"
+                >
+                  <Edit2 size={13} />
+                </Link>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="btn-danger-ghost"
+                  style={{ padding: "5px", borderRadius: "8px" }}
+                  title="Delete"
+                >
+                  {deleting ? (
+                    <div
+                      className="spinner"
+                      style={{ width: "13px", height: "13px" }}
+                    />
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
+                </button>
               </div>
-            ) : (
-              <button
-                className="btn-primary"
-                onClick={handleComplete}
-                disabled={completing}
-                style={{ padding: "5px 12px", fontSize: "11px" }}
-              >
-                {completing ? (
-                  <div
-                    className="spinner"
-                    style={{ width: "11px", height: "11px" }}
-                  />
-                ) : (
-                  <Plus size={12} />
-                )}
-                Log
-              </button>
-            )}
-          </div>
+
+              {isCompleted ? (
+                <div className="goal-met-badge" style={{ fontSize: "10px", padding: "3px 8px" }}>
+                  <CheckCircle size={11} />
+                  <span>Met</span>
+                </div>
+              ) : (
+                <button
+                  className="btn-primary"
+                  onClick={handleComplete}
+                  disabled={completing}
+                  style={{ padding: "5px 12px", fontSize: "11px" }}
+                >
+                  {completing ? (
+                    <div
+                      className="spinner"
+                      style={{ width: "11px", height: "11px" }}
+                    />
+                  ) : (
+                    <Plus size={12} />
+                  )}
+                  Log
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -380,30 +436,32 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete }
         </div>
 
         {/* Note toggle */}
-        <button
-          onClick={() => setShowNoteInput(!showNoteInput)}
-          className="btn-ghost"
-          style={{
-            padding: "4px 10px",
-            fontSize: "11px",
-            gap: "5px",
-            borderRadius: "9999px",
-            border: showNoteInput
-              ? "1px solid var(--color-outline-variant)"
-              : "1px solid transparent",
-            background: showNoteInput
-              ? "var(--color-surface-container-high)"
-              : "transparent",
-          }}
-          title="Add note"
-        >
-          <MessageSquare size={12} />
-          Note
-        </button>
+        {!isDisappearing && (
+          <button
+            onClick={() => setShowNoteInput(!showNoteInput)}
+            className="btn-ghost"
+            style={{
+              padding: "4px 10px",
+              fontSize: "11px",
+              gap: "5px",
+              borderRadius: "9999px",
+              border: showNoteInput
+                ? "1px solid var(--color-outline-variant)"
+                : "1px solid transparent",
+              background: showNoteInput
+                ? "var(--color-surface-container-high)"
+                : "transparent",
+            }}
+            title="Add note"
+          >
+            <MessageSquare size={12} />
+            Note
+          </button>
+        )}
       </div>
 
       {/* ── Row 3: Note input (conditional) ── */}
-      {showNoteInput && (
+      {showNoteInput && !isDisappearing && (
         <div
           className="animate-fade-in"
           style={{

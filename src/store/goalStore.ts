@@ -1,7 +1,14 @@
 // src/store/goalStore.ts
 import { create } from "zustand";
 import api from "../services/api";
-import { Goal, DashboardStats, HistoryData } from "../types";
+import { Goal, GoalLog, DashboardStats, HistoryData } from "../types";
+
+interface CompleteGoalResponse {
+  success: boolean;
+  message: string;
+  goal: Goal;
+  log: GoalLog;
+}
 
 interface GoalState {
   goals: Goal[];
@@ -22,7 +29,8 @@ interface GoalState {
   }) => Promise<void>;
   updateGoal: (id: string, goalData: Partial<Goal>) => Promise<void>;
   deleteGoal: (id: string) => Promise<void>;
-  completeGoalProgress: (id: string, note?: string) => Promise<void>;
+  completeGoalProgress: (id: string, note?: string) => Promise<CompleteGoalResponse>;
+  deleteLogProgress: (logId: string, goalId?: string) => Promise<void>;
 }
 
 export const useGoalStore = create<GoalState>((set, get) => ({
@@ -131,8 +139,30 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       // Immediately refresh stats metrics + logs history
       get().fetchStats();
       get().fetchHistory();
+      
+      // Return log data so caller can use its ID
+      return response.data;
     } catch (error: any) {
       const msg = error.response?.data?.message || "Failed to complete goal progress.";
+      set({ error: msg });
+      throw new Error(msg);
+    }
+  },
+
+  deleteLogProgress: async (logId, _goalId) => {
+    try {
+      const response = await api.delete(`/api/goals/logs/${logId}`);
+      const updatedGoal = response.data.goal;
+
+      set((state) => ({
+        goals: state.goals.map((g) => (g.id === updatedGoal.id ? { ...g, ...updatedGoal } : g)),
+      }));
+
+      // Immediately refresh stats metrics + logs history
+      get().fetchStats();
+      get().fetchHistory();
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to delete progress log.";
       set({ error: msg });
       throw new Error(msg);
     }

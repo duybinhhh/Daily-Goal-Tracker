@@ -67,6 +67,7 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
 * **Tiêu chí chấp nhận (AC):**
     * Khi người dùng bấm nút tương tác trực tiếp trên `GoalCard`, chỉ số tiến độ hiện tại (`current count`) tăng lên.
     * Hệ thống tự động bắn một bản ghi log vào bảng dữ liệu `GoalLog` để lưu vết thời gian kèm timestamp chính xác của Client phục vụ cho việc tính toán thống kê.
+    * **Hoàn tác & Đếm ngược:** Khi một mục tiêu được bấm hoàn thành và đạt chỉ tiêu trong ngày, thẻ mục tiêu hiển thị trạng thái đếm ngược 5 giây kèm nút **Undo** trên Dashboard trước khi ẩn đi. Nếu bấm **Undo**, hệ thống sẽ hủy bỏ check-in đó và khôi phục tiến độ thói quen cũ.
 
 #### US-06: Dashboard & Biểu đồ thống kê (Premium Statistics Overhaul)
 * **Độ ưu tiên:** Medium
@@ -87,6 +88,7 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * **Lưới hiệu năng tháng (Performance Grid):** Hiển thị lịch dạng ô lưới cho tháng được chọn. Đánh dấu chấm tròn xanh tại các ngày có ghi nhận tiến độ (`GoalLog`) và đánh dấu ngôi sao vàng cho ngày đạt năng suất cao (&ge; 3 completions).
     * **Tương tác bộ lọc:** Nhấn vào ngày bất kỳ trên Grid để lọc tức thì danh sách hoạt động ngày đó ở bảng bên phải. Bấm lại ngày đó để xóa bộ lọc.
     * **Tìm kiếm & Phân loại:** Thanh tìm kiếm lọc động các bản ghi theo tên mục tiêu hoặc ghi chú đi kèm. Có icon phân loại màu sắc cho từng mục tiêu (Sức khỏe, Tập luyện, Công việc, Học tập, Tài chính, Thói quen).
+    * **Xóa Log & Tính toán lại Streak:** Mỗi bản ghi log check-in hiển thị biểu tượng Xóa (Trash). Nhấn vào sẽ yêu cầu xác nhận; khi đồng ý, hệ thống gọi API xóa log check-in khỏi DB, tự động giảm tiến độ của thói quen liên quan, tính toán lại chuỗi Streak và đồng bộ tức thì lên giao diện/thống kê.
     * **Cột mốc vinh danh (Milestone Achievements):** Bento cards tự động tính toán để mở khóa danh hiệu "Consistent Leader" (khi chuỗi ngày hiện tại &ge; 10) và "Goal Crusher" (khi tổng check-in tháng hiện tại &ge; 15).
     * **Xuất báo cáo hàng tháng:** Tải file `.csv` chứa danh sách chi tiết các check-in gồm ID log, ID mục tiêu, Tên mục tiêu, Phân loại, Thời gian và Ghi chú đi kèm.
 
@@ -113,12 +115,14 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * Hỗ trợ lưu trữ các cấu hình bật/tắt thông báo dưới client bao gồm: nhắc nhở hàng ngày, thông báo sắp đứt chuỗi Streak, và cột mốc hoàn thành.
     * Hỗ trợ nút hành động "Export My Data" cho phép trích xuất toàn bộ dữ liệu mục tiêu và lịch sử của người dùng ra file JSON.
     * Hỗ trợ nút hành động "Delete Account" cho phép xóa vĩnh viễn tài khoản kèm toàn bộ dữ liệu liên quan ở backend qua API `DELETE /api/auth/profile` (yêu cầu Modal xác nhận an toàn trước khi xóa).
+    * **Thanh tác vụ nổi (Sticky Action Bar):** Nút Lưu cấu hình và Hủy thay đổi được hiển thị nổi cố định (Sticky) ở cạnh đáy trang Settings, giúp người dùng dễ dàng thao tác nhanh mà không cần cuộn trang.
 
 #### US-08: Tùy biến giao diện (Theme & Opacity)
 * **Độ ưu tiên:** Medium
 * **Story Point:** 3.0
 * **Tiêu chí chấp nhận (AC):**
     * Tích hợp bộ chọn chủ đề sáng/tối (Dark/Light Theme) với cơ chế preview trực quan thời gian thực.
+    * **Theme Sáng mặc định:** Khi người dùng truy cập ứng dụng lần đầu tiên, giao diện sẽ mặc định chạy Light Theme.
     * Giao diện chế độ sáng (Light Mode) tuân thủ ngôn ngữ Momentum: sử dụng màu nền xám sáng, các thẻ kính mờ màu trắng đục, chữ tối tương phản cao và viền mảnh tinh tế.
     * Cho phép điều chỉnh độ trong suốt của kính mờ (Glass Opacity) qua thanh trượt trong khoảng 20% - 95% bằng cách cập nhật biến CSS trực tiếp.
     * Lưu lựa chọn theme và opacity của người dùng vào `localStorage` để tự động phục hồi ở các phiên làm việc sau.

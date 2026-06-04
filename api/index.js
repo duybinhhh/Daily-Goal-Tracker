@@ -154,6 +154,10 @@ var PrismaDB = class {
         const logs = await prisma.goalLog.findMany({ where: prismaWhere });
         return logs.map(mapGoalLog);
       },
+      findUnique: async (where) => {
+        const log = await prisma.goalLog.findUnique({ where: { id: where.id } });
+        return mapGoalLog(log);
+      },
       create: async (data) => {
         const created = await prisma.goalLog.create({
           data: {
@@ -164,6 +168,10 @@ var PrismaDB = class {
           }
         });
         return mapGoalLog(created);
+      },
+      delete: async (id) => {
+        const deleted = await prisma.goalLog.delete({ where: { id } });
+        return mapGoalLog(deleted);
       }
     };
     // Streaks helpers
@@ -737,6 +745,107 @@ var completeGoal = async (req, res, next) => {
     next(error);
   }
 };
+var getLocalDateString = (date, timezone) => {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parts.find((p) => p.type === "year")?.value;
+    const month = parts.find((p) => p.type === "month")?.value;
+    const day = parts.find((p) => p.type === "day")?.value;
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    return date.toISOString().split("T")[0];
+  }
+};
+var recalculateStreak = async (goalId, userId) => {
+  const goal = await db.goals.findUnique({ id: goalId });
+  if (!goal) return null;
+  const user = await db.users.findUnique({ id: userId });
+  const timezone = user?.timezone || "UTC";
+  const logs = await db.logs.findMany({ goal_id: goalId });
+  const logsByDate = {};
+  for (const log of logs) {
+    const dateStr = getLocalDateString(new Date(log.completed_at), timezone);
+    logsByDate[dateStr] = (logsByDate[dateStr] || 0) + 1;
+  }
+  const completedDates = Object.keys(logsByDate).filter((dateStr) => logsByDate[dateStr] >= goal.target_count).sort();
+  let longestStreak = 0;
+  let currentStreakSegment = 0;
+  let prevDateStr = null;
+  for (const dateStr of completedDates) {
+    if (prevDateStr === null) {
+      currentStreakSegment = 1;
+    } else {
+      const diff = getCalendarDaysDiff(prevDateStr, dateStr);
+      if (diff === 1) {
+        currentStreakSegment += 1;
+      } else if (diff > 1) {
+        currentStreakSegment = 1;
+      }
+    }
+    longestStreak = Math.max(longestStreak, currentStreakSegment);
+    prevDateStr = dateStr;
+  }
+  let currentStreak = 0;
+  let lastCompletedAtStr = null;
+  if (completedDates.length > 0) {
+    const lastCompletedDateStr = completedDates[completedDates.length - 1];
+    lastCompletedAtStr = lastCompletedDateStr;
+    const todayLocalStr = getLocalDateString(/* @__PURE__ */ new Date(), timezone);
+    const diff = getCalendarDaysDiff(lastCompletedDateStr, todayLocalStr);
+    if (diff <= 1) {
+      currentStreak = currentStreakSegment;
+    } else {
+      currentStreak = 0;
+    }
+  }
+  const lastCompletedAtDate = lastCompletedAtStr ? new Date(lastCompletedAtStr).toISOString() : null;
+  const updatedStreak = await db.streaks.upsert(goalId, userId, {
+    current_streak: currentStreak,
+    longest_streak: longestStreak,
+    last_completed_at: lastCompletedAtDate
+  });
+  return updatedStreak;
+};
+var deleteLog = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { logId } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const log = await db.logs.findUnique({ id: logId });
+    if (!log || log.user_id !== userId) {
+      throw new AppError("Log not found or access denied.", 404);
+    }
+    const goal = await db.goals.findUnique({ id: log.goal_id });
+    if (!goal || goal.user_id !== userId) {
+      throw new AppError("Goal not found.", 404);
+    }
+    await db.logs.delete(logId);
+    const updatedCount = Math.max(0, goal.current_count - 1);
+    const totalTarget = goal.target_count;
+    const isCompleted = updatedCount >= totalTarget;
+    const updatedGoal = await db.goals.update(goal.id, {
+      current_count: updatedCount,
+      status: isCompleted ? "completed" : "active"
+    });
+    const updatedStreak = await recalculateStreak(goal.id, userId);
+    res.status(200).json({
+      success: true,
+      message: "Progress log deleted and goal progress updated.",
+      goal: {
+        ...updatedGoal,
+        streak: updatedStreak || { current_streak: 0, longest_streak: 0, last_completed_at: null }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // src/routes/goals.ts
 var router2 = Router2();
@@ -747,6 +856,7 @@ router2.get("/:id", getGoalById);
 router2.put("/:id", updateGoal);
 router2.delete("/:id", deleteGoal);
 router2.post("/:id/complete", completeGoal);
+router2.delete("/logs/:logId", deleteLog);
 var goals_default = router2;
 
 // src/routes/stats.ts

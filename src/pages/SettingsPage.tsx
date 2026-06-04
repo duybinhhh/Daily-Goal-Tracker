@@ -31,7 +31,7 @@ export function SettingsPage() {
     return saved ? parseFloat(saved) : 0.65;
   });
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem("setting_theme") || "dark";
+    return localStorage.getItem("setting_theme") || "light";
   });
 
   const [saving, setSaving] = useState(false);
@@ -114,7 +114,7 @@ export function SettingsPage() {
     setGlassOpacity(0.65);
     setErrorMessage(null);
 
-    const savedTheme = localStorage.getItem("setting_theme") || "dark";
+    const savedTheme = localStorage.getItem("setting_theme") || "light";
     setTheme(savedTheme);
     if (savedTheme === "light") {
       document.documentElement.classList.add("light");
@@ -470,19 +470,19 @@ export function SettingsPage() {
             </section>
           </div>
 
-          {/* Bottom Action Footer */}
-          <div className="flex justify-end items-center gap-4 pt-6 border-t border-white/5">
+          {/* Bottom Action Footer (Sticky Floating Bar) */}
+          <div className="glass-card sticky bottom-4 md:bottom-6 z-30 flex justify-end items-center gap-4 p-4 mt-8 shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
             <button
               type="button"
               onClick={handleDiscard}
-              className="px-5 py-2.5 text-sm text-on-surface-variant hover:text-on-surface font-semibold transition-colors"
+              className="px-5 py-2.5 text-sm text-on-surface-variant hover:text-on-surface font-semibold transition-colors cursor-pointer"
             >
               Discard Changes
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 bg-primary text-on-primary rounded-xl font-bold shadow-[0_8px_24px_rgba(192,193,255,0.2)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 text-sm"
+              className="px-6 py-2.5 bg-primary text-on-primary rounded-xl font-bold shadow-[0_8px_24px_rgba(192,193,255,0.2)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 text-sm cursor-pointer"
             >
               {saving ? "Saving..." : "Save Preferences"}
             </button>

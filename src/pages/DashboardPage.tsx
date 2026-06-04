@@ -1,9 +1,10 @@
 // src/pages/DashboardPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { useGoals } from "../hooks/useGoals";
 import { useAuthStore } from "../store/authStore";
+import { useGoalStore } from "../store/goalStore";
 import { GoalCard } from "../components/GoalCard";
 
 /* ── Shared section label style ── */
@@ -309,7 +310,102 @@ export const DashboardPage: React.FC = () => {
     refreshAll,
     completeGoalProgress,
     deleteGoal,
+    deleteLogProgress,
   } = useGoals();
+
+  // Local state to manage disappearing countdowns for completed goals
+  const [disappearingGoals, setDisappearingGoals] = useState<{
+    [goalId: string]: {
+      secondsLeft: number;
+      logId: string;
+    };
+  }>({});
+  const disappearingTimersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(disappearingTimersRef.current).forEach(clearInterval);
+      disappearingTimersRef.current = {};
+    };
+  }, []);
+
+  const clearDisappearingTimer = (goalId: string) => {
+    const timer = disappearingTimersRef.current[goalId];
+    if (timer) {
+      clearInterval(timer);
+      delete disappearingTimersRef.current[goalId];
+    }
+  };
+
+  const handleLogProgress = async (id: string, note?: string) => {
+    try {
+      const response: any = await completeGoalProgress(id, note);
+      
+      const updatedGoal = useGoalStore.getState().goals.find((g) => g.id === id);
+      
+      if (updatedGoal && updatedGoal.current_count >= updatedGoal.target_count) {
+        const logId = response.log?.id || "";
+        
+        clearDisappearingTimer(id);
+
+        const intervalId = setInterval(() => {
+          setDisappearingGoals((prev) => {
+            const current = prev[id];
+            if (!current) return prev;
+
+            if (current.secondsLeft <= 1) {
+              clearDisappearingTimer(id);
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            }
+
+            return {
+              ...prev,
+              [id]: {
+                ...current,
+                secondsLeft: current.secondsLeft - 1,
+              },
+            };
+          });
+        }, 1000);
+        disappearingTimersRef.current[id] = intervalId;
+
+        setDisappearingGoals((prev) => ({
+          ...prev,
+          [id]: {
+            secondsLeft: 5,
+            logId,
+          },
+        }));
+      }
+    } catch (err) {
+      console.error("Dashboard complete progress failed:", err);
+    }
+  };
+
+  const handleUndoProgress = async (goalId: string) => {
+    const disappearing = disappearingGoals[goalId];
+    if (!disappearing) return;
+
+    clearDisappearingTimer(goalId);
+
+    try {
+      await deleteLogProgress(disappearing.logId);
+
+      setDisappearingGoals((prev) => {
+        const next = { ...prev };
+        delete next[goalId];
+        return next;
+      });
+    } catch (err) {
+      console.error("Failed to undo progress:", err);
+    }
+  };
+
+  const activeFilteredGoals = filteredGoals.filter(
+    (g) => g.current_count < g.target_count || disappearingGoals[g.id]
+  );
 
   const [greeting, setGreeting] = useState("Hello");
 
@@ -742,7 +838,7 @@ export const DashboardPage: React.FC = () => {
                   Loading daily layout...
                 </p>
               </div>
-            ) : filteredGoals.length > 0 ? (
+            ) : activeFilteredGoals.length > 0 ? (
               <div
                 style={{
                   display: "flex",
@@ -750,12 +846,14 @@ export const DashboardPage: React.FC = () => {
                   gap: "12px",
                 }}
               >
-                {filteredGoals.map((goal) => (
+                {activeFilteredGoals.map((goal) => (
                   <GoalCard
                     key={goal.id}
                     goal={goal}
-                    onComplete={completeGoalProgress}
+                    onComplete={handleLogProgress}
                     onDelete={deleteGoal}
+                    disappearing={disappearingGoals[goal.id]}
+                    onUndo={() => handleUndoProgress(goal.id)}
                   />
                 ))}
               </div>

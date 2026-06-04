@@ -8,6 +8,7 @@ import {
   updateGoal,
   deleteGoal,
   completeGoal,
+  deleteLog,
 } from "../controllers/goalController";
 
 const router = Router();
@@ -21,5 +22,6 @@ router.get("/:id", getGoalById);
 router.put("/:id", updateGoal);
 router.delete("/:id", deleteGoal);
 router.post("/:id/complete", completeGoal);
+router.delete("/logs/:logId", deleteLog);
 
 export default router;

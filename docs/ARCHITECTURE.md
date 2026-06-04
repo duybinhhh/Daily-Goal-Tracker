@@ -107,9 +107,11 @@ model Notification {
     *   Trang cài đặt cập nhật thông tin cá nhân lên API `PUT /api/auth/profile` để trả về token mới.
     *   Người dùng chuyển đổi theme giữa Dark/Light Mode. Theme được lưu vào `localStorage` và kích hoạt bằng cách thêm/bớt class `light`/`dark` trên thẻ `html`.
     *   Glass Opacity được kiểm soát bằng cách gán giá trị trượt trực tiếp vào biến CSS `--glass-opacity` giúp cập nhật độ trong suốt tức thì.
-3.  **Ghi nhận mục tiêu & Tính Streak**:
+3.  **Ghi nhận mục tiêu, Hoàn tác & Tính Streak**:
     *   Khi người dùng check-in mục tiêu, frontend gọi `POST /api/goals/:id/complete`.
     *   Backend ghi nhận log trong bảng `GoalLog`, đồng thời gọi `Streak Engine` để tính toán chuỗi ngày liên tục và lưu trữ vào bảng `Streak` (tránh việc tính toán quét bảng tốn tài nguyên).
+    *   **Cơ chế hoàn tác (Undo) & Ẩn mục tiêu đã hoàn thành:** Trên Dashboard, nếu mục tiêu đạt chỉ tiêu hoàn thành trong ngày, hệ thống sẽ kích hoạt bộ đếm ngược 5 giây (`disappearingGoals` state) kèm nút **Undo** trên thẻ mục tiêu [GoalCard.tsx](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx) trước khi ẩn nó đi. Nếu người dùng chọn hoàn tác hoặc bấm xóa log check-in (gọi API `DELETE /api/goals/logs/:logId`), backend sẽ xóa bản ghi khỏi `GoalLog`, giảm tiến độ mục tiêu, phục hồi trạng thái hoạt động và chạy hàm tính toán lại streak (`recalculateStreak`).
+    *   **Thuật toán Recalculate Streak:** Hàm `recalculateStreak` sẽ quét toàn bộ các log còn lại của thói quen đó, chuyển đổi thời gian check-in về ngày địa phương (`timezone` của User), nhóm theo ngày để tìm ra các ngày đạt chỉ tiêu, sau đó duyệt từ đầu đến cuối để tính toán lại chính xác `current_streak` và `longest_streak`.
 4.  **Bảng thống kê và Heatmap (Premium Statistics Dashboard)**:
     *   Trang thống kê gọi API `GET /api/stats/dashboard` và `GET /api/stats/history` (với phạm vi 182 ngày để hiển thị 26 tuần thói quen).
     *   Căn chỉnh ngày bắt đầu của lịch hoạt động về Chủ Nhật để tạo lưới ô lịch hoàn hảo (7 dòng x 26 cột). Màu sắc các ô được điều khiển linh hoạt qua các lớp màu chủ đề `bg-primary`, `bg-primary/20`, v.v. thích ứng tự động với Light/Dark theme.
@@ -120,6 +122,7 @@ model Notification {
     *   Trang Timeline (`TimelinePage.tsx`) tự động tính toán ngày bắt đầu và kết thúc của tháng đang chọn để gọi API `GET /api/stats/history?from=&to=` lấy toàn bộ lịch sử log.
     *   Calendar Grid hiển thị các chấm xanh nếu ngày đó có ít nhất 1 log, và hiển thị ngôi sao lấp lánh nếu có từ 3 logs trở lên (cột mốc đột phá).
     *   Nhấp chọn một ngày bất kỳ trên lưới để lọc nhanh danh sách feed hoạt động bên phải, hoặc bấm lại để hủy lọc (xem toàn bộ log trong tháng).
+    *   **Xóa Log check-in:** Mỗi bản ghi trong feed hoạt động hiển thị một nút Delete. Khi click và xác nhận, hệ thống gọi API `DELETE /api/goals/logs/:logId` để xóa hoàn toàn check-in đó khỏi cơ sở dữ liệu và tự động cập nhật lại các biểu đồ/chỉ số liên quan.
     *   Tính năng xuất báo cáo định dạng CSV cho phép trích xuất trực tiếp toàn bộ log hoàn thành của tháng hiện tại ra file bảng tính qua cơ chế URI mã hóa.
 6.  **Danh sách mục tiêu chi tiết (My Goals)**:
     *   Trang Goals (`GoalsPage.tsx`) kết nối với kho dữ liệu thói quen qua `useGoals` hook.

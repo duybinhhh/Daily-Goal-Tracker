@@ -173,6 +173,10 @@ class PrismaDB {
       const logs = await prisma.goalLog.findMany({ where: prismaWhere });
       return logs.map(mapGoalLog);
     },
+    findUnique: async (where: { id: string }) => {
+      const log = await prisma.goalLog.findUnique({ where: { id: where.id } });
+      return mapGoalLog(log);
+    },
     create: async (data: { goal_id: string; user_id: string; completed_at?: string; note?: string | null }) => {
       const created = await prisma.goalLog.create({
         data: {
@@ -183,6 +187,10 @@ class PrismaDB {
         },
       });
       return mapGoalLog(created);
+    },
+    delete: async (id: string) => {
+      const deleted = await prisma.goalLog.delete({ where: { id } });
+      return mapGoalLog(deleted);
     },
   };
 

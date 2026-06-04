@@ -289,3 +289,139 @@ export const completeGoal = async (req: AuthenticatedRequest, res: Response, nex
     next(error);
   }
 };
+
+// Helper to format Date as YYYY-MM-DD in user's timezone
+const getLocalDateString = (date: Date, timezone: string): string => {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parts.find(p => p.type === "year")?.value;
+    const month = parts.find(p => p.type === "month")?.value;
+    const day = parts.find(p => p.type === "day")?.value;
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    return date.toISOString().split("T")[0];
+  }
+};
+
+// Recalculates the streak for a goal based on its remaining logs
+export const recalculateStreak = async (goalId: string, userId: string) => {
+  const goal = await db.goals.findUnique({ id: goalId });
+  if (!goal) return null;
+
+  const user = await db.users.findUnique({ id: userId });
+  const timezone = user?.timezone || "UTC";
+
+  const logs = await db.logs.findMany({ goal_id: goalId });
+
+  // Group logs by local date string
+  const logsByDate: { [dateStr: string]: number } = {};
+  for (const log of logs) {
+    const dateStr = getLocalDateString(new Date(log.completed_at), timezone);
+    logsByDate[dateStr] = (logsByDate[dateStr] || 0) + 1;
+  }
+
+  // Find unique completed dates sorted chronologically
+  const completedDates = Object.keys(logsByDate)
+    .filter(dateStr => logsByDate[dateStr] >= goal.target_count)
+    .sort();
+
+  let longestStreak = 0;
+  let currentStreakSegment = 0;
+  let prevDateStr: string | null = null;
+
+  for (const dateStr of completedDates) {
+    if (prevDateStr === null) {
+      currentStreakSegment = 1;
+    } else {
+      const diff = getCalendarDaysDiff(prevDateStr, dateStr);
+      if (diff === 1) {
+        currentStreakSegment += 1;
+      } else if (diff > 1) {
+        currentStreakSegment = 1;
+      }
+    }
+    longestStreak = Math.max(longestStreak, currentStreakSegment);
+    prevDateStr = dateStr;
+  }
+
+  let currentStreak = 0;
+  let lastCompletedAtStr: string | null = null;
+
+  if (completedDates.length > 0) {
+    const lastCompletedDateStr = completedDates[completedDates.length - 1];
+    lastCompletedAtStr = lastCompletedDateStr;
+
+    const todayLocalStr = getLocalDateString(new Date(), timezone);
+    const diff = getCalendarDaysDiff(lastCompletedDateStr, todayLocalStr);
+
+    if (diff <= 1) {
+      currentStreak = currentStreakSegment;
+    } else {
+      currentStreak = 0;
+    }
+  }
+
+  const lastCompletedAtDate = lastCompletedAtStr ? new Date(lastCompletedAtStr).toISOString() : null;
+
+  const updatedStreak = await db.streaks.upsert(goalId, userId, {
+    current_streak: currentStreak,
+    longest_streak: longestStreak,
+    last_completed_at: lastCompletedAtDate,
+  });
+
+  return updatedStreak;
+};
+
+// Delete a goal progress log and revert progress/streak
+export const deleteLog = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { logId } = req.params;
+
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+
+    // 1. Fetch log and verify ownership
+    const log = await db.logs.findUnique({ id: logId });
+    if (!log || log.user_id !== userId) {
+      throw new AppError("Log not found or access denied.", 404);
+    }
+
+    const goal = await db.goals.findUnique({ id: log.goal_id });
+    if (!goal || goal.user_id !== userId) {
+      throw new AppError("Goal not found.", 404);
+    }
+
+    // 2. Delete the log
+    await db.logs.delete(logId);
+
+    // 3. Decrement count
+    const updatedCount = Math.max(0, goal.current_count - 1);
+    const totalTarget = goal.target_count;
+    const isCompleted = updatedCount >= totalTarget;
+
+    const updatedGoal = await db.goals.update(goal.id, {
+      current_count: updatedCount,
+      status: isCompleted ? "completed" : "active",
+    });
+
+    // 4. Recalculate streak
+    const updatedStreak = await recalculateStreak(goal.id, userId);
+
+    res.status(200).json({
+      success: true,
+      message: "Progress log deleted and goal progress updated.",
+      goal: {
+        ...updatedGoal,
+        streak: updatedStreak || { current_streak: 0, longest_streak: 0, last_completed_at: null },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

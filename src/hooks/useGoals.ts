@@ -16,6 +16,7 @@ export const useGoals = (filterCategory: string = "All") => {
     updateGoal,
     deleteGoal,
     completeGoalProgress,
+    deleteLogProgress,
   } = useGoalStore();
 
   const [activeCategory, setActiveCategory] = useState<string>(filterCategory);
@@ -55,6 +56,7 @@ export const useGoals = (filterCategory: string = "All") => {
     updateGoal,
     deleteGoal,
     completeGoalProgress,
+    deleteLogProgress,
   };
 };
 export default useGoals;
