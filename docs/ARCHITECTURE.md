@@ -94,7 +94,7 @@ model Notification {
 
 ### 3.1 Cấu trúc thư mục chính (Key Directory)
 *   `src/components/`: Chứa các component dùng chung (ví dụ: `Sidebar`, `GoalCard`, các UI components như `Button`, `Input`, `Card`, `ProgressBar`).
-*   `src/pages/`: Các trang màn hình chính (`DashboardPage`, `Stats`, `SettingsPage`, `LoginPage`, `GoalFormPage`).
+*   `src/pages/`: Các trang màn hình chính (`DashboardPage`, `Stats`, `SettingsPage`, `LoginPage`, `GoalFormPage`, `TimelinePage`).
 *   `src/store/`: Zustand stores quản lý trạng thái client-side (`authStore`, `goalStore`).
 *   `src/services/api.ts`: Cấu hình Axios instance kèm cơ chế bắt lỗi 401 tự động refresh session.
 *   `server/db.ts`: Lớp wrapper Prisma Client giả lập mô hình dữ liệu cũ và đóng gói các API tương tác DB.
@@ -113,3 +113,8 @@ model Notification {
 4.  **Bảng thống kê và Heatmap**:
     *   Trang thống kê gọi API `GET /api/stats/dashboard` và `GET /api/stats/history`.
     *   Màu sắc của các ô heatmap trong Activity Calendar grid được hiển thị linh hoạt theo các lớp CSS `.heatmap-cell-0` đến `.heatmap-cell-3` sử dụng hàm `color-mix` để tự tương thích với cả 2 giao diện sáng/tối.
+5.  **Trục thời gian hoạt động (Activity Timeline)**:
+    *   Trang Timeline (`TimelinePage.tsx`) tự động tính toán ngày bắt đầu và kết thúc của tháng đang chọn để gọi API `GET /api/stats/history?from=&to=` lấy toàn bộ lịch sử log.
+    *   Calendar Grid hiển thị các chấm xanh nếu ngày đó có ít nhất 1 log, và hiển thị ngôi sao lấp lánh nếu có từ 3 logs trở lên (cột mốc đột phá).
+    *   Nhấp chọn một ngày bất kỳ trên lưới để lọc nhanh danh sách feed hoạt động bên phải, hoặc bấm lại để hủy lọc (xem toàn bộ log trong tháng).
+    *   Tính năng xuất báo cáo định dạng CSV cho phép trích xuất trực tiếp toàn bộ log hoàn thành của tháng hiện tại ra file bảng tính qua cơ chế URI mã hóa.

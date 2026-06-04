@@ -548,3 +548,25 @@ html.light .heatmap-cell-2 {
   color: var(--color-on-secondary);
 }
 
+.neon-glow-primary {
+  box-shadow: 0 0 20px rgba(192, 193, 255, 0.15);
+}
+
+.neon-glow-secondary {
+  box-shadow: 0 0 20px rgba(78, 222, 163, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(144, 143, 160, 0.2);
+  border-radius: 10px;
+}
+
+

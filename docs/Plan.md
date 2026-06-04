@@ -17,12 +17,13 @@
 
 ## 3. Bản Đồ Màn Hình & API Endpoints (MVP Scope)
 
-### 3.1. Danh Sách 5 Màn Hình Chính
+### 3.1. Danh Sách 6 Màn Hình Chính
 1. **Home / Dashboard (`/`)**: Giao diện hiển thị danh sách 3 mục tiêu ngày (Max 3 Goals), thanh kéo lịch tuần 7 ngày (Weekly Slider Grid), bộ lọc danh mục và vòng tròn tiến độ.
 2. **Tạo mục tiêu (`/goals/new`)**: Form tạo thói quen trong 30 giây (Nhị phân hoặc Số lượng định lượng như cốc nước, km).
 3. **Chi tiết mục tiêu (`/goals/:id`)**: Nhật ký tiến độ 14 ngày, chuỗi lửa lớn và tỷ lệ hoàn thành lũy kế.
 4. **Lịch sử & Thống kê (`/stats`)**: Bento metrics (Tỷ lệ %, Chuỗi cực đại) + Biểu đồ cột 7 ngày + GitHub-style Activity Heatmap (28 ngày).
-5. **Cài đặt (`/settings`)**: Hồ sơ cá nhân (Múi giờ, Tên), công tắc bật hiệu ứng chúc mừng (Confetti) và Danger Zone (Xóa dữ liệu).
+5. **Trục thời gian hoạt động (`/timeline`)**: Lưới ô hiệu năng tháng (Performance Grid) tích hợp chấm xanh/sao vàng, feed hoạt động lọc động và xuất báo cáo CSV.
+6. **Cài đặt (`/settings`)**: Hồ sơ cá nhân (Múi giờ, Tên), công tắc bật hiệu ứng chúc mừng (Confetti) và Danger Zone (Xóa dữ liệu).
 
 ### 3.2. Hệ Thống API Hệ Mặt Đất (Endpoints)
 - **Auth**: `/api/auth/register`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, `PUT /api/auth/profile` (cập nhật thông tin cá nhân), `DELETE /api/auth/profile` (xóa tài khoản vĩnh viễn).

@@ -76,6 +76,16 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * Hiển thị danh sách lịch sử hoàn thành dưới dạng trục thời gian (`Timeline`) theo ngày/tháng cụ thể.
     * Render biểu đồ cột/đường trực quan cho Tỷ lệ hoàn thành (`Completion Rate Chart`) và Chuỗi ngày liên tục (`Streak Chart`).
 
+#### US-09: Màn hình Trục thời gian hoạt động (Activity Timeline Page)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 4.0
+* **Tiêu chí chấp nhận (AC):**
+    * **Lưới hiệu năng tháng (Performance Grid):** Hiển thị lịch dạng ô lưới cho tháng được chọn. Đánh dấu chấm tròn xanh tại các ngày có ghi nhận tiến độ (`GoalLog`) và đánh dấu ngôi sao vàng cho ngày đạt năng suất cao (&ge; 3 completions).
+    * **Tương tác bộ lọc:** Nhấn vào ngày bất kỳ trên Grid để lọc tức thì danh sách hoạt động ngày đó ở bảng bên phải. Bấm lại ngày đó để xóa bộ lọc.
+    * **Tìm kiếm & Phân loại:** Thanh tìm kiếm lọc động các bản ghi theo tên mục tiêu hoặc ghi chú đi kèm. Có icon phân loại màu sắc cho từng mục tiêu (Sức khỏe, Tập luyện, Công việc, Học tập, Tài chính, Thói quen).
+    * **Cột mốc vinh danh (Milestone Achievements):** Bento cards tự động tính toán để mở khóa danh hiệu "Consistent Leader" (khi chuỗi ngày hiện tại &ge; 10) và "Goal Crusher" (khi tổng check-in tháng hiện tại &ge; 15).
+    * **Xuất báo cáo hàng tháng:** Tải file `.csv` chứa danh sách chi tiết các check-in gồm ID log, ID mục tiêu, Tên mục tiêu, Phân loại, Thời gian và Ghi chú đi kèm.
+
 ### 📦 Module 4: Settings & Appearance Customization (Sprint 4 — 6.0 SP)
 
 #### US-07: Quản lý hồ sơ và Cấu hình cá nhân

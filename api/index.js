@@ -88,6 +88,12 @@ var PrismaDB = class {
           data: updateData
         });
         return mapUser(updated);
+      },
+      delete: async (id) => {
+        const deleted = await prisma.user.delete({
+          where: { id }
+        });
+        return mapUser(deleted);
       }
     };
     // Goals CRUD Operations
@@ -437,6 +443,60 @@ var logout = async (req, res, next) => {
     next(error);
   }
 };
+var updateProfile = async (req, res, next) => {
+  try {
+    const authReq = req;
+    if (!authReq.user) {
+      throw new AppError("Unauthenticated request", 401);
+    }
+    const { name, email, timezone } = req.body;
+    const userId = authReq.user.id;
+    if (!name || !email) {
+      throw new AppError("Name and email are required.", 400);
+    }
+    if (email !== authReq.user.email) {
+      const existingUser = await db.users.findUnique({ email });
+      if (existingUser) {
+        throw new AppError("An account with this email already exists.", 409);
+      }
+    }
+    const updatedUser = await db.users.update(userId, {
+      name,
+      email,
+      timezone: timezone || authReq.user.timezone
+    });
+    const accessToken = generateAccessToken(updatedUser);
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        timezone: updatedUser.timezone
+      },
+      accessToken
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var deleteAccount = async (req, res, next) => {
+  try {
+    const authReq = req;
+    if (!authReq.user) {
+      throw new AppError("Unauthenticated request", 401);
+    }
+    const userId = authReq.user.id;
+    await db.users.delete(userId);
+    res.status(200).json({
+      success: true,
+      message: "Account deleted successfully."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // src/routes/auth.ts
 var router = Router();
@@ -444,6 +504,8 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/refresh", refreshToken);
 router.post("/logout", logout);
+router.put("/profile", authMiddleware, updateProfile);
+router.delete("/profile", authMiddleware, deleteAccount);
 var auth_default = router;
 
 // src/routes/goals.ts
