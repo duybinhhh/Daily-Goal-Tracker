@@ -31,7 +31,8 @@ Khi truy cập vào ứng dụng lần đầu tiên, giao diện mặc định s
 
 Màn hình Dashboard (`/`) là trung tâm kiểm soát các hoạt động cần thực hiện trong ngày hiện tại.
 
-![Dashboard Overview](file:///d:/Download/daily-goal-tracker/assets/dashboard_preview.png) *(Nếu có)*
+<img width="1920" height="909" alt="image" src="https://github.com/user-attachments/assets/9b53803b-0f2a-4be5-a4b9-6e2d580d0e8d" />
+
 
 ### 2.1. Các Thành Phần Chính trên Dashboard
 - **Header Thông Minh**: Chào hỏi cá nhân hóa động theo buổi (Sáng/Chiều/Tối), hiển thị huy hiệu ngọn lửa **Streak** cao nhất hiện tại của bạn và nút làm mới dữ liệu nhanh (**Refresh**).
