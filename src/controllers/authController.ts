@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "../../server/db";
 import { AppError } from "../middleware/errorHandler";
-import { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET } from "../middleware/auth";
+import { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, AuthenticatedRequest } from "../middleware/auth";
 
 // Helpers to sign tokens
 const generateAccessToken = (user: { id: string; email: string; name: string; timezone: string }): string => {
@@ -165,6 +165,71 @@ export const logout = async (req: Request, res: Response, next: NextFunction): P
     res.status(200).json({
       success: true,
       message: "Successfully logged out.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    if (!authReq.user) {
+      throw new AppError("Unauthenticated request", 401);
+    }
+    const { name, email, timezone } = req.body;
+    const userId = authReq.user.id;
+
+    if (!name || !email) {
+      throw new AppError("Name and email are required.", 400);
+    }
+
+    // Check if new email is already taken
+    if (email !== authReq.user.email) {
+      const existingUser = await db.users.findUnique({ email });
+      if (existingUser) {
+        throw new AppError("An account with this email already exists.", 409);
+      }
+    }
+
+    const updatedUser = await db.users.update(userId, {
+      name,
+      email,
+      timezone: timezone || authReq.user.timezone,
+    });
+
+    // Generate new access token with updated profile information
+    const accessToken = generateAccessToken(updatedUser);
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        timezone: updatedUser.timezone,
+      },
+      accessToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteAccount = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    if (!authReq.user) {
+      throw new AppError("Unauthenticated request", 401);
+    }
+    const userId = authReq.user.id;
+
+    await db.users.delete(userId);
+
+    res.status(200).json({
+      success: true,
+      message: "Account deleted successfully.",
     });
   } catch (error) {
     next(error);

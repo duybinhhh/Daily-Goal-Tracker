@@ -1,13 +1,301 @@
 // src/pages/DashboardPage.tsx
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Flame, Sparkles, FolderKanban, BookOpen, AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 import { useGoals } from "../hooks/useGoals";
 import { useAuthStore } from "../store/authStore";
 import { GoalCard } from "../components/GoalCard";
-import { Card } from "../components/ui/Card";
-import { Button } from "../components/ui/Button";
 
+/* ── Shared section label style ── */
+const SECTION_LABEL: React.CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 600,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase" as const,
+  color: "var(--color-on-surface-variant)",
+};
+
+/* ─── Mini Calendar ─── */
+const MiniCalendar: React.FC = () => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const today = new Date();
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() === month;
+
+  const monthName = currentDate.toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Convert Sunday-first to Monday-first
+  const startOffset = (firstDay + 6) % 7;
+
+  const prevMonth = () =>
+    setCurrentDate(new Date(year, month - 1, 1));
+  const nextMonth = () =>
+    setCurrentDate(new Date(year, month + 1, 1));
+
+  const cells: (number | null)[] = [
+    ...Array(startOffset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+
+  // Pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="glass-card" style={{ padding: "20px" }}>
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "16px",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "var(--color-on-surface-variant)",
+          }}
+        >
+          {monthName}
+        </span>
+        <div style={{ display: "flex", gap: "2px" }}>
+          <button className="btn-ghost" style={{ padding: "4px 6px" }} onClick={prevMonth}>
+            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
+              chevron_left
+            </span>
+          </button>
+          <button className="btn-ghost" style={{ padding: "4px 6px" }} onClick={nextMonth}>
+            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
+              chevron_right
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Day headers */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: "4px",
+          marginBottom: "6px",
+          textAlign: "center",
+        }}
+      >
+        {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
+          <div
+            key={d}
+            style={{
+              fontSize: "10px",
+              fontWeight: 700,
+              color: "var(--color-outline)",
+              letterSpacing: "0.04em",
+            }}
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Day cells */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: "4px",
+          textAlign: "center",
+        }}
+      >
+        {cells.map((day, idx) => {
+          if (!day) return <div key={`empty-${idx}`} />;
+
+          const isToday =
+            isCurrentMonth && day === today.getDate();
+          const isPast =
+            isCurrentMonth && day < today.getDate();
+
+          return (
+            <div
+              key={day}
+              style={{
+                padding: "6px 2px",
+                borderRadius: "8px",
+                fontSize: "12px",
+                fontWeight: isToday ? 700 : 400,
+                cursor: "pointer",
+                transition: "background 0.15s",
+                color: isToday
+                  ? "var(--color-on-primary)"
+                  : isPast
+                  ? "var(--color-outline)"
+                  : "var(--color-on-surface)",
+                background: isToday
+                  ? "var(--color-primary)"
+                  : "transparent",
+                boxShadow: isToday
+                  ? "0 4px 12px rgba(192,193,255,0.25)"
+                  : "none",
+                opacity: isPast ? 0.4 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!isToday)
+                  (e.currentTarget as HTMLDivElement).style.background =
+                    "var(--bg-hover)";
+              }}
+              onMouseLeave={(e) => {
+                if (!isToday)
+                  (e.currentTarget as HTMLDivElement).style.background =
+                    "transparent";
+              }}
+            >
+              {day}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ─── Upcoming Milestones ─── */
+interface MilestoneProps {
+  bestStreak: number;
+  doneTodayCount: number;
+  totalActCount: number;
+  goals: Array<{ title: string; streak?: { current_streak: number } }>;
+}
+
+const UpcomingMilestones: React.FC<MilestoneProps> = ({
+  bestStreak,
+  doneTodayCount,
+  totalActCount,
+  goals,
+}) => {
+  const milestones: Array<{
+    label: string;
+    sub: string;
+    color: string;
+  }> = [];
+
+  // Streak milestone
+  const nextStreakTarget =
+    bestStreak < 7 ? 7 : bestStreak < 15 ? 15 : bestStreak < 30 ? 30 : 50;
+  const daysLeft = nextStreakTarget - bestStreak;
+  if (bestStreak > 0) {
+    milestones.push({
+      label: `${nextStreakTarget}-Day Fire Streak`,
+      sub:
+        daysLeft === 0
+          ? "Milestone reached! 🎉"
+          : `${daysLeft} day${daysLeft > 1 ? "s" : ""} remaining`,
+      color: "var(--color-tertiary)",
+    });
+  }
+
+  // Today completion milestone
+  const remaining = totalActCount - doneTodayCount;
+  if (totalActCount > 0 && remaining > 0) {
+    milestones.push({
+      label: "Complete Today's Goals",
+      sub: `${remaining} goal${remaining > 1 ? "s" : ""} left to finish today`,
+      color: "var(--color-secondary)",
+    });
+  } else if (totalActCount > 0 && remaining === 0) {
+    milestones.push({
+      label: "All Goals Met! 🎯",
+      sub: "You crushed it today",
+      color: "var(--color-secondary)",
+    });
+  }
+
+  // Longest streak goal from any active goal
+  const topGoal = goals.reduce(
+    (best, g) =>
+      (g.streak?.current_streak || 0) > (best.streak?.current_streak || 0)
+        ? g
+        : best,
+    goals[0]
+  );
+
+  if (topGoal && topGoal.streak && topGoal.streak.current_streak > 0) {
+    milestones.push({
+      label: topGoal.title,
+      sub: `${topGoal.streak.current_streak}d streak — keep it going!`,
+      color: "var(--color-primary)",
+    });
+  }
+
+  if (milestones.length === 0) {
+    milestones.push({
+      label: "Create your first goal",
+      sub: "Set a target to start tracking",
+      color: "var(--color-outline)",
+    });
+  }
+
+  return (
+    <div className="glass-card" style={{ padding: "20px" }}>
+      <h3
+        style={{
+          fontSize: "11px",
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "var(--color-on-surface-variant)",
+          marginBottom: "16px",
+        }}
+      >
+        Upcoming Milestones
+      </h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+        {milestones.map((m, i) => (
+          <div key={i} style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+            <div
+              style={{
+                width: "3px",
+                height: "44px",
+                borderRadius: "9999px",
+                background: m.color,
+                flexShrink: 0,
+                marginTop: "2px",
+              }}
+            />
+            <div>
+              <p
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "var(--color-on-surface)",
+                  marginBottom: "3px",
+                }}
+              >
+                {m.label}
+              </p>
+              <p style={{ fontSize: "11px", color: "var(--color-on-surface-variant)" }}>
+                {m.sub}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ─── Main Dashboard Page ─── */
 export const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
   const {
@@ -27,179 +315,588 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) {
-      setGreeting("Good morning");
-    } else if (hour < 18) {
-      setGreeting("Good afternoon");
-    } else {
-      setGreeting("Good evening");
-    }
+    if (hour < 12) setGreeting("Good morning");
+    else if (hour < 18) setGreeting("Good afternoon");
+    else setGreeting("Good evening");
   }, []);
 
   const totalActCount = goals.filter((g) => g.status === "active").length;
-  const doneTodayCount = goals.filter((g) => g.current_count >= g.target_count).length;
-  const completionRate = totalActCount > 0 ? Math.round((doneTodayCount / totalActCount) * 100) : 0;
+  const doneTodayCount = goals.filter(
+    (g) => g.current_count >= g.target_count
+  ).length;
+  const completionRate =
+    totalActCount > 0 ? Math.round((doneTodayCount / totalActCount) * 100) : 0;
 
-  // Derive high streak stats safely from goals
-  const activeStreaks = goals.map((g) => g.streak?.current_streak || 0);
-  const bestCurrentStreak = activeStreaks.length > 0 ? Math.max(...activeStreaks) : 0;
+  const bestCurrentStreak = Math.max(
+    0,
+    ...goals.map((g) => g.streak?.current_streak || 0)
+  );
+  const totalCompleted = goals.reduce((sum, g) => sum + g.current_count, 0);
 
   return (
-    <div className="min-h-screen bg-slate-950 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Dynamic User Greetings Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-900 pb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2">
-              {greeting}, {user?.name || "Achiever"}! <Sparkles className="w-5 h-5 text-amber-400 fill-amber-500/20" />
-            </h1>
-            <p className="text-sm text-slate-400 mt-1">
-              Here is your daily layout. Achieve your milestones step-by-step today.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={refreshAll}
-              className="text-slate-400 py-1.5 px-3 hover:text-white"
-            >
-              <RefreshCw className="w-4 h-4 mr-1.5" />
-              Refresh
-            </Button>
-            <Link to="/new-goal">
-              <Button variant="primary" size="md" className="font-semibold text-xs sm:text-sm">
-                <Plus className="w-4 h-4 mr-1.5" />
-                Add New Goal
-              </Button>
-            </Link>
-          </div>
-        </div>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      {/* ── Sticky Header ── */}
+      <header
+        id="dashboard-header"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          padding: "14px 24px",
+          borderBottom: "1px solid var(--border-subtle)",
+          background: "var(--header-bg)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+        }}
+      >
+        <h1
+          style={{
+            fontSize: "22px",
+            fontWeight: 700,
+            letterSpacing: "-0.03em",
+            color: "var(--color-on-surface)",
+          }}
+        >
+          {greeting},{" "}
+          <span style={{ color: "var(--color-primary)" }}>
+            {user?.name || "Achiever"}
+          </span>{" "}
+          ✦
+        </h1>
 
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {/* Streak badge in header */}
+          {bestCurrentStreak > 0 && (
+            <div className="streak-badge">
+              <span
+                className="material-symbols-outlined ms-filled"
+                style={{ fontSize: "15px" }}
+              >
+                local_fire_department
+              </span>
+              {bestCurrentStreak} Day Streak
+            </div>
+          )}
+          <button onClick={refreshAll} className="btn-ghost" title="Refresh">
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+          <Link to="/new-goal" className="btn-primary">
+            <span
+              className="material-symbols-outlined"
+              style={{ fontSize: "16px" }}
+            >
+              add
+            </span>
+            Add Goal
+          </Link>
+        </div>
+      </header>
+
+      {/* ── Main Content ── */}
+      <main
+        style={{
+          flex: 1,
+          padding: "24px 24px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "20px",
+        }}
+      >
+        {/* Error Banner */}
         {error && (
-          <div className="p-4 bg-rose-500/10 border border-rose-500/25 text-rose-400 rounded-xl text-sm flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 mr-1" />
-            <span>{error}</span>
+          <div
+            style={{
+              padding: "12px 16px",
+              background: "rgba(255, 180, 171, 0.08)",
+              border: "1px solid rgba(255, 180, 171, 0.2)",
+              borderRadius: "0.75rem",
+              color: "var(--color-error)",
+              fontSize: "13px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <AlertCircle size={16} />
+            {error}
           </div>
         )}
 
-        {/* Dashboard Analytics Bento boxes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          <Card className="flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs text-slate-500 uppercase tracking-widest font-semibold block">Today's Progress</span>
-              <span className="text-3xl font-extrabold text-slate-100">{doneTodayCount} / {totalActCount}</span>
-              <span className="text-xs text-emerald-400 block font-medium">Completed goals count</span>
-            </div>
-            <div className="relative h-16 w-16 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-full">
-              <span className="text-xs font-bold text-slate-100">{completionRate}%</span>
-            </div>
-          </Card>
-
-          <Card className="flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs text-slate-500 uppercase tracking-widest font-semibold block">Active Streak Highs</span>
-              <span className="text-3xl font-extrabold text-amber-400 flex items-center gap-1.5">
-                <Flame className="w-7 h-7 text-amber-500 fill-amber-500/25" />
-                {bestCurrentStreak} days
+        {/* ── Bento Stats Row ── */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "16px",
+          }}
+        >
+          {/* Today's Progress */}
+          <div className="glass-card glass-card-glow stat-card">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--color-on-surface-variant)",
+                }}
+              >
+                Today's Progress
               </span>
-              <span className="text-xs text-slate-400 block">Your best consecutive streak</span>
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: "20px", color: "var(--color-secondary)" }}
+              >
+                trending_up
+              </span>
             </div>
-          </Card>
-
-          <Card className="flex items-center justify-between sm:col-span-2 lg:col-span-1">
-            <div className="space-y-1">
-              <span className="text-xs text-slate-500 uppercase tracking-widest font-semibold block">Metrics Rate</span>
-              <div className="h-2 w-full max-w-[180px] bg-slate-950 rounded-full mt-2.5 overflow-hidden">
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "8px",
+                  marginBottom: "10px",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "32px",
+                    fontWeight: 800,
+                    letterSpacing: "-0.04em",
+                    color: "var(--color-on-surface)",
+                  }}
+                >
+                  {completionRate}%
+                </span>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "var(--color-secondary)",
+                  }}
+                >
+                  {doneTodayCount}/{totalActCount} goals
+                </span>
+              </div>
+              <div className="progress-track">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400"
-                  style={{ width: `${completionRate}%` }}
+                  className="progress-fill"
+                  style={{
+                    width: `${completionRate}%`,
+                    background: "var(--color-secondary)",
+                  }}
                 />
               </div>
-              <span className="text-slate-400 text-xs block pt-2">{completionRate}% total completion percentage</span>
             </div>
-            <div className="h-10 w-10 shrink-0 flex items-center justify-center bg-emerald-500/10 text-emerald-400 rounded-lg">
-              <Sparkles className="w-5 h-5" />
+          </div>
+
+          {/* Streak */}
+          <div
+            className="glass-card glass-card-glow stat-card"
+            style={{ position: "relative", overflow: "hidden" }}
+          >
+            <span
+              className="material-symbols-outlined ms-filled"
+              style={{
+                position: "absolute",
+                right: "-12px",
+                top: "-12px",
+                fontSize: "110px",
+                opacity: 0.04,
+                color: "var(--color-tertiary)",
+                pointerEvents: "none",
+              }}
+            >
+              local_fire_department
+            </span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                position: "relative",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--color-on-surface-variant)",
+                }}
+              >
+                Current Streak
+              </span>
+              <span
+                className="material-symbols-outlined ms-filled"
+                style={{ fontSize: "20px", color: "var(--color-tertiary)" }}
+              >
+                local_fire_department
+              </span>
             </div>
-          </Card>
+            <div style={{ position: "relative" }}>
+              <span
+                style={{
+                  fontSize: "32px",
+                  fontWeight: 800,
+                  letterSpacing: "-0.04em",
+                  color: "var(--color-on-surface)",
+                }}
+              >
+                {bestCurrentStreak} Days
+              </span>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--color-on-surface-variant)",
+                  marginTop: "4px",
+                }}
+              >
+                {bestCurrentStreak >= 7
+                  ? "Top 5% of all users 🏆"
+                  : "Keep it up!"}
+              </p>
+            </div>
+          </div>
+
+          {/* Total Completed */}
+          <div className="glass-card glass-card-glow stat-card">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--color-on-surface-variant)",
+                }}
+              >
+                Total Logged
+              </span>
+              <span
+                className="material-symbols-outlined ms-filled"
+                style={{ fontSize: "20px", color: "var(--color-primary)" }}
+              >
+                verified
+              </span>
+            </div>
+            <div>
+              <span
+                style={{
+                  fontSize: "32px",
+                  fontWeight: 800,
+                  letterSpacing: "-0.04em",
+                  color: "var(--color-on-surface)",
+                }}
+              >
+                {totalCompleted.toLocaleString()}
+              </span>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--color-on-surface-variant)",
+                  marginTop: "4px",
+                }}
+              >
+                {doneTodayCount >= totalActCount && totalActCount > 0
+                  ? "Milestone reached: Elite 🎯"
+                  : "Progress logged across all goals"}
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Category filters chip sliders */}
-        {goals.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-2 text-xs font-bold rounded-full transition-all border ${
-                  activeCategory.toLowerCase() === cat.toLowerCase()
-                    ? "bg-emerald-600 border-emerald-500 text-white"
-                    : "bg-slate-900 border-slate-800/80 text-slate-400 hover:text-white"
-                }`}
+        {/* ── Two-Column Layout: Goals + Right Panel ── */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) 300px",
+            gap: "20px",
+            alignItems: "start",
+            flex: 1,
+          }}
+        >
+          {/* ── LEFT: Goal List ── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* Section header + filters */}
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "12px",
+                }}
               >
-                {cat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Dynamic Content view list */}
-        {loading ? (
-          <div className="text-center py-24 space-y-3">
-            <div className="animate-spin h-8 w-8 text-emerald-500 mx-auto border-t-2 border-emerald-500 border-l border-r border-transparent rounded-full" />
-            <p className="text-sm text-slate-400">Loading daily layout...</p>
-          </div>
-        ) : filteredGoals.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredGoals.map((goal) => (
-              <GoalCard
-                key={goal.id}
-                goal={goal}
-                onComplete={completeGoalProgress}
-                onDelete={deleteGoal}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center max-w-md mx-auto py-16 px-4 bg-slate-900/40 border border-slate-800/60 rounded-2xl">
-            {goals.length === 0 ? (
-              <div className="space-y-4">
-                <FolderKanban className="w-12 h-12 text-slate-600 mx-auto stroke-[1.5]" />
-                <div>
-                  <h3 className="text-base font-bold text-slate-200">No goals found</h3>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto mt-1">
-                    Start tracking healthy habits today by writing down your first daily target.
-                  </p>
-                </div>
-                <div className="pt-2">
-                  <Link to="/new-goal">
-                    <Button variant="primary" size="md">
-                      <Plus className="w-4 h-4 mr-1.5" />
-                      Create first Goal
-                    </Button>
-                  </Link>
+                <h2
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: 700,
+                    letterSpacing: "-0.02em",
+                    color: "var(--color-on-surface)",
+                  }}
+                >
+                  Today's Priority Goals
+                </h2>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  <button
+                    className="btn-ghost"
+                    style={{ padding: "6px 8px" }}
+                    title="Filter"
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ fontSize: "18px" }}
+                    >
+                      filter_list
+                    </span>
+                  </button>
+                  <button
+                    className="btn-ghost"
+                    style={{ padding: "6px 8px" }}
+                    title="Grid View"
+                  >
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ fontSize: "18px" }}
+                    >
+                      grid_view
+                    </span>
+                  </button>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <BookOpen className="w-11 h-11 text-slate-600 mx-auto stroke-[1.5]" />
-                <div>
-                  <h3 className="text-base font-semibold text-slate-200">No habits on category "{activeCategory}"</h3>
-                  <p className="text-xs text-slate-400 max-w-xs mx-auto mt-1">
-                    No active daily goals map to this category selector right now.
-                  </p>
+
+              {/* Category chips */}
+              {goals.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    overflowX: "auto",
+                    paddingBottom: "4px",
+                  }}
+                >
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className={`filter-chip ${
+                        activeCategory.toLowerCase() === cat.toLowerCase()
+                          ? "filter-chip-active"
+                          : "filter-chip-inactive"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
                 </div>
-                <div className="pt-2">
-                  <Button variant="secondary" size="sm" onClick={() => setActiveCategory("All")}>
-                    Clear Filter
-                  </Button>
+              )}
+            </div>
+
+            {/* Goal cards */}
+            {loading ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "14px",
+                  padding: "64px 0",
+                }}
+              >
+                <div
+                  className="spinner"
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    color: "var(--color-primary)",
+                  }}
+                />
+                <p
+                  style={{
+                    fontSize: "13px",
+                    color: "var(--color-on-surface-variant)",
+                  }}
+                >
+                  Loading daily layout...
+                </p>
+              </div>
+            ) : filteredGoals.length > 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                {filteredGoals.map((goal) => (
+                  <GoalCard
+                    key={goal.id}
+                    goal={goal}
+                    onComplete={completeGoalProgress}
+                    onDelete={deleteGoal}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "48px 0",
+                }}
+              >
+                <div
+                  className="glass-card"
+                  style={{
+                    maxWidth: "340px",
+                    width: "100%",
+                    padding: "40px 28px",
+                    textAlign: "center",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "14px",
+                  }}
+                >
+                  {goals.length === 0 ? (
+                    <>
+                      <span
+                        className="material-symbols-outlined"
+                        style={{
+                          fontSize: "48px",
+                          color: "var(--color-outline)",
+                          opacity: 0.5,
+                        }}
+                      >
+                        folder_open
+                      </span>
+                      <div>
+                        <h3
+                          style={{
+                            fontSize: "15px",
+                            fontWeight: 700,
+                            color: "var(--color-on-surface)",
+                            marginBottom: "6px",
+                          }}
+                        >
+                          No goals yet
+                        </h3>
+                        <p
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--color-on-surface-variant)",
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          Start by creating your first daily goal to build
+                          lasting habits.
+                        </p>
+                      </div>
+                      <Link to="/new-goal" className="btn-primary">
+                        <span
+                          className="material-symbols-outlined"
+                          style={{ fontSize: "16px" }}
+                        >
+                          add
+                        </span>
+                        Create First Goal
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        className="material-symbols-outlined"
+                        style={{
+                          fontSize: "48px",
+                          color: "var(--color-outline)",
+                          opacity: 0.5,
+                        }}
+                      >
+                        menu_book
+                      </span>
+                      <div>
+                        <h3
+                          style={{
+                            fontSize: "15px",
+                            fontWeight: 700,
+                            color: "var(--color-on-surface)",
+                            marginBottom: "6px",
+                          }}
+                        >
+                          No goals in "{activeCategory}"
+                        </h3>
+                        <p
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--color-on-surface-variant)",
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          No active goals match this category filter.
+                        </p>
+                      </div>
+                      <button
+                        className="btn-ghost"
+                        onClick={() => setActiveCategory("All")}
+                        style={{
+                          padding: "7px 16px",
+                          border:
+                            "1px solid var(--color-outline-variant)",
+                          borderRadius: "9999px",
+                        }}
+                      >
+                        Clear Filter
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
           </div>
-        )}
-      </div>
+
+          {/* ── RIGHT PANEL: Calendar + Milestones ── */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              position: "sticky",
+              top: "72px",
+            }}
+          >
+            <MiniCalendar />
+            <UpcomingMilestones
+              bestStreak={bestCurrentStreak}
+              doneTodayCount={doneTodayCount}
+              totalActCount={totalActCount}
+              goals={goals}
+            />
+          </div>
+        </div>
+      </main>
     </div>
   );
 };

@@ -19,42 +19,74 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 }) => {
   const percentage = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
 
-  const heightClass = {
-    sm: "h-1.5",
-    md: "h-3",
-    lg: "h-4",
-  }[size];
+  const heightMap = { sm: "4px", md: "6px", lg: "8px" };
+  const height = heightMap[size];
 
-  let progressColor = "bg-sky-500";
+  let fillColor = "var(--color-primary)";
   if (percentage >= 100) {
-    progressColor = "bg-gradient-to-r from-emerald-500 to-teal-400";
+    fillColor = "var(--color-secondary)";
   } else if (percentage >= 50) {
-    progressColor = "bg-gradient-to-r from-emerald-600 to-sky-500";
+    fillColor = "var(--color-primary)";
   } else if (percentage > 0) {
-    progressColor = "bg-amber-500";
+    fillColor = "var(--color-tertiary)";
   } else {
-    progressColor = "bg-slate-800";
+    fillColor = "var(--color-surface-container-high)";
   }
 
   return (
-    <div className="w-full">
+    <div style={{ width: "100%" }}>
       {(label || showPercent) && (
-        <div className="mb-1.5 flex items-center justify-between text-xs font-semibold text-slate-400">
-          {label && <span className="line-clamp-1 truncate">{label}</span>}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "8px",
+            fontSize: "12px",
+            fontWeight: 600,
+            color: "var(--color-on-surface-variant)",
+          }}
+        >
+          {label && (
+            <span
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {label}
+            </span>
+          )}
           {showPercent && (
             <span
-              className={
-                percentage >= 100 ? "text-emerald-400 font-semibold" : "text-slate-400"
-              }
+              style={{
+                color:
+                  percentage >= 100
+                    ? "var(--color-secondary)"
+                    : "var(--color-on-surface-variant)",
+              }}
             >
               {percentage}% ({value}/{max})
             </span>
           )}
         </div>
       )}
-      <div className={`w-full overflow-hidden rounded-full bg-slate-900 border border-slate-800/80 p-[2px] ${heightClass}`}>
+      <div
+        style={{
+          width: "100%",
+          height,
+          background: "var(--color-surface-container-high)",
+          borderRadius: "9999px",
+          overflow: "hidden",
+        }}
+      >
         <motion.div
-          className={`h-full rounded-full ${progressColor}`}
+          style={{
+            height: "100%",
+            borderRadius: "9999px",
+            background: fillColor,
+          }}
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
           transition={{ duration: 0.6, ease: "easeOut" }}

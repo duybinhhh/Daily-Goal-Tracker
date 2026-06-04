@@ -17,6 +17,8 @@ interface AuthState {
   logout: () => Promise<void>;
   checkAuth: () => void;
   clearError: () => void;
+  updateProfile: (name: string, email: string, timezone: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -114,6 +116,43 @@ export const useAuthStore = create<AuthState>((set) => ({
       clearStoredTokens();
       localStorage.removeItem("user");
       set({ user: null, isAuthenticated: false, error: null });
+    }
+  },
+
+  updateProfile: async (name, email, timezone) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.put("/api/auth/profile", { name, email, timezone });
+      const { user, accessToken } = response.data;
+      
+      localStorage.setItem("user", JSON.stringify(user));
+      if (accessToken) {
+        const currentRefreshToken = localStorage.getItem("refreshToken") || "";
+        setStoredTokens(accessToken, currentRefreshToken);
+      }
+
+      set({
+        user,
+        loading: false,
+      });
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to update profile.";
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  deleteAccount: async () => {
+    set({ loading: true, error: null });
+    try {
+      await api.delete("/api/auth/profile");
+      clearStoredTokens();
+      localStorage.removeItem("user");
+      set({ user: null, isAuthenticated: false, loading: false });
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to delete account.";
+      set({ error: msg, loading: false });
+      throw new Error(msg);
     }
   },
 }));

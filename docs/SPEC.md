@@ -76,6 +76,27 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * Hiển thị danh sách lịch sử hoàn thành dưới dạng trục thời gian (`Timeline`) theo ngày/tháng cụ thể.
     * Render biểu đồ cột/đường trực quan cho Tỷ lệ hoàn thành (`Completion Rate Chart`) và Chuỗi ngày liên tục (`Streak Chart`).
 
+### 📦 Module 4: Settings & Appearance Customization (Sprint 4 — 6.0 SP)
+
+#### US-07: Quản lý hồ sơ và Cấu hình cá nhân
+* **Độ ưu tiên:** High / Medium
+* **Story Point:** 3.0
+* **Tiêu chí chấp nhận (AC):**
+    * Cho phép cập nhật tên hiển thị (Display Name), Email và múi giờ (Timezone) của người dùng hiện tại.
+    * Gửi yêu cầu qua API `PUT /api/auth/profile` để đồng bộ thông tin vào Database và cấp lại Access Token mới chứa thông tin cập nhật.
+    * Hỗ trợ lưu trữ các cấu hình bật/tắt thông báo dưới client bao gồm: nhắc nhở hàng ngày, thông báo sắp đứt chuỗi Streak, và cột mốc hoàn thành.
+    * Hỗ trợ nút hành động "Export My Data" cho phép trích xuất toàn bộ dữ liệu mục tiêu và lịch sử của người dùng ra file JSON.
+    * Hỗ trợ nút hành động "Delete Account" cho phép xóa vĩnh viễn tài khoản kèm toàn bộ dữ liệu liên quan ở backend qua API `DELETE /api/auth/profile` (yêu cầu Modal xác nhận an toàn trước khi xóa).
+
+#### US-08: Tùy biến giao diện (Theme & Opacity)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 3.0
+* **Tiêu chí chấp nhận (AC):**
+    * Tích hợp bộ chọn chủ đề sáng/tối (Dark/Light Theme) với cơ chế preview trực quan thời gian thực.
+    * Giao diện chế độ sáng (Light Mode) tuân thủ ngôn ngữ Momentum: sử dụng màu nền xám sáng, các thẻ kính mờ màu trắng đục, chữ tối tương phản cao và viền mảnh tinh tế.
+    * Cho phép điều chỉnh độ trong suốt của kính mờ (Glass Opacity) qua thanh trượt trong khoảng 20% - 95% bằng cách cập nhật biến CSS trực tiếp.
+    * Lưu lựa chọn theme và opacity của người dùng vào `localStorage` để tự động phục hồi ở các phiên làm việc sau.
+
 ---
 
 ## 4. Tech Stack Đề Xuất (Tinh gọn & Đồng bộ)

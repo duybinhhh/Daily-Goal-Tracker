@@ -1,7 +1,6 @@
 // src/pages/LoginPage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, Target, Mail, Lock, User as UserIcon } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -11,11 +10,7 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [isRegister, setIsRegister] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    name: "",
-  });
+  const [formData, setFormData] = useState({ email: "", password: "", name: "" });
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
@@ -25,33 +20,18 @@ export const LoginPage: React.FC = () => {
   }, [isRegister, clearError]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/");
-    }
+    if (isAuthenticated) navigate("/");
   }, [isAuthenticated, navigate]);
 
   const validate = () => {
     const errors: { [key: string]: string } = {};
-
-    if (!formData.email) {
-      errors.email = "Email is required.";
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
-        errors.email = "Please input a valid email address.";
-      }
-    }
-
-    if (!formData.password) {
-      errors.password = "Password is required.";
-    } else if (formData.password.length < 6) {
+    if (!formData.email) errors.email = "Email is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
+      errors.email = "Please enter a valid email address.";
+    if (!formData.password) errors.password = "Password is required.";
+    else if (formData.password.length < 6)
       errors.password = "Password must be at least 6 characters.";
-    }
-
-    if (isRegister && !formData.name) {
-      errors.name = "Full name is required to register.";
-    }
-
+    if (isRegister && !formData.name) errors.name = "Full name is required.";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -59,7 +39,6 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-
     try {
       if (isRegister) {
         await register(formData.email, formData.password, formData.name);
@@ -68,44 +47,140 @@ export const LoginPage: React.FC = () => {
       }
       navigate("/");
     } catch (err) {
-      console.error("Authentication action failed:", err);
+      console.error("Auth failed:", err);
     }
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-slate-950 px-4 py-12">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800/80 rounded-2xl p-8 shadow-xl shadow-black/40">
-        
-        {/* Brand Banner */}
-        <div className="text-center mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-white shadow-lg shadow-emerald-950/45 mb-4">
-            <Target className="h-6 w-6 animate-pulse" />
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--color-background)",
+        padding: "32px 16px",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Background blobs */}
+      <div
+        style={{
+          position: "absolute",
+          top: "-20%",
+          left: "-10%",
+          width: "500px",
+          height: "500px",
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(192,193,255,0.06) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          bottom: "-20%",
+          right: "-10%",
+          width: "400px",
+          height: "400px",
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(78,222,163,0.05) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        className="glass-card animate-fade-in"
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          padding: "40px 36px",
+          position: "relative",
+        }}
+      >
+        {/* Brand */}
+        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "52px",
+              height: "52px",
+              borderRadius: "1rem",
+              background: "var(--color-primary)",
+              marginBottom: "16px",
+              boxShadow: "0 8px 24px rgba(192,193,255,0.25)",
+            }}
+          >
+            <span
+              className="material-symbols-outlined ms-filled"
+              style={{ fontSize: "28px", color: "var(--color-on-primary)" }}
+            >
+              bolt
+            </span>
           </div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">
-            {isRegister ? "Create your Account" : "Welcome Back"}
-          </h2>
-          <p className="text-sm text-slate-400 mt-1.5">
+          <h1
+            style={{
+              fontSize: "24px",
+              fontWeight: 800,
+              letterSpacing: "-0.03em",
+              color: "var(--color-on-surface)",
+              marginBottom: "6px",
+            }}
+          >
+            {isRegister ? "Create Account" : "Welcome Back"}
+          </h1>
+          <p style={{ fontSize: "13px", color: "var(--color-on-surface-variant)" }}>
             {isRegister
-              ? "Establish consistent daily goal tracking easily"
-              : "Access your daily goals to build long-term positive habits"}
+              ? "Start tracking your daily goals and build better habits"
+              : "Sign in to access your daily goal tracker"}
           </p>
         </div>
 
+        {/* Error */}
         {error && (
-          <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium rounded-lg text-center animate-shake">
+          <div
+            style={{
+              marginBottom: "20px",
+              padding: "10px 14px",
+              background: "rgba(255,180,171,0.08)",
+              border: "1px solid rgba(255,180,171,0.2)",
+              borderRadius: "0.75rem",
+              color: "var(--color-error)",
+              fontSize: "12px",
+              fontWeight: 500,
+              textAlign: "center",
+            }}
+          >
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {isRegister && (
-            <div className="relative">
-              <UserIcon className="absolute left-3 top-[38px] h-4 w-4 text-slate-500" />
+            <div style={{ position: "relative" }}>
+              <span
+                className="material-symbols-outlined"
+                style={{
+                  position: "absolute",
+                  left: "12px",
+                  top: "34px",
+                  fontSize: "18px",
+                  color: "var(--color-outline)",
+                  pointerEvents: "none",
+                  zIndex: 1,
+                }}
+              >
+                person
+              </span>
               <Input
                 id="name"
                 label="Full Name"
                 placeholder="E.g., Binh Nguyen"
                 className="pl-10"
+                style={{ paddingLeft: "40px" }}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 error={formErrors.name}
@@ -115,14 +190,27 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          <div className="relative">
-            <Mail className="absolute left-3 top-[38px] h-4 w-4 text-slate-500" />
+          <div style={{ position: "relative" }}>
+            <span
+              className="material-symbols-outlined"
+              style={{
+                position: "absolute",
+                left: "12px",
+                top: "34px",
+                fontSize: "18px",
+                color: "var(--color-outline)",
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            >
+              mail
+            </span>
             <Input
               id="email"
               label="Email Address"
               type="email"
-              placeholder="name@email.com"
-              className="pl-10"
+              placeholder="you@example.com"
+              style={{ paddingLeft: "40px" }}
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               error={formErrors.email}
@@ -131,14 +219,27 @@ export const LoginPage: React.FC = () => {
             />
           </div>
 
-          <div className="relative">
-            <Lock className="absolute left-3 top-[38px] h-4 w-4 text-slate-500" />
+          <div style={{ position: "relative" }}>
+            <span
+              className="material-symbols-outlined"
+              style={{
+                position: "absolute",
+                left: "12px",
+                top: "34px",
+                fontSize: "18px",
+                color: "var(--color-outline)",
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            >
+              lock
+            </span>
             <Input
               id="password"
               label="Password"
               type="password"
               placeholder="••••••••"
-              className="pl-10"
+              style={{ paddingLeft: "40px" }}
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               error={formErrors.password}
@@ -150,32 +251,57 @@ export const LoginPage: React.FC = () => {
           <Button
             type="submit"
             variant="primary"
-            className="w-full h-[45px] font-semibold text-sm mt-2"
             isLoading={loading}
+            style={{ width: "100%", padding: "12px 20px", marginTop: "8px", fontSize: "14px" }}
           >
-            {isRegister ? "Sign Up" : "Sign In"}
+            {isRegister ? "Create Account" : "Sign In"}
           </Button>
         </form>
 
-        <div className="mt-8 text-center border-t border-slate-800/60 pt-4 text-xs text-slate-400">
+        <div
+          style={{
+            marginTop: "24px",
+            paddingTop: "20px",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            textAlign: "center",
+            fontSize: "12px",
+            color: "var(--color-on-surface-variant)",
+          }}
+        >
           {isRegister ? (
             <p>
               Already have an account?{" "}
               <button
                 onClick={() => setIsRegister(false)}
-                className="text-emerald-400 hover:text-emerald-300 font-semibold underline transition-all bg-transparent border-0 cursor-pointer"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--color-primary)",
+                  fontWeight: 600,
+                  textDecoration: "underline",
+                  fontSize: "12px",
+                }}
               >
-                Sign In here
+                Sign In
               </button>
             </p>
           ) : (
             <p>
-              New to DailyGoal tracker?{" "}
+              New here?{" "}
               <button
                 onClick={() => setIsRegister(true)}
-                className="text-emerald-400 hover:text-emerald-300 font-semibold underline transition-all bg-transparent border-0 cursor-pointer"
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--color-primary)",
+                  fontWeight: 600,
+                  textDecoration: "underline",
+                  fontSize: "12px",
+                }}
               >
-                Create Account here
+                Create an Account
               </button>
             </p>
           )}

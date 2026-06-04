@@ -2,11 +2,12 @@
 import React, { useEffect } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
-import Navbar from "./components/Navbar";
+import Sidebar from "./components/Sidebar";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { GoalFormPage } from "./pages/GoalFormPage";
 import { Stats } from "./pages/Stats";
+import { SettingsPage } from "./pages/SettingsPage";
 
 // Auth Guard for protected workspace screens
 interface ProtectedRouteProps {
@@ -26,60 +27,73 @@ export default function App() {
 
   useEffect(() => {
     checkAuth();
+    const savedTheme = localStorage.getItem("setting_theme") || "dark";
+    if (savedTheme === "light") {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
+    } else {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    }
   }, [checkAuth]);
 
   return (
     <HashRouter>
-      <div
-        id="app-wrapper"
-        className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-emerald-600 selection:text-white"
-      >
-        <Navbar />
+      <Routes>
+        {/* Public authentication page — no sidebar */}
+        <Route path="/login" element={<LoginPage />} />
 
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <Routes>
-            {/* Public authentication page */}
-            <Route path="/login" element={<LoginPage />} />
-
-            {/* Protected daily tracker screens */}
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/new-goal"
-              element={
-                <ProtectedRoute>
-                  <GoalFormPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/edit-goal/:id"
-              element={
-                <ProtectedRoute>
-                  <GoalFormPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/stats"
-              element={
-                <ProtectedRoute>
-                  <Stats />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Fallback redirect */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
-      </div>
+        {/* Protected pages — with persistent sidebar */}
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
     </HashRouter>
+  );
+}
+
+function AppLayout() {
+  return (
+    <div
+      id="app-wrapper"
+      style={{
+        display: "flex",
+        width: "100vw",
+        height: "100vh",
+        background: "var(--color-background)",
+        color: "var(--color-on-background)",
+      }}
+    >
+      {/* Persistent Left Sidebar */}
+      <Sidebar />
+
+      {/* Scrollable main area — fills remaining width */}
+      <div
+        id="main-scroll-area"
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          overflowY: "auto",
+          overflowX: "hidden",
+        }}
+      >
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/new-goal" element={<GoalFormPage />} />
+          <Route path="/edit-goal/:id" element={<GoalFormPage />} />
+          <Route path="/stats" element={<Stats />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </div>
   );
 }

@@ -10,30 +10,48 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className = "", label, error, id, type = "text", ...props }, ref) => {
     return (
-      <div className="w-full mb-4">
+      <div style={{ width: "100%", marginBottom: "16px" }}>
         {label && (
           <label
             htmlFor={id}
-            className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5"
+            style={{
+              display: "block",
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.07em",
+              textTransform: "uppercase",
+              color: "var(--color-on-surface-variant)",
+              marginBottom: "6px",
+            }}
           >
             {label}
           </label>
         )}
-        <div className="relative">
+        <div style={{ position: "relative" }}>
           <input
             id={id}
             ref={ref}
             type={type}
-            className={`w-full bg-slate-900 border text-slate-100 placeholder-slate-500 rounded-lg px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${
+            className={`m-input ${className}`}
+            style={
               error
-                ? "border-rose-500 hover:border-rose-400"
-                : "border-slate-800 hover:border-slate-700"
-            } ${className}`}
+                ? {
+                    borderColor: "var(--color-error)",
+                  }
+                : {}
+            }
             {...props}
           />
         </div>
         {error && (
-          <p className="mt-1 text-xs text-rose-500 font-medium animate-pulse">
+          <p
+            style={{
+              marginTop: "5px",
+              fontSize: "11px",
+              fontWeight: 500,
+              color: "var(--color-error)",
+            }}
+          >
             {error}
           </p>
         )}

@@ -1,11 +1,9 @@
 // src/components/GoalCard.tsx
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Edit2, Trash2, CheckCircle, Flame, Plus, MessageSquare } from "lucide-react";
+import { Flame, Edit2, Trash2, CheckCircle, Plus, MessageSquare } from "lucide-react";
 import { Goal } from "../types";
-import { Card } from "./ui/Card";
-import { ProgressBar } from "./ui/ProgressBar";
-import { Button } from "./ui/Button";
+import { motion } from "motion/react";
 
 interface GoalCardProps {
   goal: Goal;
@@ -13,11 +11,42 @@ interface GoalCardProps {
   onDelete: (id: string) => Promise<void>;
 }
 
+const CATEGORY_CONFIG: Record<
+  string,
+  { icon: string; color: string; bg: string; pillClass: string; progressColor: string }
+> = {
+  health:   { icon: "water_drop",     color: "var(--color-error)",     bg: "rgba(255,180,171,0.10)", pillClass: "cat-health",   progressColor: "var(--color-error)" },
+  fitness:  { icon: "fitness_center", color: "var(--color-secondary)", bg: "rgba(78,222,163,0.10)",  pillClass: "cat-fitness",  progressColor: "var(--color-secondary)" },
+  work:     { icon: "work",           color: "var(--color-primary)",   bg: "rgba(192,193,255,0.10)", pillClass: "cat-work",     progressColor: "var(--color-primary)" },
+  learning: { icon: "menu_book",      color: "var(--color-primary)",   bg: "rgba(192,193,255,0.12)", pillClass: "cat-learning", progressColor: "var(--color-primary)" },
+  finance:  { icon: "savings",        color: "var(--color-tertiary)",  bg: "rgba(255,182,144,0.10)", pillClass: "cat-finance",  progressColor: "var(--color-tertiary)" },
+  routine:  { icon: "repeat",         color: "var(--color-on-surface-variant)", bg: "rgba(199,196,215,0.08)", pillClass: "cat-routine", progressColor: "var(--color-on-surface-variant)" },
+};
+
+const DEFAULT_CONFIG = {
+  icon: "flag",
+  color: "var(--color-primary)",
+  bg: "rgba(192,193,255,0.10)",
+  pillClass: "cat-work",
+  progressColor: "var(--color-primary)",
+};
+
 export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete }) => {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [completing, setCompleting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const catKey = goal.category.toLowerCase();
+  const config = CATEGORY_CONFIG[catKey] || DEFAULT_CONFIG;
+
+  const isCompleted = goal.current_count >= goal.target_count;
+  const percentage =
+    goal.target_count > 0
+      ? Math.min(100, Math.round((goal.current_count / goal.target_count) * 100))
+      : 0;
+  const currentStreak = goal.streak?.current_streak || 0;
+  const longestStreak = goal.streak?.longest_streak || 0;
 
   const handleComplete = async () => {
     setCompleting(true);
@@ -33,161 +62,384 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete }
   };
 
   const handleDelete = async () => {
-    if (window.confirm(`Are you sure you want to delete the goal "${goal.title}"?`)) {
+    if (window.confirm(`Delete goal "${goal.title}"?`)) {
       setDeleting(true);
       try {
         await onDelete(goal.id);
       } catch (err) {
-        console.error("Failed to delete goal:", err);
+        console.error("Failed to delete:", err);
       } finally {
         setDeleting(false);
       }
     }
   };
 
-  const isCompleted = goal.current_count >= goal.target_count;
-  const currentStreakVal = goal.streak?.current_streak || 0;
-  const longestStreakVal = goal.streak?.longest_streak || 0;
-
-  // Aesthetic category lookups
-  const categoryStyles: { [key: string]: string } = {
-    health: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-    fitness: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    work: "bg-sky-500/10 text-sky-400 border-sky-500/20",
-    learning: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-    finance: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    routine: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-  };
-
-  const catKey = goal.category.toLowerCase();
-  const categoryPillClass = categoryStyles[catKey] || "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-
   return (
-    <Card hoverable className="relative overflow-hidden flex flex-col justify-between h-full min-h-[220px]">
-      <div>
-        {/* Top Header section */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${categoryPillClass}`}>
-              {goal.category}
-            </span>
-            <span className="text-xs text-slate-500 uppercase tracking-wider">
-              {goal.frequency}
+    <div
+      className="glass-card animate-fade-in"
+      style={{
+        padding: "20px 24px",
+        position: "relative",
+        overflow: "hidden",
+        transition: "border-color 0.2s, box-shadow 0.2s",
+        ...(isCompleted
+          ? { borderColor: "rgba(78,222,163,0.2)", boxShadow: "0 0 0 0 transparent" }
+          : {}),
+      }}
+      onMouseEnter={(e) => {
+        if (!isCompleted)
+          (e.currentTarget as HTMLDivElement).style.boxShadow =
+            "0 8px 32px rgba(192,193,255,0.1)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
+      }}
+    >
+      {/* Top accent line when completed */}
+      {isCompleted && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "2px",
+            background:
+              "linear-gradient(90deg, var(--color-secondary) 0%, transparent 80%)",
+          }}
+        />
+      )}
+
+      {/* ── Row 1: Icon + Info + Actions ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+        }}
+      >
+        {/* Left: Icon + title + meta */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          {/* Icon bubble */}
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              minWidth: "48px",
+              borderRadius: "50%",
+              background: config.bg,
+              border: `1px solid color-mix(in srgb, ${config.color} 30%, transparent)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              className="material-symbols-outlined ms-filled"
+              style={{ fontSize: "22px", color: config.color }}
+            >
+              {config.icon}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Link
-              to={`/edit-goal/${goal.id}`}
-              className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-md transition-all"
-              title="Edit Goal"
+          {/* Title + tags */}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h3
+              style={{
+                fontSize: "15px",
+                fontWeight: 700,
+                color: isCompleted
+                  ? "var(--color-on-surface-variant)"
+                  : "var(--color-on-surface)",
+                textDecoration: isCompleted ? "line-through" : "none",
+                marginBottom: "5px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
             >
-              <Edit2 className="w-3.5 h-3.5" />
-            </Link>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-slate-800 rounded-md transition-all disabled:opacity-30"
-              title="Delete Goal"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Title and Description */}
-        <div className="mb-4">
-          <h3 className={`text-base font-semibold text-slate-100 mb-1 ${isCompleted ? "line-through text-slate-400" : ""}`}>
-            {goal.title}
-          </h3>
-          {goal.description && (
-            <p className="text-xs text-slate-400 font-normal leading-relaxed line-clamp-2">
-              {goal.description}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-auto space-y-4">
-        {/* Progress Bar integration */}
-        <ProgressBar value={goal.current_count} max={goal.target_count} />
-
-        {/* Streak indicator and progress button panel */}
-        <div className="flex items-center justify-between gap-4 pt-1 border-t border-slate-800/50">
-          <div className="flex items-center gap-3">
-            {currentStreakVal > 0 ? (
-              <div className="flex items-center gap-1 text-amber-400 font-semibold text-xs py-0.5" title={`Current streak: ${currentStreakVal} days. Longest: ${longestStreakVal} days`}>
-                <Flame className="w-4 h-4 fill-amber-500/25" />
-                <span>{currentStreakVal}d</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 text-slate-500 text-xs py-0.5">
-                <Flame className="w-4 h-4 opacity-30" />
-                <span>0d</span>
-              </div>
+              {goal.title}
+            </h3>
+            {goal.description && (
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--color-on-surface-variant)",
+                  lineHeight: 1.5,
+                  overflow: "hidden",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 1,
+                  WebkitBoxOrient: "vertical",
+                  marginBottom: "6px",
+                }}
+              >
+                {goal.description}
+              </p>
             )}
-
-            {longestStreakVal > 0 && (
-              <span className="text-[10px] text-slate-500">
-                L: {longestStreakVal}d
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span className={`cat-pill ${config.pillClass}`}>
+                {goal.category}
               </span>
-            )}
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "var(--color-outline)",
+                }}
+              >
+                {goal.frequency}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Progress % + Actions */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "20px",
+            flexShrink: 0,
+          }}
+        >
+          {/* Progress column */}
+          <div style={{ textAlign: "right" }}>
+            <span
+              style={{
+                fontSize: "20px",
+                fontWeight: 800,
+                letterSpacing: "-0.03em",
+                color: isCompleted ? "var(--color-secondary)" : config.color,
+              }}
+            >
+              {percentage}%
+            </span>
+            <div
+              style={{
+                width: "120px",
+                height: "4px",
+                background: "var(--color-surface-container-high)",
+                borderRadius: "9999px",
+                overflow: "hidden",
+                marginTop: "6px",
+              }}
+            >
+              <motion.div
+                style={{
+                  height: "100%",
+                  borderRadius: "9999px",
+                  background: isCompleted
+                    ? "var(--color-secondary)"
+                    : config.progressColor,
+                }}
+                initial={{ width: 0 }}
+                animate={{ width: `${percentage}%` }}
+                transition={{ duration: 0.7, ease: "easeOut" }}
+              />
+            </div>
+            <p
+              style={{
+                fontSize: "11px",
+                color: "var(--color-outline)",
+                marginTop: "4px",
+                textAlign: "right",
+              }}
+            >
+              {goal.current_count} / {goal.target_count}
+            </p>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setShowNoteInput(!showNoteInput)}
-              className={`p-1.5 rounded-lg border text-slate-400 hover:text-white transition-all ${
-                showNoteInput ? "bg-slate-800 border-slate-700" : "bg-transparent border-transparent"
-              }`}
-              title="Add Completion Note"
-            >
-              <MessageSquare className="w-4 h-4" />
-            </button>
+          {/* Action buttons */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <div style={{ display: "flex", gap: "2px" }}>
+              <Link
+                to={`/edit-goal/${goal.id}`}
+                className="btn-ghost"
+                style={{ padding: "5px", borderRadius: "8px" }}
+                title="Edit"
+              >
+                <Edit2 size={13} />
+              </Link>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="btn-danger-ghost"
+                style={{ padding: "5px", borderRadius: "8px" }}
+                title="Delete"
+              >
+                {deleting ? (
+                  <div
+                    className="spinner"
+                    style={{ width: "13px", height: "13px" }}
+                  />
+                ) : (
+                  <Trash2 size={13} />
+                )}
+              </button>
+            </div>
 
             {isCompleted ? (
-              <div className="flex items-center gap-1 text-emerald-400 text-xs font-semibold px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>Goal Met</span>
+              <div className="goal-met-badge" style={{ fontSize: "10px", padding: "3px 8px" }}>
+                <CheckCircle size={11} />
+                <span>Met</span>
               </div>
             ) : (
-              <Button
-                variant="primary"
-                size="sm"
-                isLoading={completing}
+              <button
+                className="btn-primary"
                 onClick={handleComplete}
-                className="shadow-md h-[32px] px-3 font-semibold text-xs"
+                disabled={completing}
+                style={{ padding: "5px 12px", fontSize: "11px" }}
               >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Log Progress
-              </Button>
+                {completing ? (
+                  <div
+                    className="spinner"
+                    style={{ width: "11px", height: "11px" }}
+                  />
+                ) : (
+                  <Plus size={12} />
+                )}
+                Log
+              </button>
             )}
           </div>
         </div>
-
-        {/* Dynamic inline note input */}
-        {showNoteInput && (
-          <div className="pt-2 animate-fadeIn border-t border-slate-800/20 flex gap-2">
-            <input
-              type="text"
-              placeholder="E.g., Read chapter 2, did 5km run..."
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              className="flex-1 bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder-slate-600 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-emerald-500"
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleComplete}
-              isLoading={completing}
-              className="py-1 px-2.5 text-xs h-[28px]"
-            >
-              Save
-            </Button>
-          </div>
-        )}
       </div>
-    </Card>
+
+      {/* ── Row 2: Streak info + Note toggle ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingTop: "14px",
+          borderTop: "1px solid var(--border-subtle)",
+          marginTop: "4px",
+        }}
+      >
+        {/* Streak */}
+        <div
+          style={{ display: "flex", alignItems: "center", gap: "12px" }}
+        >
+          {currentStreak > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                color: "var(--color-tertiary)",
+                fontSize: "12px",
+                fontWeight: 600,
+              }}
+              title={`Longest: ${longestStreak} days`}
+            >
+              <Flame
+                size={14}
+                style={{ fill: "rgba(255,182,144,0.25)", flexShrink: 0 }}
+              />
+              <span>{currentStreak}d streak</span>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                color: "var(--color-outline)",
+                fontSize: "12px",
+              }}
+            >
+              <Flame size={14} style={{ opacity: 0.3 }} />
+              <span>No streak yet</span>
+            </div>
+          )}
+          {longestStreak > 1 && (
+            <span
+              style={{ fontSize: "10px", color: "var(--color-outline)" }}
+            >
+              best: {longestStreak}d
+            </span>
+          )}
+        </div>
+
+        {/* Note toggle */}
+        <button
+          onClick={() => setShowNoteInput(!showNoteInput)}
+          className="btn-ghost"
+          style={{
+            padding: "4px 10px",
+            fontSize: "11px",
+            gap: "5px",
+            borderRadius: "9999px",
+            border: showNoteInput
+              ? "1px solid var(--color-outline-variant)"
+              : "1px solid transparent",
+            background: showNoteInput
+              ? "var(--color-surface-container-high)"
+              : "transparent",
+          }}
+          title="Add note"
+        >
+          <MessageSquare size={12} />
+          Note
+        </button>
+      </div>
+
+      {/* ── Row 3: Note input (conditional) ── */}
+      {showNoteInput && (
+        <div
+          className="animate-fade-in"
+          style={{
+            display: "flex",
+            gap: "8px",
+            paddingTop: "12px",
+          }}
+        >
+          <input
+            type="text"
+            placeholder="E.g., ran 5km, read 20 pages…"
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleComplete()}
+            className="m-input"
+            style={{ flex: 1, fontSize: "12px", padding: "8px 12px" }}
+            autoFocus
+          />
+          <button
+            className="btn-primary"
+            onClick={handleComplete}
+            disabled={completing}
+            style={{ padding: "8px 16px", fontSize: "12px" }}
+          >
+            {completing ? (
+              <div
+                className="spinner"
+                style={{ width: "12px", height: "12px" }}
+              />
+            ) : (
+              "Save"
+            )}
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 

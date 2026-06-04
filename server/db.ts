@@ -88,6 +88,12 @@ class PrismaDB {
       });
       return mapUser(updated);
     },
+    delete: async (id: string) => {
+      const deleted = await prisma.user.delete({
+        where: { id },
+      });
+      return mapUser(deleted);
+    },
   };
 
   // Goals CRUD Operations
