@@ -1,33 +1,47 @@
-# 🎯 Daily Goal Tracker
+# 🎯 Momentum: Daily Goal Tracker (Premium Edition)
 
-Ứng dụng theo dõi và quản lý mục tiêu cá nhân hàng ngày, giúp duy trì kỷ luật bản thân bằng cách thiết lập thói quen, theo dõi tiến độ, tính toán chuỗi ngày liên tục (**Streak**) và hiển thị thống kê trực quan.
-
----
-
-## 🌟 Điểm nổi bật & Thiết kế (Design Aesthetics)
-
-*   **Premium & Modern UI/UX**: Thiết kế mặc định Dark mode sang trọng với nền Slate-950 và các màu sắc nhấn bắt mắt (Indigo, Emerald, Orange).
-*   **Glassmorphism Style**: Các thẻ mục tiêu, bảng biểu được thiết kế theo phong cách kính mờ bán trong suốt thời thượng.
-*   **Micro-interactions**: Sử dụng chuyển động mượt mà (thông qua thư viện `motion`) để phản hồi tức thì các thao tác của người dùng như hoàn thành mục tiêu, nảy số lượng hay nảy ngọn lửa Streak.
-*   **Hiệu năng & Tiện lợi**: Không sử dụng PostgreSQL cồng kềnh cho chạy thử cục bộ; dự án tự động ghi/đọc dữ liệu vào một tệp JSON cục bộ giả lập Prisma Client giúp khởi chạy nhanh chóng chỉ trong vài giây.
+Ứng dụng theo dõi và quản lý mục tiêu cá nhân hàng ngày cao cấp, giúp người dùng duy trì kỷ luật bản thân bằng cách xây dựng thói quen tốt, theo dõi tiến độ thời gian thực, tính toán chuỗi ngày liên tục (**Streak**) và trực quan hóa hiệu suất thông qua bảng phân tích Bento-grid hiện đại.
 
 ---
 
-## 🚀 Các Tính Năng Core MVP
+## 🌟 Các Tính Năng Cao Cấp & Trải Nghiệm Người Dùng (Premium UI/UX)
 
-1.  **Quản lý mục tiêu cá nhân**: Tạo mới, chỉnh sửa, xem danh sách mục tiêu dạng thẻ ([GoalCard](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx)) kèm bộ lọc trạng thái (Active / Completed / Paused). Áp dụng cơ chế **Soft Delete** để bảo toàn lịch sử thống kê.
-2.  **Đánh dấu tiến độ ngày (Check-in)**: Tăng nhanh chỉ số hoàn thành mục tiêu trực tiếp từ Dashboard, tự động lưu vết mốc thời gian chính xác trong cơ sở dữ liệu.
-3.  **Thuật toán tính chuỗi ngày liên tục (Streak Engine)**: Tự động tính toán và lưu trữ `current_streak` và `longest_streak` cho mỗi mục tiêu thói quen ngay khi người dùng ghi nhận tiến độ.
-4.  **Dashboard & Bento-style Analytics**: Hiển thị tổng quan tiến độ hoàn thành trong ngày dưới dạng phần trăm, lịch tuần dạng slider 7 ngày, kèm theo biểu đồ cột/đường trực quan và Heatmap 28 ngày hoạt động dạng đóng góp (GitHub-style contribution chart).
-5.  **Hệ thống xác thực JWT an toàn**: Quản lý đăng ký, đăng nhập và đăng xuất. Quản lý Token tự động qua Axios Interceptor trên Client và cơ chế tự refresh token ngầm khi Access Token hết hạn.
+1. **Giao Diện Momentum Theme Đa Dạng (Light & Dark Theme)**:
+   - Hệ thống giao diện Light/Dark linh hoạt được lưu trữ tự động trong `localStorage`. Light theme là chế độ hiển thị mặc định dịu mắt khi truy cập lần đầu.
+   - Thiết kế **Glassmorphism** thời thượng với các lớp phủ kính mờ bán trong suốt, hỗ trợ tinh chỉnh độ mờ đục (**Glass Opacity**) và bật/tắt hiệu ứng chuyển động mượt mà.
+   - Thanh tác vụ nổi cố định ở cuối màn hình (**Sticky Floating Action Bar**) giúp lưu/hủy các tùy chọn cài đặt một cách nhanh chóng và tự nhiên.
+2. **Dashboard Hoàn Thiện & Cơ Chế Hoàn Tác Thông Minh (Undo Engine)**:
+   - Hiển thị tiến trình hoàn thành trong ngày bằng vòng tròn tiến độ SVG và slider lịch tuần 7 ngày.
+   - **Tự động ẩn mục tiêu hoàn thành**: Khi thói quen đạt chỉ tiêu trong ngày, thẻ sẽ hiển thị đếm ngược 5 giây kèm nút **Undo** hoàn tác trước khi tự động ẩn đi, giúp giảm tải thông tin trên màn hình chính.
+3. **Danh Sách Mục Tiêu Chi Tiết (My Goals - `/goals`)**:
+   - Giao diện Bento Grid hiển thị tất cả mục tiêu với chức năng tìm kiếm trực quan và lọc nhanh theo trạng thái (Tất cả / Hoạt động / Tạm dừng).
+   - Bộ sắp xếp nâng cao theo độ ưu tiên (**Priority**), thời gian cập nhật (**Recent**), hoặc chuỗi ngày liên tục (**Streak**).
+   - Menu hành động nhanh cho phép Tạm dừng/Kích hoạt lại, Chỉnh sửa, và Xóa thói quen trực tiếp trên thẻ.
+4. **Bảng Thống Kê Momentum (Premium Stats Dashboard - `/stats`)**:
+   - **Aligned Header**: Tích hợp thanh tiêu đề chứa ô tìm kiếm cột mốc, huy hiệu chuỗi ngày Streak động toàn cục, nút xuất báo cáo CSV và làm mới dữ liệu nhanh.
+   - **Bento Grid Metric**: Hiển thị tổng quan tỷ lệ hoàn thành kèm so sánh xu hướng tăng trưởng (+/- %) so với tháng trước.
+   - **Consistency Heatmap (182 ngày)**: Lưới đóng góp 26 tuần (GitHub-style contribution chart) căn chỉnh ngày bắt đầu về Chủ Nhật, hiển thị chi tiết khi rê chuột.
+   - **Biểu Đồ Xu Hướng 10 Tuần**: Nhóm dữ liệu tiến độ 70 ngày gần nhất vẽ biểu đồ cột CSS động tự điều chỉnh chiều cao và hiển thị tooltip.
+   - **Biểu Đồ Tròn Goal Distribution**: Sử dụng `conic-gradient` chia tỷ lệ mục tiêu theo danh mục kèm bảng chú thích màu sắc động.
+   - **Milestone Feed**: Dòng thời gian ghi nhận các cột mốc thành tựu thói quen (ví dụ: "Achiever Elite Tier Unlocked").
+5. **Trục Thời Gian Hoạt Động (Activity Timeline - `/timeline`)**:
+   - **Performance Grid**: Hiển thị trạng thái hoàn thành mỗi ngày trong tháng, tự động đánh dấu sao vàng lấp lánh (Breakthrough Badge) cho những ngày đạt năng suất cao (từ 3 thói quen trở lên).
+   - **Feed Hoạt Động Lọc Động**: Click chọn ngày bất kỳ trên lưới để xem chi tiết các check-in của ngày đó.
+   - **Xóa Check-in & Tự Động Tính Lại Streak**: Cho phép xóa log check-in cũ. Khi xóa, backend tự động tính toán lại chuỗi Streak dựa trên múi giờ người dùng.
+   - **Xuất báo cáo CSV**: Cho phép tải xuống báo cáo hoạt động dạng bảng tính CSV trực tiếp về trình duyệt.
+6. **Hệ Thống Streak Engine & Timezone-Aware**:
+   - Thuật toán tự động nhóm log theo ngày địa phương dựa trên `timezone` của người dùng để xác định chuỗi ngày hiện tại (`current_streak`) và chuỗi kỷ lục (`longest_streak`).
+   - Cung cấp tính năng cập nhật Profile (Tên, Email, Múi giờ) và Danger Zone (Xuất dữ liệu cá nhân dạng JSON, Xóa tài khoản vĩnh viễn).
 
 ---
 
 ## 💻 Tech Stack
 
-*   **Frontend**: React 19 + TypeScript + Vite 6 + Tailwind CSS v4 + Zustand + React Router v6.
-*   **Backend**: Node.js + Express + TypeScript (chạy qua `tsx`).
-*   **Database (Dev)**: Local File Database (JSON) được quản lý qua [db.ts](file:///d:/Download/daily-goal-tracker/server/db.ts) lưu tại `data/db.json` nhằm mô phỏng chính xác mô hình dữ liệu của [schema.prisma](file:///d:/Download/daily-goal-tracker/prisma/schema.prisma) mà không cần cấu hình database phức tạp.
+* **Frontend**: React 19 + TypeScript + Vite 6 + Tailwind CSS v4 + Zustand + React Router v6.
+* **Backend**: Node.js + Express + TypeScript (chạy qua `tsx`).
+* **Database (Chạy thử cục bộ)**: Local File Database (JSON) được quản lý qua `server/db.ts` lưu tại `data/db.json` nhằm mô phỏng chính xác mô hình dữ liệu của Prisma mà không cần cấu hình database phức tạp.
+* **Database (Sản xuất)**: PostgreSQL được cấu hình qua Prisma ORM (`prisma/schema.prisma`).
+* **Authentication**: JWT (Access Token 15 phút + Refresh Token 7 ngày) kèm cơ chế Axios Interceptors tự động làm mới phiên làm việc.
 
 ---
 
@@ -35,29 +49,42 @@
 
 ```text
 daily-goal-tracker/
-├── assets/                 # Các tài nguyên tĩnh và cấu hình AI Studio
+├── assets/                 # Tài nguyên tĩnh và cấu hình AI Studio
 ├── data/                   # Thư mục chứa cơ sở dữ liệu cục bộ db.json
-├── docs/                   # Tài liệu chi tiết dự án
-│   ├── ARCHITECTURE.md     # Đặc tả kiến trúc phần mềm & schema db
-│   ├── CHANGELOG.md        # Nhật ký phát triển và danh sách các Sprint
-│   ├── Plan.md             # Kế hoạch phát triển và thiết kế giao diện
-│   └── SPEC.md             # Tài liệu đặc tả sản phẩm & User Stories
-├── prisma/                 # Cấu hình schema PostgreSQL (cho giai đoạn production)
-├── server/                 # Tầng Database Client giả lập lưu file
+├── docs/                   # Hệ thống tài liệu chi tiết dự án
+│   ├── ARCHITECTURE.md     # Đặc tả kiến trúc phần mềm, schema database & data flow
+│   ├── CHANGELOG.md        # Nhật ký phát triển chi tiết qua từng Sprint
+│   ├── Plan.md             # Kế hoạch phát triển, màu sắc tokens & phân bổ UI/UX
+│   ├── SPEC.md             # Tài liệu đặc tả sản phẩm & User Stories (AC)
+│   └── VIBE_PROCESS_VERIFICATION.md # Tài liệu chứng minh quy trình kiểm thử 4 bước
+├── prisma/                 # Cấu hình schema PostgreSQL (cho môi trường production)
+├── server/                 # Database Wrapper giả lập lưu file JSON
 │   └── db.ts
 ├── src/                    # Mã nguồn chính của ứng dụng
 │   ├── components/         # Các Component giao diện tái sử dụng
-│   ├── controllers/        # Logic điều khiển API backend
-│   ├── hooks/              # Custom React hooks
-│   ├── middleware/         # Các middleware trung gian (Error Handler, Auth Guard)
-│   ├── pages/              # Các màn hình chính (Dashboard, Login, Goal Form, Stats)
-│   ├── routes/             # Định tuyến API endpoint
-│   ├── services/           # Service gọi API (Axios Interceptors)
+│   │   ├── ui/             # Các UI elements dùng chung (Button, Card, Input, ProgressBar)
+│   │   ├── GoalCard.tsx    # Component thẻ mục tiêu với bộ đếm ngược Undo
+│   │   ├── Navbar.tsx      # Thanh điều hướng ngang
+│   │   └── Sidebar.tsx     # Thanh điều hướng dọc chứa Avatar và Streak badge
+│   ├── controllers/        # Logic xử lý API ở phía backend
+│   ├── hooks/              # Custom React hooks (quản lý truy vấn dữ liệu)
+│   ├── middleware/         # Middleware trung gian (Auth Guard, Error Handler)
+│   ├── pages/              # Các màn hình chính của ứng dụng
+│   │   ├── DashboardPage.tsx # Màn hình chính trong ngày
+│   │   ├── GoalFormPage.tsx  # Biểu mẫu tạo mới mục tiêu thói quen
+│   │   ├── GoalsPage.tsx     # Quản lý tất cả mục tiêu thói quen (Bento Grid)
+│   │   ├── LoginPage.tsx     # Trang Đăng nhập & Đăng ký
+│   │   ├── SettingsPage.tsx  # Trang cấu hình Theme, Glass Opacity, Timezone & Danger Zone
+│   │   ├── Stats.tsx         # Bảng thống kê hiệu năng Momentum chi tiết
+│   │   └── TimelinePage.tsx  # Nhật ký hoạt động, Performance Grid & xuất CSV
+│   ├── routes/             # Định tuyến API endpoint phía backend
+│   ├── services/           # Services gọi API & cấu hình Axios Interceptors
 │   ├── store/              # Zustand state stores (authStore, goalStore)
-│   ├── App.tsx             # Component gốc định nghĩa định tuyến
+│   ├── App.tsx             # Component gốc định nghĩa định tuyến và cấu hình theme
 │   ├── main.tsx            # Điểm khởi chạy React client
-│   └── index.css           # Cấu hình Tailwind CSS v4
-├── server.ts               # File khởi chạy server Express chính
+│   ├── types.ts            # Định nghĩa các TypeScript interfaces dùng chung
+│   └── index.css           # Định nghĩa các CSS variables, Light Mode & glassmorphism
+├── server.ts               # File khởi chạy máy chủ Express
 ├── tsconfig.json           # Cấu hình TypeScript compiler
 └── vite.config.ts          # Cấu hình đóng gói Vite
 ```
@@ -74,7 +101,7 @@ Tạo file `.env` tại thư mục gốc bằng cách sao chép từ [.env.examp
 ```bash
 cp .env.example .env
 ```
-Mở file `.env` và điền khóa API của bạn:
+Mở file `.env` và điền thông tin cấu hình:
 ```env
 GEMINI_API_KEY="YOUR_GEMINI_API_KEY_HERE"
 APP_URL="http://localhost:5173"
@@ -86,7 +113,7 @@ npm install
 ```
 
 ### 4. Khởi động máy chủ phát triển
-Chạy lệnh bên dưới để khởi động đồng thời cả server frontend Vite và server backend Express:
+Chạy lệnh bên dưới để khởi động đồng thời cả frontend Vite và backend Express:
 ```bash
 npm run dev
 ```
@@ -98,7 +125,8 @@ Truy cập vào ứng dụng tại địa chỉ: `http://localhost:5173`.
 
 Để hiểu rõ hơn về các khía cạnh thiết kế và lịch trình của dự án, vui lòng đọc các tài liệu chi tiết trong thư mục `docs/`:
 
-*   [ARCHITECTURE.md](file:///d:/Download/daily-goal-tracker/docs/ARCHITECTURE.md) - Chi tiết sơ đồ dữ liệu, API flow và cấu trúc tầng dịch vụ.
-*   [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md) - Toàn bộ yêu cầu chi tiết về tính năng, User Stories và bộ tiêu chí AC.
-*   [CHANGELOG.md](file:///d:/Download/daily-goal-tracker/docs/CHANGELOG.md) - Ghi nhận tiến độ qua các Sprint phát triển.
-*   [Plan.md (docs)](file:///d:/Download/daily-goal-tracker/docs/Plan.md) hoặc [Plan.md (gốc)](file:///d:/Download/daily-goal-tracker/Plan.md) - Kế hoạch thiết kế UI/UX bento-grid và sơ đồ phân bổ các view.
+* [ARCHITECTURE.md](file:///d:/Download/daily-goal-tracker/docs/ARCHITECTURE.md) - Sơ đồ cấu trúc cơ sở dữ liệu, API flow và luồng hoạt động.
+* [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md) - Yêu cầu chi tiết tính năng, User Stories và tiêu chí chấp nhận (AC).
+* [CHANGELOG.md](file:///d:/Download/daily-goal-tracker/docs/CHANGELOG.md) - Tiến trình phát triển sản phẩm qua từng giai đoạn/Sprint.
+* [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md) - Sơ đồ màn hình và hệ thống tokens màu sắc.
+* [VIBE_PROCESS_VERIFICATION.md](file:///d:/Download/daily-goal-tracker/docs/VIBE_PROCESS_VERIFICATION.md) - Quy trình kiểm thử và nghiệm thu thực tế các tính năng.
