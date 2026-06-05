@@ -19,6 +19,8 @@ model User {
   goals         Goal[]
   logs          GoalLog[]
   notifications Notification[]
+  push_subscription     String?
+  last_reminder_sent_date String?
 }
 
 model Goal {

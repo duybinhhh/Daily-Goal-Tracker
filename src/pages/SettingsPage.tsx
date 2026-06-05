@@ -3,6 +3,12 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
+import {
+  checkNotificationPermission,
+  getActiveSubscription,
+  subscribeToPush,
+  unsubscribeFromPush
+} from "../services/pushNotification";
 
 export function SettingsPage() {
   const { user, updateProfile, deleteAccount, logout, loading, error, clearError } = useAuthStore();
@@ -38,6 +44,42 @@ export function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const [activeReminders, setActiveReminders] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+
+  // Check active push subscription on mount
+  useEffect(() => {
+    async function loadSubscriptionStatus() {
+      try {
+        const sub = await getActiveSubscription();
+        setActiveReminders(!!sub);
+      } catch (err) {
+        console.error("Failed to load push subscription status:", err);
+      }
+    }
+    loadSubscriptionStatus();
+  }, []);
+
+  const handleActiveRemindersChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setSubscribing(true);
+    setErrorMessage(null);
+    try {
+      if (checked) {
+        const sub = await subscribeToPush();
+        setActiveReminders(!!sub);
+      } else {
+        await unsubscribeFromPush();
+        setActiveReminders(false);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to update notification settings. Please check your browser permissions.");
+      setActiveReminders(!checked);
+    } finally {
+      setSubscribing(false);
+    }
+  };
 
   // Apply glass opacity slider value in real-time
   useEffect(() => {
@@ -358,6 +400,30 @@ export function SettingsPage() {
                     <label
                       htmlFor="goal-remind"
                       className="switch-label relative inline-block w-12 h-6 bg-white/10 rounded-full cursor-pointer transition-colors duration-300"
+                    >
+                      <span className="switch-dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md"></span>
+                    </label>
+                  </div>
+                </div>
+                <div className="h-[1px] bg-white/5"></div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-on-surface">Active Reminders</p>
+                    <p className="text-[11px] text-on-surface-variant">Prevent streak loss: alert at 21:00 if goals are incomplete</p>
+                  </div>
+                  <div>
+                    <input
+                      type="checkbox"
+                      id="active-reminders"
+                      className="hidden switch-checkbox"
+                      checked={activeReminders}
+                      disabled={subscribing}
+                      onChange={handleActiveRemindersChange}
+                    />
+                    <label
+                      htmlFor="active-reminders"
+                      className="switch-label relative inline-block w-12 h-6 bg-white/10 rounded-full cursor-pointer transition-colors duration-300"
+                      style={{ opacity: subscribing ? 0.6 : 1 }}
                     >
                       <span className="switch-dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md"></span>
                     </label>

@@ -75,3 +75,60 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+// Web Push event listener
+self.addEventListener("push", (event) => {
+  let data = { title: "Nhắc nhở! 🔥", body: "Bạn có thói quen chưa hoàn thành." };
+  
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = { title: "Nhắc nhở! 🔥", body: event.data.text() };
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || "/icon.png",
+    badge: data.badge || "/icon.png",
+    data: data.data || { url: "/" },
+    tag: "active-reminder-tag", // Prevents stacking duplicate notifications
+    renotify: true,
+    vibrate: [200, 100, 200]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Notification click listener
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  
+  const targetUrl = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // If a window is already open, focus it and navigate
+      for (const client of clientList) {
+        if ("focus" in client) {
+          try {
+            // Check if URL matches or if it's the home URL
+            const urlObj = new URL(client.url);
+            if (urlObj.pathname === targetUrl || (targetUrl === "/" && urlObj.pathname === "")) {
+              return client.focus();
+            }
+          } catch (err) {
+            // ignore url parse error
+          }
+        }
+      }
+      // Otherwise, open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

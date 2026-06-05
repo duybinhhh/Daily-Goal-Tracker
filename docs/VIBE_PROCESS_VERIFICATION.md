@@ -1,6 +1,6 @@
-# 🛡️ VIBE PROCESS VERIFICATION: PWA OFFLINE MODE, UNDO LOG & UX OPTIMIZATION
+# 🛡️ VIBE PROCESS VERIFICATION: ACTIVE REMINDERS, PWA OFFLINE MODE, UNDO LOG & UX OPTIMIZATION
 
-Tài liệu này chứng minh và ghi nhận chi tiết quá trình phát triển các tính năng mới (**Chế độ Ngoại tuyến & Đồng bộ hóa sau - Offline Mode & Sync**, **Hoàn tác tiến độ - Undo Log**, **Hiệu ứng biến mất 5s trên Dashboard**, **Xóa log từ Timeline**, **Đồng bộ tính lại Streak**, **Cân đối màn Đăng nhập**, **Sticky Action Bar trong Settings** và **Mặc định Theme Sáng**) tuân thủ nghiêm ngặt theo quy trình 4 bước chuẩn hóa: **Plan (Lập kế hoạch) -> Doc (Tài liệu hóa) -> Build (Xây dựng) -> Test (Kiểm thử & Nghiệm thu)**.
+Tài liệu này chứng minh và ghi nhận chi tiết quá trình phát triển các tính năng mới (**Nhắc nhở chủ động chống đứt chuỗi - Active Reminders**, **Chế độ Ngoại tuyến & Đồng bộ hóa sau - Offline Mode & Sync**, **Hoàn tác tiến độ - Undo Log**, **Hiệu ứng biến mất 5s trên Dashboard**, **Xóa log từ Timeline**, **Đồng bộ tính lại Streak**, **Cân đối màn Đăng nhập**, **Sticky Action Bar trong Settings** và **Mặc định Theme Sáng**) tuân thủ nghiêm ngặt theo quy trình 4 bước chuẩn hóa: **Plan (Lập kế hoạch) -> Doc (Tài liệu hóa) -> Build (Xây dựng) -> Test (Kiểm thử & Nghiệm thu)**.
 
 ---
 
@@ -23,34 +23,42 @@ Giai đoạn này xác định mục tiêu, giải pháp kỹ thuật và sơ đ
     *   Yêu cầu: Người dùng có thể check-in thói quen ngay cả khi không có sóng 4G/Wifi (ví dụ: chạy bộ ở công viên, tập gym tầng hầm, trên máy bay).
     *   Hạ tầng: Chuyển đổi ứng dụng thành PWA (Progressive Web App) với Web App Manifest và Service Worker để lưu cache giao diện shell hoàn toàn ngoại tuyến.
     *   Giải pháp: Tích hợp IndexedDB dưới trình duyệt làm kho lưu trữ đệm cho dữ liệu danh sách mục tiêu/chỉ số và làm hàng đợi (syncQueue) lưu tạm các check-in offline. Tự động lắng nghe sự kiện `online` để kích hoạt trình đồng bộ `syncOfflineData` đưa dữ liệu lên Server, đồng thời tính toán lại Streak chính xác theo mốc thời gian thực hiện ban đầu (`completed_at`).
+*   **Nhắc nhở chủ động chống đứt chuỗi (Active Reminders)**:
+    *   Yêu cầu: Người dùng hay quên mở ứng dụng, dẫn đến đứt chuỗi Streak. Cần gửi thông báo đẩy đến trình duyệt/mobile vào lúc 21h00 tối hàng ngày nếu họ vẫn còn thói quen chưa làm xong.
+    *   Giải pháp: Tích hợp chuẩn Web Push sử dụng VAPID keys. Lưu trữ push subscription dưới dạng JSON trong bảng User. Chạy một luồng lập lịch nền (scheduler) kiểm tra mỗi phút, đối chiếu múi giờ cục bộ của người dùng để kích hoạt đẩy thông báo lúc 21h00 local time và lưu ngày gửi gần nhất (`last_reminder_sent_date`) để chống gửi trùng lặp.
 
 ---
 
 ## 2. Doc (Tài liệu hóa kỹ thuật)
 Các tính năng và luồng xử lý mới được mô tả chi tiết trong hệ thống tài liệu dự án trước khi lập trình:
-1.  **Định nghĩa User Stories**: Cập nhật các tiêu chí chấp nhận (AC) cho nút Undo và đếm ngược trong `US-05`, chức năng xóa log và tính lại Streak trong `US-09`, Sticky Action Bar trong `US-07`, và theme mặc định trong `US-08` tại tệp [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md).
-2.  **Định nghĩa API Endpoints**: Đăng ký API mới `DELETE /api/goals/logs/:logId` và cập nhật bản đồ màn hình tại tệp [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md).
+1.  **Định nghĩa User Stories**: Cập nhật các tiêu chí chấp nhận (AC) cho nút Undo và đếm ngược trong `US-05`, chức năng xóa log và tính lại Streak trong `US-09`, Sticky Action Bar trong `US-07`, theme mặc định trong `US-08`, và Active Reminders chống đứt chuỗi trong tệp [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md).
+2.  **Định nghĩa API Endpoints**: Đăng ký API mới `DELETE /api/goals/logs/:logId`, `PUT /api/auth/push-subscription` (lưu đăng ký thông báo), và `GET /api/auth/vapid-public-key` (lấy khóa VAPID công khai) tại tệp [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md).
 3.  **Nhật ký phát triển**: Ghi nhận chi tiết lịch sử hoàn thành các tính năng mới với mốc thời gian cụ thể (GMT+7) trong tệp [CHANGELOG.md](file:///d:/Download/daily-goal-tracker/docs/CHANGELOG.md).
 
 ---
 
-## 3. Build (Xây dựng & Triển khai mã nguồn)
+3.  **Build (Xây dựng & Triển khai mã nguồn)**
 Quá trình lập trình được tiến hành tuần tự từ cơ sở dữ liệu, API điều hướng, trạng thái Client đến giao diện người dùng:
 1.  **Backend & Database**:
-    *   Cập nhật [db.ts](file:///d:/Download/daily-goal-tracker/server/db.ts) để thêm phương thức `delete` và `findUnique` cho Helper logs của Prisma.
+    *   Cập nhật tệp cơ sở dữ liệu [schema.prisma](file:///d:/Download/daily-goal-tracker/prisma/schema.prisma) để bổ sung trường `push_subscription` và `last_reminder_sent_date` cho mô hình `User`.
+    *   Cập nhật [db.ts](file:///d:/Download/daily-goal-tracker/server/db.ts) để thêm phương thức `delete` và `findUnique` cho Helper logs của Prisma, đồng thời mở rộng `users.update` và `users.findMany` phục vụ việc truy vấn người dùng đã đăng ký thông báo đẩy.
+    *   Xây dựng helper [vapidHelper.ts](file:///d:/Download/daily-goal-tracker/src/services/vapidHelper.ts) tự động kiểm tra và sinh khóa VAPID lưu vào tệp `.env` nếu chưa có.
+    *   Xây dựng dịch vụ lập lịch nền [reminderScheduler.ts](file:///d:/Download/daily-goal-tracker/src/services/reminderScheduler.ts) quét cơ sở dữ liệu mỗi phút để tìm các tài khoản đến mốc 21h00 cục bộ và còn thói quen chưa làm nhằm đẩy Push Notification.
     *   Xây dựng controller `deleteLog` và hàm logic `recalculateStreak` dựa trên múi giờ của người dùng tại [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts).
     *   Cập nhật controller `completeGoal` tại [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts) để chấp nhận tham số `completed_at` tùy chọn từ client nhằm đồng bộ chính xác thời gian ghi nhận thói quen lúc ngoại tuyến.
     *   Đăng ký tuyến đường `DELETE /logs/:logId` trong [goals.ts](file:///d:/Download/daily-goal-tracker/src/routes/goals.ts).
+    *   Đăng ký tuyến đường `PUT /push-subscription` và `GET /vapid-public-key` trong [auth.ts](file:///d:/Download/daily-goal-tracker/src/routes/auth.ts).
 2.  **Zustand Store & Local Storage Services**:
+    *   Xây dựng lớp tiện ích client [pushNotification.ts](file:///d:/Download/daily-goal-tracker/src/services/pushNotification.ts) hỗ trợ kiểm tra quyền, đăng ký push và hủy đăng ký với Web Push Service của trình duyệt.
     *   Xây dựng lớp tiện ích IndexedDB tại [indexedDb.ts](file:///d:/Download/daily-goal-tracker/src/services/indexedDb.ts) gồm hai kho lưu trữ `metadata` (lưu cache tĩnh cho goals, stats, history) và `syncQueue` (hàng đợi check-in offline).
     *   Xây dựng trình đồng bộ dữ liệu tại [syncManager.ts](file:///d:/Download/daily-goal-tracker/src/services/syncManager.ts) tự động đẩy các tác vụ hoàn thành từ hàng đợi IndexedDB lên Server khi phục hồi kết nối. Tích hợp **Web Locks API** (`navigator.locks`) cùng fallback **LocalStorage Lock** (timeout 10s) để ngăn tranh chấp đồng bộ giữa nhiều tab trình duyệt đang mở cùng lúc.
     *   Cập nhật [goalStore.ts](file:///d:/Download/daily-goal-tracker/src/store/goalStore.ts) hỗ trợ các biến trạng thái `isOffline`, `isSyncing` và tự động đọc dữ liệu từ cache IndexedDB kèm bù trừ số đếm tạm thời khi mất kết nối mạng. Đồng thời nâng cấp `fetchGoals` và `fetchHistory` để tự động gộp hàng đợi ngoại tuyến `syncQueue` vào dữ liệu server tải về, triệt tiêu lỗi quay ngược trạng thái khi chuyển mạng.
     *   Thiết lập cơ chế sinh UUID ngẫu nhiên tại client (`log_id`) ngay khi nhấn check-in để làm Primary Key cho log check-in ở backend DB, đảm bảo tính idempotency tuyệt đối.
 3.  **UI & Components**:
-    *   **PWA Setup**: Tạo cấu hình [manifest.json](file:///d:/Download/daily-goal-tracker/public/manifest.json) để ứng dụng có thể cài đặt lên màn hình chính, viết Service Worker [sw.js](file:///d:/Download/daily-goal-tracker/public/sw.js) để cache giao diện chạy offline, liên kết manifest trong [index.html](file:///d:/Download/daily-goal-tracker/index.html) và đăng ký Service Worker trong [main.tsx](file:///d:/Download/daily-goal-tracker/src/main.tsx).
+    *   **PWA Setup**: Tạo cấu hình [manifest.json](file:///d:/Download/daily-goal-tracker/public/manifest.json) để ứng dụng có thể cài đặt lên màn hình chính, viết Service Worker [sw.js](file:///d:/Download/daily-goal-tracker/public/sw.js) để cache giao diện chạy offline và đón sự kiện `push`/`notificationclick` để hiển thị/điều hướng thông báo đẩy, liên kết manifest trong [index.html](file:///d:/Download/daily-goal-tracker/index.html) và đăng ký Service Worker trong [main.tsx](file:///d:/Download/daily-goal-tracker/src/main.tsx).
     *   **Dashboard & GoalCard:** Thêm state `disappearingGoals` quản lý bộ đếm thời gian 5s trong [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx). Thiết kế giao diện đếm ngược kèm nút "Undo" trong [GoalCard.tsx](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx). Thêm các huy hiệu hiển thị trạng thái mạng ("Offline Mode" màu cam và "Syncing..." màu xanh lá) nổi bật trên thanh Header tại [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx).
     *   **Timeline:** Thêm nút xóa log check-in kế bên mỗi mục lịch sử và tích hợp hàm gọi xác nhận trong [TimelinePage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/TimelinePage.tsx).
-    *   **Settings:** Cài đặt mặc định theme là `light` thay vì `dark`. Di chuyển cụm Save/Discard vào khung kính mờ `glass-card sticky bottom-4 md:bottom-6 z-30` tại [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx).
+    *   **Settings:** Cài đặt mặc định theme là `light` thay vì `dark`. Di chuyển cụm Save/Discard vào khung kính mờ `glass-card sticky bottom-4 md:bottom-6 z-30` tại [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx). Thêm công tắc bật/tắt **Nhắc nhở chủ động (Active Reminders)** tích hợp luồng xin quyền thông báo và đồng bộ với backend.
     *   **LoginPage:** Thêm class `w-full` và kiểu `width: "100%"` cho wrapper ngoài cùng để sửa lỗi căn lệch màn hình.
     *   **GoalFormPage:** Đồng bộ các class Tailwind (`text-slate-400` -> `text-on-surface-variant`, `m-input`) cho biểu mẫu.
 
@@ -87,4 +95,10 @@ Quá trình kiểm thử đã được chạy trực tiếp trên môi trường
 *   **Timezone-Safe Streak & Cycle Reset Verification (Đạt)**:
     1. **Kiểm thử tính khoảng cách ngày theo múi giờ**: Khởi tạo người dùng ở múi giờ `Asia/Ho_Chi_Minh` (+07:00), log check-in ở hai mốc liên tiếp thuộc ngày 4/6/2026 và 5/6/2026 (ở dạng giờ UTC). Hàm `getCalendarDaysDiffTimezone` quy đổi thành công mốc UTC tương ứng sang lịch cục bộ trước khi tính toán chênh lệch ngày. Kết quả streak tăng chính xác lên **2 ngày**, không bị lỗi kẹt ở 1 ngày do lệch múi giờ với server.
     2. **Kiểm thử tự động reset tiến độ (Cycle Reset)**: Khi bước sang ngày mới, hàm `syncAndResetGoalProgress` tự động quét các log check-in trong ngày hôm nay của người dùng. Đối với thói quen chưa được check-in hôm nay, tiến độ `current_count` tự động reset từ `3/3` về `0/3` và trạng thái cập nhật thành `active` trên cơ sở dữ liệu. Toàn bộ các API `getGoals`, `getGoalById`, `completeGoal`, `updateGoal`, `deleteLog` và `getDashboardStats` được đồng bộ chạy hàm reset này, loại bỏ hoàn toàn việc lưu đọng tiến độ cũ.
+*   **Active Reminders Push Notification Verification (Đạt)**:
+    1. **Kiểm thử đăng ký Push Subscription**: Truy cập màn Cài đặt, bật 'Active Reminders'. Hộp thoại xin quyền hiện lên và được chấp thuận. Gửi API `/push-subscription` đăng ký thành công chuỗi khóa trong DB của User.
+    2. **Kiểm thử Lập lịch scheduler lúc 21h00**: Chạy scheduler và mock múi giờ của User để lúc này đang là 21h05 tối local time. Hệ thống phát hiện người dùng còn 1 thói quen hàng ngày chưa đạt mục tiêu (ví dụ: Drink Water 0/1). 
+    3. **Kiểm thử Đẩy thông báo thành công**: Server gọi `webpush.sendNotification()` đẩy gói tin an toàn. Service Worker đón nhận và hiển thị thông báo "Chống đứt chuỗi! 🔥" trên thiết bị. Trạng thái `last_reminder_sent_date` của User được cập nhật thành ngày hôm nay, ngăn chặn đẩy lặp tin nhắn ở lần quét tiếp theo trong ngày.
+    4. **Kiểm thử Tự động dọn dẹp**: Thử nghiệm giả lập đăng ký đẩy hết hiệu lực (hủy đăng ký thủ công). Server nhận lỗi 410, tự động dọn sạch trường `push_subscription` về null trong cơ sở dữ liệu để tránh rác tài nguyên.
+
 

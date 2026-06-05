@@ -6,6 +6,20 @@
 
 Tất cả các thay đổi lớn của dự án sẽ được ghi nhận và cập nhật theo từng Sprint tại đây.
 
+## [Đã hoàn thành] - Active Reminders Push Notifications - 2026-06-05 13:30 (GMT+7)
+### Đã thêm & Cải tiến (Added & Improved)
+* **Tính năng Nhắc nhở chủ động chống đứt chuỗi (Active Reminders):**
+  - Tích hợp thư viện `web-push` và tạo trình khởi tạo [vapidHelper.ts](file:///d:/Download/daily-goal-tracker/src/services/vapidHelper.ts) tự động sinh và lưu khóa VAPID vào `.env` khi khởi động dự án.
+  - Xây dựng trình lập lịch nền [reminderScheduler.ts](file:///d:/Download/daily-goal-tracker/src/services/reminderScheduler.ts) quét DB mỗi phút, kiểm tra múi giờ của người dùng để đẩy thông báo lúc 21h00 local time nếu còn mục tiêu ngày chưa làm xong.
+  - Hỗ trợ cơ chế tự dọn dẹp (self-cleaning) DB đối với các đăng ký đẩy hết hiệu lực (nhận lỗi 410/404 từ nhà mạng).
+* **Quản lý Đăng ký và API Web Push phía Backend:**
+  - Cập nhật [schema.prisma](file:///d:/Download/daily-goal-tracker/prisma/schema.prisma) thêm trường `push_subscription` và `last_reminder_sent_date` cho bảng `User`.
+  - Bổ sung API `PUT /api/auth/push-subscription` đăng ký/hủy đẩy thông báo và `GET /api/auth/vapid-public-key` lấy khóa VAPID công khai.
+* **Tích hợp Service Worker và UI phía Client:**
+  - Service Worker [sw.js](file:///d:/Download/daily-goal-tracker/public/sw.js) bắt sự kiện `push` hiển thị thông báo "Chống đứt chuỗi! 🔥" và `notificationclick` để mở/focus ứng dụng.
+  - Xây dựng tiện ích client [pushNotification.ts](file:///d:/Download/daily-goal-tracker/src/services/pushNotification.ts) xin quyền thông báo và đồng bộ khóa đẩy lên server.
+  - Thêm công tắc toggle "Active Reminders" kèm luồng kích hoạt quyền trình duyệt trên màn hình cài đặt [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx).
+
 ## [Đã hoàn thành] - Timezone-Aware Streak & Cycle-Aware Progress Reset Fix - 2026-06-05 11:35 (GMT+7)
 ### Đã thêm & Cải tiến (Added & Improved)
 * **Thuật toán Tính Khoảng Cách Ngày An Toàn Theo Múi Giờ (Timezone-Safe Calendar Diff):**

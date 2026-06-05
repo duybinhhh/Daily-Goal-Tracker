@@ -108,11 +108,12 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
 
 #### US-07: Quản lý hồ sơ và Cấu hình cá nhân
 * **Độ ưu tiên:** High / Medium
-* **Story Point:** 3.0
+* **Story Point:** 4.0
 * **Tiêu chí chấp nhận (AC):**
     * Cho phép cập nhật tên hiển thị (Display Name), Email và múi giờ (Timezone) của người dùng hiện tại.
     * Gửi yêu cầu qua API `PUT /api/auth/profile` để đồng bộ thông tin vào Database và cấp lại Access Token mới chứa thông tin cập nhật.
     * Hỗ trợ lưu trữ các cấu hình bật/tắt thông báo dưới client bao gồm: nhắc nhở hàng ngày, thông báo sắp đứt chuỗi Streak, và cột mốc hoàn thành.
+    * **Nhắc nhở chủ động chống đứt chuỗi (Active Reminders):** Tích hợp công tắc bật/tắt thông báo đẩy trên giao diện Settings. Khi người dùng bật, trình duyệt sẽ yêu cầu quyền thông báo (`Notification.requestPermission()`) và đăng ký Web Push Subscription thông qua Service Worker. Thông tin Subscription (endpoint, keys) được gửi qua API `PUT /api/auth/push-subscription` và lưu vào DB người dùng. Khi người dùng tắt, hệ thống sẽ gọi unsubscribe và xóa subscription trên DB.
     * Hỗ trợ nút hành động "Export My Data" cho phép trích xuất toàn bộ dữ liệu mục tiêu và lịch sử của người dùng ra file JSON.
     * Hỗ trợ nút hành động "Delete Account" cho phép xóa vĩnh viễn tài khoản kèm toàn bộ dữ liệu liên quan ở backend qua API `DELETE /api/auth/profile` (yêu cầu Modal xác nhận an toàn trước khi xóa).
     * **Thanh tác vụ nổi (Sticky Action Bar):** Nút Lưu cấu hình và Hủy thay đổi được hiển thị nổi cố định (Sticky) ở cạnh đáy trang Settings, giúp người dùng dễ dàng thao tác nhanh mà không cần cuộn trang.

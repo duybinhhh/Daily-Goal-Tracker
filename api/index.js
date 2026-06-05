@@ -71,6 +71,14 @@ var PrismaDB = class {
         }
         return mapUser(user);
       },
+      findMany: async (where) => {
+        let prismaWhere = {};
+        if (where?.has_push_subscription) {
+          prismaWhere.push_subscription = { not: null };
+        }
+        const list = await prisma.user.findMany({ where: prismaWhere });
+        return list.map(mapUser);
+      },
       create: async (data) => {
         const created = await prisma.user.create({
           data: {
@@ -536,6 +544,40 @@ var deleteAccount = async (req, res, next) => {
     next(error);
   }
 };
+var updatePushSubscription = async (req, res, next) => {
+  try {
+    const authReq = req;
+    if (!authReq.user) {
+      throw new AppError("Unauthenticated request", 401);
+    }
+    const userId = authReq.user.id;
+    const { push_subscription } = req.body;
+    const subscriptionString = push_subscription ? JSON.stringify(push_subscription) : null;
+    await db.users.update(userId, {
+      push_subscription: subscriptionString
+    });
+    res.status(200).json({
+      success: true,
+      message: push_subscription ? "Push subscription registered." : "Push subscription removed."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var getVapidPublicKey = async (req, res, next) => {
+  try {
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    if (!publicKey) {
+      throw new AppError("VAPID keys not configured on server.", 500);
+    }
+    res.status(200).json({
+      success: true,
+      publicKey
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // src/routes/auth.ts
 var router = Router();
@@ -545,30 +587,106 @@ router.post("/refresh", refreshToken);
 router.post("/logout", logout);
 router.put("/profile", authMiddleware, updateProfile);
 router.delete("/profile", authMiddleware, deleteAccount);
+router.put("/push-subscription", authMiddleware, updatePushSubscription);
+router.get("/vapid-public-key", getVapidPublicKey);
 var auth_default = router;
 
 // src/routes/goals.ts
 import { Router as Router2 } from "express";
 
 // src/controllers/goalController.ts
-var getCalendarDaysDiff = (dateStr1, dateStr2) => {
-  const d1 = new Date(dateStr1);
-  const d2 = new Date(dateStr2);
-  const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
-  const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
+var getLocalDateParts = (date, timezone) => {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parseInt(parts.find((p) => p.type === "year").value, 10);
+    const month = parseInt(parts.find((p) => p.type === "month").value, 10) - 1;
+    const day = parseInt(parts.find((p) => p.type === "day").value, 10);
+    return { year, month, day };
+  } catch (e) {
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth(),
+      day: date.getUTCDate()
+    };
+  }
+};
+var getCalendarDaysDiffTimezone = (dateStr1, dateStr2, timezone) => {
+  const hasTimeComponent1 = dateStr1.includes("T") || dateStr1.includes(" ");
+  const hasTimeComponent2 = dateStr2.includes("T") || dateStr2.includes(" ");
+  const localDateStr1 = hasTimeComponent1 ? getLocalDateString(new Date(dateStr1), timezone) : dateStr1;
+  const localDateStr2 = hasTimeComponent2 ? getLocalDateString(new Date(dateStr2), timezone) : dateStr2;
+  const [y1, m1, d1] = localDateStr1.split("-").map(Number);
+  const [y2, m2, d2] = localDateStr2.split("-").map(Number);
+  const utc1 = Date.UTC(y1, m1 - 1, d1);
+  const utc2 = Date.UTC(y2, m2 - 1, d2);
   const msPerDay = 1e3 * 60 * 60 * 24;
   return Math.floor((utc2 - utc1) / msPerDay);
+};
+var isSameLocalWeek = (d1, d2, timezone) => {
+  const p1 = getLocalDateParts(d1, timezone);
+  const p2 = getLocalDateParts(d2, timezone);
+  const date1 = new Date(p1.year, p1.month, p1.day);
+  const date2 = new Date(p2.year, p2.month, p2.day);
+  const getMondayOfDate = (d) => {
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.getFullYear(), d.getMonth(), diff);
+  };
+  const monday1 = getMondayOfDate(date1);
+  const monday2 = getMondayOfDate(date2);
+  return monday1.getFullYear() === monday2.getFullYear() && monday1.getMonth() === monday2.getMonth() && monday1.getDate() === monday2.getDate();
+};
+var isSameLocalMonth = (d1, d2, timezone) => {
+  const p1 = getLocalDateParts(d1, timezone);
+  const p2 = getLocalDateParts(d2, timezone);
+  return p1.year === p2.year && p1.month === p2.month;
+};
+var syncAndResetGoalProgress = async (goal, timezone) => {
+  const logs = await db.logs.findMany({ goal_id: goal.id });
+  const now = /* @__PURE__ */ new Date();
+  const currentCycleLogs = logs.filter((log) => {
+    const logDate = new Date(log.completed_at);
+    if (goal.frequency === "weekly") {
+      return isSameLocalWeek(logDate, now, timezone);
+    } else if (goal.frequency === "monthly") {
+      return isSameLocalMonth(logDate, now, timezone);
+    } else {
+      const p1 = getLocalDateParts(logDate, timezone);
+      const p2 = getLocalDateParts(now, timezone);
+      return p1.year === p2.year && p1.month === p2.month && p1.day === p2.day;
+    }
+  });
+  const correctCount = currentCycleLogs.length;
+  const isCompleted = correctCount >= goal.target_count;
+  const correctStatus = isCompleted ? "completed" : "active";
+  if (goal.current_count !== correctCount || goal.status !== correctStatus) {
+    const updated = await db.goals.update(goal.id, {
+      current_count: correctCount,
+      status: correctStatus
+    });
+    return updated;
+  }
+  return goal;
 };
 var getGoals = async (req, res, next) => {
   try {
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
     const goals = await db.goals.findMany({ user_id: userId });
     const goalsWithStreaks = await Promise.all(
       goals.map(async (goal) => {
+        const syncedGoal = await syncAndResetGoalProgress(goal, timezone);
         const streak = await db.streaks.findUnique({ goal_id: goal.id });
         return {
-          ...goal,
+          ...syncedGoal,
           streak: streak || { current_streak: 0, longest_streak: 0, last_completed_at: null }
         };
       })
@@ -626,12 +744,15 @@ var getGoalById = async (req, res, next) => {
     if (!goal || goal.user_id !== userId) {
       throw new AppError("Goal not found or access denied.", 404);
     }
-    const streak = await db.streaks.findUnique({ goal_id: goal.id });
-    const logs = await db.logs.findMany({ goal_id: goal.id });
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const syncedGoal = await syncAndResetGoalProgress(goal, timezone);
+    const streak = await db.streaks.findUnique({ goal_id: syncedGoal.id });
+    const logs = await db.logs.findMany({ goal_id: syncedGoal.id });
     res.status(200).json({
       success: true,
       goal: {
-        ...goal,
+        ...syncedGoal,
         streak: streak || { current_streak: 0, longest_streak: 0, last_completed_at: null },
         logs
       }
@@ -668,11 +789,14 @@ var updateGoal = async (req, res, next) => {
       updates.current_count = parsed;
     }
     const updatedGoal = await db.goals.update(id, updates);
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const syncedGoal = await syncAndResetGoalProgress(updatedGoal, timezone);
     const streak = await db.streaks.findUnique({ goal_id: goal.id });
     res.status(200).json({
       success: true,
       goal: {
-        ...updatedGoal,
+        ...syncedGoal,
         streak: streak || { current_streak: 0, longest_streak: 0, last_completed_at: null }
       }
     });
@@ -708,16 +832,19 @@ var completeGoal = async (req, res, next) => {
     if (!goal || goal.user_id !== userId) {
       throw new AppError("Goal not found.", 404);
     }
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const syncedGoal = await syncAndResetGoalProgress(goal, timezone);
     if (log_id) {
       const existingLog = await db.logs.findUnique({ id: log_id });
       if (existingLog) {
         console.log(`[Goal Controller] Duplicate check-in detected for log_id: ${log_id}. Returning existing log.`);
-        const currentStreak = await db.streaks.findUnique({ goal_id: goal.id });
+        const currentStreak = await db.streaks.findUnique({ goal_id: syncedGoal.id });
         res.status(200).json({
           success: true,
           message: "Progress already logged.",
           goal: {
-            ...goal,
+            ...syncedGoal,
             streak: currentStreak || { current_streak: 0, longest_streak: 0, last_completed_at: null }
           },
           log: existingLog
@@ -728,21 +855,21 @@ var completeGoal = async (req, res, next) => {
     const todayStr = completed_at || (/* @__PURE__ */ new Date()).toISOString();
     const newLog = await db.logs.create({
       id: log_id || void 0,
-      goal_id: goal.id,
+      goal_id: syncedGoal.id,
       user_id: userId,
       completed_at: todayStr,
       note: note || null
     });
-    const updatedCount = goal.current_count + 1;
-    const totalTarget = goal.target_count;
+    const updatedCount = syncedGoal.current_count + 1;
+    const totalTarget = syncedGoal.target_count;
     let isFullyCompletedToday = updatedCount >= totalTarget;
-    const updatedGoal = await db.goals.update(goal.id, {
+    const updatedGoal = await db.goals.update(syncedGoal.id, {
       current_count: updatedCount,
       status: isFullyCompletedToday ? "completed" : "active"
     });
-    let streak = await db.streaks.findUnique({ goal_id: goal.id });
+    let streak = await db.streaks.findUnique({ goal_id: syncedGoal.id });
     if (!streak) {
-      streak = await db.streaks.create({ user_id: userId, goal_id: goal.id });
+      streak = await db.streaks.create({ user_id: userId, goal_id: syncedGoal.id });
     }
     let isStreakUpdated = false;
     let newCurrentStreak = streak.current_streak;
@@ -753,7 +880,7 @@ var completeGoal = async (req, res, next) => {
         newLongestStreak = 1;
         isStreakUpdated = true;
       } else {
-        const daysDiff = getCalendarDaysDiff(streak.last_completed_at, todayStr);
+        const daysDiff = getCalendarDaysDiffTimezone(streak.last_completed_at, todayStr, timezone);
         if (daysDiff === 1) {
           newCurrentStreak = streak.current_streak + 1;
           newLongestStreak = Math.max(newLongestStreak, newCurrentStreak);
@@ -766,7 +893,7 @@ var completeGoal = async (req, res, next) => {
         }
       }
     }
-    const updatedStreak = await db.streaks.upsert(goal.id, userId, {
+    const updatedStreak = await db.streaks.upsert(syncedGoal.id, userId, {
       current_streak: newCurrentStreak,
       longest_streak: newLongestStreak,
       last_completed_at: isFullyCompletedToday ? todayStr : streak.last_completed_at
@@ -777,7 +904,7 @@ var completeGoal = async (req, res, next) => {
         await db.notifications.create({
           user_id: userId,
           type: "milestone",
-          message: `\u{1F525} Amazing! You've reached a ${newCurrentStreak}-day streak for goal: "${goal.title}"! Keep it up!`
+          message: `\u{1F525} Amazing! You've reached a ${newCurrentStreak}-day streak for goal: "${syncedGoal.title}"! Keep it up!`
         });
       }
     }
@@ -830,7 +957,7 @@ var recalculateStreak = async (goalId, userId) => {
     if (prevDateStr === null) {
       currentStreakSegment = 1;
     } else {
-      const diff = getCalendarDaysDiff(prevDateStr, dateStr);
+      const diff = getCalendarDaysDiffTimezone(prevDateStr, dateStr, timezone);
       if (diff === 1) {
         currentStreakSegment += 1;
       } else if (diff > 1) {
@@ -846,7 +973,7 @@ var recalculateStreak = async (goalId, userId) => {
     const lastCompletedDateStr = completedDates[completedDates.length - 1];
     lastCompletedAtStr = lastCompletedDateStr;
     const todayLocalStr = getLocalDateString(/* @__PURE__ */ new Date(), timezone);
-    const diff = getCalendarDaysDiff(lastCompletedDateStr, todayLocalStr);
+    const diff = getCalendarDaysDiffTimezone(lastCompletedDateStr, todayLocalStr, timezone);
     if (diff <= 1) {
       currentStreak = currentStreakSegment;
     } else {
@@ -882,12 +1009,15 @@ var deleteLog = async (req, res, next) => {
       current_count: updatedCount,
       status: isCompleted ? "completed" : "active"
     });
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const syncedGoal = await syncAndResetGoalProgress(updatedGoal, timezone);
     const updatedStreak = await recalculateStreak(goal.id, userId);
     res.status(200).json({
       success: true,
       message: "Progress log deleted and goal progress updated.",
       goal: {
-        ...updatedGoal,
+        ...syncedGoal,
         streak: updatedStreak || { current_streak: 0, longest_streak: 0, last_completed_at: null }
       }
     });
@@ -923,7 +1053,12 @@ var getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
-    const goals = await db.goals.findMany({ user_id: userId });
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const rawGoals = await db.goals.findMany({ user_id: userId });
+    const goals = await Promise.all(
+      rawGoals.map((goal) => syncAndResetGoalProgress(goal, timezone))
+    );
     const streaks = await db.streaks.findMany({ user_id: userId });
     const totalGoals = goals.length;
     const activeGoals = goals.filter((g) => g.status !== "paused").length;

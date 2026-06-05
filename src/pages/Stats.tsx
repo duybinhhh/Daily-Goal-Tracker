@@ -107,11 +107,10 @@ export const Stats: React.FC = () => {
 
   // Helper for heatmap colors
   const getHeatmapColorClass = (count: number): string => {
-    if (count === 0) return "bg-surface-container-highest";
-    if (count === 1) return "bg-primary/20";
-    if (count === 2) return "bg-primary/50";
-    if (count === 3) return "bg-primary/80";
-    return "bg-primary";
+    if (count === 0) return "heatmap-cell-0";
+    if (count === 1) return "heatmap-cell-1";
+    if (count === 2) return "heatmap-cell-2";
+    return "heatmap-cell-3";
   };
 
   // 2. Compute dynamic stats and categories breakdown
@@ -546,11 +545,10 @@ export const Stats: React.FC = () => {
             <div className="flex items-center gap-2 self-end">
               <span className="text-xs font-semibold text-on-surface-variant">Less</span>
               <div className="flex gap-[3px]">
-                <div className="w-3.5 h-3.5 bg-surface-container-highest rounded-[3px]"></div>
-                <div className="w-3.5 h-3.5 bg-primary/20 rounded-[3px]"></div>
-                <div className="w-3.5 h-3.5 bg-primary/50 rounded-[3px]"></div>
-                <div className="w-3.5 h-3.5 bg-primary/80 rounded-[3px]"></div>
-                <div className="w-3.5 h-3.5 bg-primary rounded-[3px] shadow-[0_0_8px_rgba(192,193,255,0.4)]"></div>
+                <div className="heatmap-cell heatmap-cell-0"></div>
+                <div className="heatmap-cell heatmap-cell-1"></div>
+                <div className="heatmap-cell heatmap-cell-2"></div>
+                <div className="heatmap-cell heatmap-cell-3" style={{ boxShadow: '0 0 8px rgba(78, 222, 163, 0.4)' }}></div>
               </div>
               <span className="text-xs font-semibold text-on-surface-variant">More</span>
             </div>
@@ -565,8 +563,8 @@ export const Stats: React.FC = () => {
                 return (
                   <div
                     key={day.date}
-                    style={day.count >= 4 ? { boxShadow: '0 0 8px rgba(192, 193, 255, 0.4)' } : undefined}
-                    className={`heatmap-cell rounded-sm relative group cursor-pointer transition-all hover:scale-110 ${getHeatmapColorClass(
+                    style={day.count >= 3 ? { boxShadow: '0 0 8px rgba(78, 222, 163, 0.4)' } : undefined}
+                    className={`heatmap-cell relative group cursor-pointer transition-all hover:scale-110 ${getHeatmapColorClass(
                       day.count
                     )}`}
                   >

@@ -235,3 +235,42 @@ export const deleteAccount = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+
+export const updatePushSubscription = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    if (!authReq.user) {
+      throw new AppError("Unauthenticated request", 401);
+    }
+    const userId = authReq.user.id;
+    const { push_subscription } = req.body;
+
+    const subscriptionString = push_subscription ? JSON.stringify(push_subscription) : null;
+
+    await db.users.update(userId, {
+      push_subscription: subscriptionString,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: push_subscription ? "Push subscription registered." : "Push subscription removed.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getVapidPublicKey = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    if (!publicKey) {
+      throw new AppError("VAPID keys not configured on server.", 500);
+    }
+    res.status(200).json({
+      success: true,
+      publicKey,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

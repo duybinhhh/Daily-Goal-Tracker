@@ -516,6 +516,12 @@ html.light .switch-label {
 }
 
 /* Heatmap cells (Activity Calendar Grid) */
+.heatmap-cell {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 3px;
+}
+
 .heatmap-cell-0 {
   background-color: var(--color-surface-container-lowest);
   border: 1px solid var(--border-subtle);

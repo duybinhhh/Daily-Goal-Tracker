@@ -8,7 +8,8 @@
 * **HTTP Client:** **Axios** với request/response Interceptor tự động xử lý và xoay vòng JWT tokens.
 * **Authentication:** **JWT** (Access Token 15 phút + Refresh Token 7 ngày), mã hóa mật khẩu bằng **bcryptjs**.
 * **Offline Caching & Queue:** **IndexedDB** (trình duyệt lưu đệm dữ liệu mục tiêu/chỉ số và hàng đợi đồng bộ offline).
-* **PWA Engine:** **Service Worker** (`sw.js` cache giao diện shell tĩnh) + **Web App Manifest** (`manifest.json` cho phép cài đặt lên màn hình chính).
+* **PWA Engine:** **Service Worker** (`sw.js` cache giao diện shell tĩnh và đón nhận sự kiện push/notificationclick) + **Web App Manifest** (`manifest.json` cho phép cài đặt lên màn hình chính).
+* **Web Push Notifications:** Sử dụng thư viện **web-push** ở Backend để đẩy thông báo về thiết bị/trình duyệt của người dùng thông qua chuẩn VAPID keys.
 
 ---
 
@@ -149,3 +150,10 @@ model Notification {
         - Trong quá trình kết nối lại (khi mạng chuyển sang online và sync manager đang đồng bộ), việc tải lại dữ liệu từ Server có thể diễn ra trước khi hàng đợi ngoại tuyến được dọn sạch hoàn toàn, dẫn đến việc dữ liệu giao diện bị quay về trạng thái cũ trước khi offline (flicker/reset).
         - Để giải quyết vấn đề này, các hàm fetch dữ liệu `fetchGoals` và `fetchHistory` trong Zustand store (`goalStore.ts`) được thiết kế để *luôn luôn* đọc hàng đợi `syncQueue` từ IndexedDB và thực hiện cộng gộp/bù trừ số đếm, tự tạo bản ghi log giả định ngay tại client-side để hiển thị trước khi server phản hồi. Nhờ đó, giao diện người dùng luôn thống nhất với thực tế hành động của họ ở mọi thời điểm chuyển tiếp kết nối.
     *   **Đồng bộ khi có mạng:** Hệ thống lắng nghe sự kiện `online` thông qua trình sự kiện toàn cục ở `App.tsx` để tránh đăng ký lặp lại. Khi phát hiện mạng phục hồi, trình quản lý `syncManager.ts` thực hiện khóa đồng bộ, quét hàng đợi IndexedDB và tuần tự đồng bộ các bản ghi check-in với đúng mốc giờ gốc của sự kiện (`completed_at`). Sau khi đồng bộ thành công, stores sẽ được cập nhật lại dữ liệu chuẩn từ server và tính toán lại Streak/Lịch sử thống kê một cách toàn vẹn.
+8. **Nhắc nhở chủ động chống đứt chuỗi (Active Reminders)**:
+    *   **Thiết lập phía Backend:** Khi ứng dụng khởi chạy, helper [vapidHelper.ts](file:///d:/Download/daily-goal-tracker/src/services/vapidHelper.ts) tự động khởi tạo VAPID keys lưu vào tệp `.env` nếu chưa tồn tại.
+    *   **Lập lịch gửi thông báo (Scheduler):** Dịch vụ [reminderScheduler.ts](file:///d:/Download/daily-goal-tracker/src/services/reminderScheduler.ts) được kích hoạt chạy ngầm trên máy chủ mỗi phút. Nó quét qua toàn bộ người dùng có lưu `push_subscription` trên DB. Đối với mỗi người dùng, hệ thống quy đổi thời gian hiện tại sang múi giờ (`timezone`) của họ.
+    *   **Xác định đứt chuỗi:** Khi giờ địa phương chạm hoặc vượt quá 21h00 tối và chưa gửi nhắc nhở trong ngày (`last_reminder_sent_date` khác ngày hiện tại), hệ thống sẽ đối chiếu danh sách thói quen của người dùng. Nếu phát hiện có thói quen hàng ngày (`frequency === "daily"`) chưa hoàn thành (`current_count < target_count`), hệ thống gọi thư viện `web-push` gửi thông báo đẩy và cập nhật `last_reminder_sent_date` về ngày hiện tại nhằm chống gửi lặp.
+    *   **Đăng ký & Hủy ở Client:** Người dùng bật tắt qua nút cấu hình tại Settings. Trình duyệt gọi Service Worker đăng ký hoặc hủy đăng ký dịch vụ đẩy thông báo với Browser Push Service thông qua tiện ích [pushNotification.ts](file:///d:/Download/daily-goal-tracker/src/services/pushNotification.ts) và gọi API `PUT /api/auth/push-subscription` cập nhật DB.
+    *   **Service Worker xử lý:** Service Worker lắng nghe sự kiện `push` hiển thị thông báo với tiêu đề `"Chống đứt chuỗi! 🔥"` và nội dung khuyến khích. Đồng thời, sự kiện `notificationclick` được lắng nghe để tự động mở/tập trung cửa sổ ứng dụng về màn hình chính.
+    *   **Cơ chế Tự dọn dẹp (Self-cleaning):** Nếu Service Worker của trình duyệt bị hủy hoặc hết hạn, Server nhận mã lỗi (404/410) khi gửi thông báo đẩy sẽ tự động xóa sạch `push_subscription` của người dùng đó khỏi cơ sở dữ liệu để bảo trì tài nguyên.

@@ -10,7 +10,7 @@ Chào mừng bạn đến với **Momentum**, hệ thống theo dõi và quản 
 3. [Quản Lý Danh Sách Mục Tiêu (My Goals)](#3-quản-lý-danh-sách-mục-tiêu-my-goals)
 4. [Bảng Thống Kê & Phân Tích Hiệu Năng (Premium Stats)](#4-bảng-thống-kê--phân-tích-hiệu-năng-premium-stats)
 5. [Trục Thời Gian Hoạt Động (Activity Timeline)](#5-trục-thời-gian-hoạt-động-activity-timeline)
-6. [Cấu Hình & Cài Đặt (Settings)](#6-cấu-hình--cài-đặt-settings)
+6. [Cấu Hình & Cài Đặt (Settings) & Nhắc nhở chủ động](#6-cấu-hình--cài-đặt-settings)
 7. [Các Câu Hỏi Thường Gặp (FAQs)](#7-các-câu-hỏi-thường-gặp-faqs)
 
 ---
@@ -140,6 +140,16 @@ Trang cài đặt (`/settings`) giúp bạn cá nhân hóa hoàn toàn trải ng
 ### 6.3. Danger Zone (Vùng Nguy Hiểm)
 - **Export My Data (Xuất dữ liệu)**: Tải xuống toàn bộ hồ sơ cá nhân và lịch sử thói quen dưới dạng file JSON để lưu trữ dự phòng.
 - **Delete Account (Xóa tài khoản)**: Xóa vĩnh viễn tài khoản của bạn cùng tất cả mục tiêu, lịch sử check-in và chuỗi Streak liên quan. *Lưu ý: Hành động này không thể hoàn tác.*
+
+### 6.4. Thông báo & Nhắc nhở chủ động chống đứt chuỗi (Active Reminders)
+Để khắc phục tình trạng người dùng quên mở ứng dụng dẫn đến mất chuỗi Streak đáng tiếc, Momentum cung cấp tính năng **Nhắc nhở chủ động chống đứt chuỗi (Active Reminders)**:
+- **Nguyên lý hoạt động:** Khi bạn bật tính năng này, trình duyệt sẽ yêu cầu quyền thông báo đẩy. Hàng ngày vào lúc **21h00 tối (giờ địa phương theo Múi giờ tài khoản của bạn)**, hệ thống máy chủ sẽ tự động kiểm tra xem bạn còn thói quen hàng ngày nào chưa hoàn thành hay không. Nếu phát hiện còn thói quen chưa làm, một thông báo đẩy (Push Notification) sẽ được gửi thẳng đến thiết bị/trình duyệt của bạn (kể cả khi bạn đã đóng ứng dụng).
+- **Cách kích hoạt:**
+  1. Đi tới trang **Settings** (`/settings`).
+  2. Tại bảng **Notifications**, tìm mục **Active Reminders** và bật công tắc này lên.
+  3. Xác nhận cho phép hiển thị thông báo khi trình duyệt gửi yêu cầu.
+  4. Nhấn **Save Preferences** ở thanh tác vụ nổi để lưu lại.
+- **Tương tác thông báo:** Nhấn trực tiếp vào thông báo đẩy "Chống đứt chuỗi! 🔥" trên điện thoại hoặc máy tính để mở và điều hướng nhanh về màn hình chính của ứng dụng để hoàn thành mục tiêu.
 
 ---
 

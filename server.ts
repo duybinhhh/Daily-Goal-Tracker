@@ -4,9 +4,17 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import app from "./src/express-app";
+import { initVapidKeys } from "./src/services/vapidHelper";
+import { startReminderScheduler } from "./src/services/reminderScheduler";
 
 async function startServer() {
   const PORT = 3000;
+
+  // Initialize Web Push VAPID keys
+  initVapidKeys();
+
+  // Start the background Active Reminders scheduler
+  startReminderScheduler();
 
   // Vite middleware for client asset compiling in development
   if (process.env.NODE_ENV !== "production") {

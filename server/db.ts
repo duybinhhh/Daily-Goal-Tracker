@@ -70,6 +70,14 @@ class PrismaDB {
       }
       return mapUser(user);
     },
+    findMany: async (where?: { has_push_subscription?: boolean }) => {
+      let prismaWhere: any = {};
+      if (where?.has_push_subscription) {
+        prismaWhere.push_subscription = { not: null };
+      }
+      const list = await prisma.user.findMany({ where: prismaWhere });
+      return list.map(mapUser);
+    },
     create: async (data: { email: string; password_hash: string; name: string; timezone?: string }) => {
       const created = await prisma.user.create({
         data: {
@@ -81,7 +89,17 @@ class PrismaDB {
       });
       return mapUser(created);
     },
-    update: async (id: string, updateData: { email?: string; password_hash?: string; name?: string; timezone?: string }) => {
+    update: async (
+      id: string,
+      updateData: {
+        email?: string;
+        password_hash?: string;
+        name?: string;
+        timezone?: string;
+        push_subscription?: string | null;
+        last_reminder_sent_date?: string | null;
+      }
+    ) => {
       const updated = await prisma.user.update({
         where: { id },
         data: updateData,
