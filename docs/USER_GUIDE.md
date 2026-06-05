@@ -224,5 +224,13 @@ Momentum cung cấp tính năng **Social Sharing** cao cấp cho phép bạn kho
 > 3. Bạn có thể bấm check-in hoặc hoàn tác (Undo) bình thường. Bản ghi sẽ được xếp vào hàng đợi chờ đồng bộ. Trạng thái giao diện luôn hiển thị mượt mà và không lo bị gửi đúp log nhờ cơ chế khóa click dồn dập và cơ chế UUID định danh.
 > 4. Khi thiết bị có mạng trở lại, hệ thống sẽ tự động đồng bộ hóa an toàn (chỉ một tab xử lý đồng bộ nhờ Web Locks API) và gửi dữ liệu check-in lên máy chủ với đúng giờ giấc ban đầu bạn thực hiện, đảm bảo chuỗi Streak của bạn không bao giờ bị đứt gãy! Giao diện cũng sẽ tự động hợp nhất hàng đợi ngoại tuyến nên không hề có hiện tượng giật lag giật lại trạng thái cũ!
 
+**Q: Làm thế nào để thêm phím tắt "Check-in nhanh" ngoài màn hình chính điện thoại?**
+> **A:** 
+> 1. Hãy truy cập trang web bằng trình duyệt trên điện thoại (Chrome cho Android hoặc Safari cho iOS).
+> 2. Chọn menu cài đặt trình duyệt (hoặc nút Chia sẻ trên iOS) và chọn **"Thêm vào Màn hình chính"** (Add to Home screen) để cài đặt ứng dụng dưới dạng PWA.
+> 3. Sau khi ứng dụng đã cài đặt xong:
+>    - **Đối với các launcher di động hỗ trợ Shortcuts:** Bạn chỉ cần nhấn và giữ biểu tượng ứng dụng ngoài màn hình chính. Một menu lối tắt sẽ hiện lên, hãy chọn **"Check-in nhanh"** để truy cập tức thì màn hình tối giản. Bạn cũng có thể nhấn giữ lối tắt này và kéo thả ra màn hình làm một phím tắt độc lập.
+>    - **Đối với mọi thiết bị khác:** Bạn có thể mở ứng dụng, truy cập màn hình **Settings** -> cuộn xuống mục **Mobile PWA Widget & Shortcuts** và nhấn **"Mở ngay"** để bookmark trực tiếp liên kết check-in nhanh (`/#/quick-checkin`) ra màn hình chính của thiết bị.
+
 ---
 *Chúc bạn có những trải nghiệm tuyệt vời và duy trì được kỷ luật bản thân xuất sắc cùng **Momentum**!*
