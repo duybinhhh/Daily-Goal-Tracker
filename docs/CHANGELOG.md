@@ -6,6 +6,16 @@
 
 Tất cả các thay đổi lớn của dự án sẽ được ghi nhận và cập nhật theo từng Sprint tại đây.
 
+## [Đã hoàn thành] - Timezone-Aware Streak & Cycle-Aware Progress Reset Fix - 2026-06-05 11:35 (GMT+7)
+### Đã thêm & Cải tiến (Added & Improved)
+* **Thuật toán Tính Khoảng Cách Ngày An Toàn Theo Múi Giờ (Timezone-Safe Calendar Diff):**
+  - Triển khai hàm `getCalendarDaysDiffTimezone` trong [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts) để chuyển đổi các timestamp ISO thành chuỗi ngày địa phương (`YYYY-MM-DD`) dựa trên cấu hình múi giờ (`timezone`) của người dùng trước khi tính khoảng cách ngày.
+  - Sửa đổi toàn bộ hệ thống Streak Engine trong `completeGoal` và `recalculateStreak` để sử dụng cách tính này, giải quyết triệt để lỗi kẹt/mất streak (streak luôn bằng 1) do lệch múi giờ giữa client (+07:00) và server (-07:00).
+* **Cơ chế Reset Tiến Độ Theo Chu Kỳ Tự Động (Cycle-Aware Progress Reset Engine):**
+  - Phát triển hàm `syncAndResetGoalProgress` tự động đối chiếu các bản ghi log trong cơ sở dữ liệu đối với chu kỳ hiện tại (hàng ngày, hàng tuần, hàng tháng) dựa trên múi giờ của người dùng.
+  - Nếu phát hiện đã chuyển sang chu kỳ mới, tiến độ hiện tại (`current_count`) của thói quen sẽ được tự động reset về `0` (hoặc số check-in thực tế trong chu kỳ mới) và cập nhật trạng thái mục tiêu (`status`) thành `"active"` trong cơ sở dữ liệu.
+  - Đồng bộ gọi hàm reset này trong tất cả các API trả về mục tiêu hoặc thao tác dữ liệu thói quen (`getGoals`, `getGoalById`, `completeGoal`, `updateGoal`, `deleteLog`) cũng như API lấy chỉ số thống kê (`getDashboardStats`), đảm bảo số đếm hiển thị trên UI luôn chính xác và không bị tích lũy cộng dồn vô hạn qua các ngày.
+
 ## [Đã hoàn thành] - Offline Sync Reliability & Concurrency Overhaul - 2026-06-05 11:20 (GMT+7)
 ### Đã thêm & Cải tiến (Added & Improved)
 * **Khóa đồng bộ đa tab (Multi-tab Synchronization Locking):**

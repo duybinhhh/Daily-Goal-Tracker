@@ -3,6 +3,7 @@ import { Response, NextFunction } from "express";
 import { db } from "../../server/db";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
+import { syncAndResetGoalProgress } from "./goalController";
 
 function getLogDedupeKey(log: { goal_id: string; completed_at: string; note?: string | null }): string {
   return [
@@ -17,7 +18,13 @@ export const getDashboardStats = async (req: AuthenticatedRequest, res: Response
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
 
-    const goals = await db.goals.findMany({ user_id: userId });
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+
+    const rawGoals = await db.goals.findMany({ user_id: userId });
+    const goals = await Promise.all(
+      rawGoals.map(goal => syncAndResetGoalProgress(goal, timezone))
+    );
     const streaks = await db.streaks.findMany({ user_id: userId });
 
     const totalGoals = goals.length;

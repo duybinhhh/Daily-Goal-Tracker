@@ -3,8 +3,9 @@
 ## 1. Stack & Kiến Trúc Hiện Tại (Core Context)
 - **Frontend**: React 19 + TypeScript + Vite 6 + Tailwind CSS v4 + Zustand + React Router v6.
 - **Backend**: Node.js + Express + TypeScript (chạy qua `tsx`).
-- **Database**: Sử dụng **Local File Database** (JSON) qua file `server/db.ts` lưu tại `data/db.json` để giả lập Prisma client. *Tuyệt đối không dùng PostgreSQL hay chạy Prisma migrate trong giai đoạn này.*
+- **Database**: Sử dụng **PostgreSQL (Supabase)** thông qua **Prisma ORM**.
 - **Auth**: JWT (Access Token 15 phút + Refresh Token 7 ngày với cơ chế tự động xoay vòng qua Axios Interceptors).
+- **Timezone-Safe Streak & Cycle Resets**: Tự động tính toán khoảng cách ngày an toàn theo múi giờ của người dùng (`getCalendarDaysDiffTimezone`) nhằm tránh lỗi mất streak do lệch múi giờ với server. Tích hợp công cụ `syncAndResetGoalProgress` tự động reset tiến độ (`current_count` và `status`) khi chuyển chu kỳ mới (ngày/tuần/tháng) dựa trên múi giờ tài khoản.
 - **Offline & PWA**: Biến ứng dụng thành Progressive Web App (PWA) qua tệp `manifest.json` và Service Worker `sw.js`. Caching dữ liệu thói quen và lưu hàng đợi check-in offline thông qua **IndexedDB** dưới trình duyệt, tự động đồng bộ hóa lên server khi phát hiện kết nối mạng được khôi phục. *Cập nhật tính năng an toàn*: Bảo vệ quá trình đồng bộ hóa đa tab bằng **Web Locks API** (hỗ trợ fallback LocalStorage Lock) để loại bỏ race conditions; sử dụng client-side UUID (`log_id`) làm Primary Key của bản ghi `GoalLog` trên database để đảm bảo tính idempotency và triệt tiêu trùng lặp log; tích hợp guard `completing` phía UI để tránh click dồn dập; luôn hợp nhất `syncQueue` vào dữ liệu fetch từ server để giao diện hiển thị mượt mà không bị giật lùi dữ liệu cũ.
 
 ## 2. Định Hướng UI/UX & Hệ Thống Thẩm Mỹ

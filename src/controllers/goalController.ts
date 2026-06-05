@@ -4,31 +4,134 @@ import { db } from "../../server/db";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 
-// Helper for date differences in calendar days
-const getCalendarDaysDiff = (dateStr1: string, dateStr2: string): number => {
-  const d1 = new Date(dateStr1);
-  const d2 = new Date(dateStr2);
+// Helper to get local date parts (year, month, day) in timezone
+const getLocalDateParts = (date: Date, timezone: string) => {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parseInt(parts.find(p => p.type === "year")!.value, 10);
+    const month = parseInt(parts.find(p => p.type === "month")!.value, 10) - 1; // 0-indexed
+    const day = parseInt(parts.find(p => p.type === "day")!.value, 10);
+    return { year, month, day };
+  } catch (e) {
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth(),
+      day: date.getUTCDate()
+    };
+  }
+};
+
+// Helper for date differences in calendar days, timezone-safe
+const getCalendarDaysDiffTimezone = (dateStr1: string, dateStr2: string, timezone: string): number => {
+  const hasTimeComponent1 = dateStr1.includes("T") || dateStr1.includes(" ");
+  const hasTimeComponent2 = dateStr2.includes("T") || dateStr2.includes(" ");
   
-  const utc1 = Date.UTC(d1.getFullYear(), d1.getMonth(), d1.getDate());
-  const utc2 = Date.UTC(d2.getFullYear(), d2.getMonth(), d2.getDate());
+  const localDateStr1 = hasTimeComponent1 
+    ? getLocalDateString(new Date(dateStr1), timezone) 
+    : dateStr1;
+    
+  const localDateStr2 = hasTimeComponent2 
+    ? getLocalDateString(new Date(dateStr2), timezone) 
+    : dateStr2;
+    
+  const [y1, m1, d1] = localDateStr1.split("-").map(Number);
+  const [y2, m2, d2] = localDateStr2.split("-").map(Number);
+  
+  const utc1 = Date.UTC(y1, m1 - 1, d1);
+  const utc2 = Date.UTC(y2, m2 - 1, d2);
   
   const msPerDay = 1000 * 60 * 60 * 24;
   return Math.floor((utc2 - utc1) / msPerDay);
 };
+
+// Helper to check if a date is within the current local week of the user
+const isSameLocalWeek = (d1: Date, d2: Date, timezone: string): boolean => {
+  const p1 = getLocalDateParts(d1, timezone);
+  const p2 = getLocalDateParts(d2, timezone);
+  
+  const date1 = new Date(p1.year, p1.month, p1.day);
+  const date2 = new Date(p2.year, p2.month, p2.day);
+  
+  const getMondayOfDate = (d: Date): Date => {
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.getFullYear(), d.getMonth(), diff);
+  };
+  
+  const monday1 = getMondayOfDate(date1);
+  const monday2 = getMondayOfDate(date2);
+  
+  return monday1.getFullYear() === monday2.getFullYear() &&
+         monday1.getMonth() === monday2.getMonth() &&
+         monday1.getDate() === monday2.getDate();
+};
+
+// Helper to check if a date is within the current local month of the user
+const isSameLocalMonth = (d1: Date, d2: Date, timezone: string): boolean => {
+  const p1 = getLocalDateParts(d1, timezone);
+  const p2 = getLocalDateParts(d2, timezone);
+  return p1.year === p2.year && p1.month === p2.month;
+};
+
+// Syncs and resets the current_count / status of a goal if it belongs to a previous cycle
+export const syncAndResetGoalProgress = async (goal: any, timezone: string) => {
+  const logs = await db.logs.findMany({ goal_id: goal.id });
+  const now = new Date();
+  
+  // Filter logs that belong to the current cycle
+  const currentCycleLogs = logs.filter((log) => {
+    const logDate = new Date(log.completed_at);
+    if (goal.frequency === "weekly") {
+      return isSameLocalWeek(logDate, now, timezone);
+    } else if (goal.frequency === "monthly") {
+      return isSameLocalMonth(logDate, now, timezone);
+    } else {
+      // daily
+      const p1 = getLocalDateParts(logDate, timezone);
+      const p2 = getLocalDateParts(now, timezone);
+      return p1.year === p2.year && p1.month === p2.month && p1.day === p2.day;
+    }
+  });
+  
+  const correctCount = currentCycleLogs.length;
+  const isCompleted = correctCount >= goal.target_count;
+  const correctStatus = isCompleted ? "completed" : "active";
+  
+  if (goal.current_count !== correctCount || goal.status !== correctStatus) {
+    const updated = await db.goals.update(goal.id, {
+      current_count: correctCount,
+      status: correctStatus,
+    });
+    return updated;
+  }
+  
+  return goal;
+};
+
 
 export const getGoals = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
 
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+
     const goals = await db.goals.findMany({ user_id: userId });
     
-    // Attach streaks to each goal
+    // Attach streaks to each goal and sync progress
     const goalsWithStreaks = await Promise.all(
       goals.map(async (goal) => {
+        const syncedGoal = await syncAndResetGoalProgress(goal, timezone);
         const streak = await db.streaks.findUnique({ goal_id: goal.id });
         return {
-          ...goal,
+          ...syncedGoal,
           streak: streak || { current_streak: 0, longest_streak: 0, last_completed_at: null },
         };
       })
@@ -99,13 +202,17 @@ export const getGoalById = async (req: AuthenticatedRequest, res: Response, next
       throw new AppError("Goal not found or access denied.", 404);
     }
 
-    const streak = await db.streaks.findUnique({ goal_id: goal.id });
-    const logs = await db.logs.findMany({ goal_id: goal.id });
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const syncedGoal = await syncAndResetGoalProgress(goal, timezone);
+
+    const streak = await db.streaks.findUnique({ goal_id: syncedGoal.id });
+    const logs = await db.logs.findMany({ goal_id: syncedGoal.id });
 
     res.status(200).json({
       success: true,
       goal: {
-        ...goal,
+        ...syncedGoal,
         streak: streak || { current_streak: 0, longest_streak: 0, last_completed_at: null },
         logs,
       },
@@ -150,12 +257,17 @@ export const updateGoal = async (req: AuthenticatedRequest, res: Response, next:
     }
 
     const updatedGoal = await db.goals.update(id, updates);
+
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const syncedGoal = await syncAndResetGoalProgress(updatedGoal, timezone);
+
     const streak = await db.streaks.findUnique({ goal_id: goal.id });
 
     res.status(200).json({
       success: true,
       goal: {
-        ...updatedGoal,
+        ...syncedGoal,
         streak: streak || { current_streak: 0, longest_streak: 0, last_completed_at: null },
       },
     });
@@ -201,17 +313,23 @@ export const completeGoal = async (req: AuthenticatedRequest, res: Response, nex
       throw new AppError("Goal not found.", 404);
     }
 
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+
+    // Sync and reset progress first to ensure today's count is correct before check-in
+    const syncedGoal = await syncAndResetGoalProgress(goal, timezone);
+
     // Check for duplicate check-in using log_id
     if (log_id) {
       const existingLog = await db.logs.findUnique({ id: log_id });
       if (existingLog) {
         console.log(`[Goal Controller] Duplicate check-in detected for log_id: ${log_id}. Returning existing log.`);
-        const currentStreak = await db.streaks.findUnique({ goal_id: goal.id });
+        const currentStreak = await db.streaks.findUnique({ goal_id: syncedGoal.id });
         res.status(200).json({
           success: true,
           message: "Progress already logged.",
           goal: {
-            ...goal,
+            ...syncedGoal,
             streak: currentStreak || { current_streak: 0, longest_streak: 0, last_completed_at: null },
           },
           log: existingLog,
@@ -225,28 +343,28 @@ export const completeGoal = async (req: AuthenticatedRequest, res: Response, nex
     // 1. Log progress
     const newLog = await db.logs.create({
       id: log_id || undefined,
-      goal_id: goal.id,
+      goal_id: syncedGoal.id,
       user_id: userId,
       completed_at: todayStr,
       note: note || null,
     });
 
     // 2. Increment target count
-    const updatedCount = goal.current_count + 1;
-    const totalTarget = goal.target_count;
+    const updatedCount = syncedGoal.current_count + 1;
+    const totalTarget = syncedGoal.target_count;
     
     let isFullyCompletedToday = updatedCount >= totalTarget;
     
     // Update count in database
-    const updatedGoal = await db.goals.update(goal.id, {
+    const updatedGoal = await db.goals.update(syncedGoal.id, {
       current_count: updatedCount,
       status: isFullyCompletedToday ? "completed" : "active"
     });
 
     // 3. Streak Engine logic
-    let streak = await db.streaks.findUnique({ goal_id: goal.id });
+    let streak = await db.streaks.findUnique({ goal_id: syncedGoal.id });
     if (!streak) {
-      streak = await db.streaks.create({ user_id: userId, goal_id: goal.id });
+      streak = await db.streaks.create({ user_id: userId, goal_id: syncedGoal.id });
     }
 
     let isStreakUpdated = false;
@@ -260,7 +378,7 @@ export const completeGoal = async (req: AuthenticatedRequest, res: Response, nex
         newLongestStreak = 1;
         isStreakUpdated = true;
       } else {
-        const daysDiff = getCalendarDaysDiff(streak.last_completed_at, todayStr);
+        const daysDiff = getCalendarDaysDiffTimezone(streak.last_completed_at, todayStr, timezone);
         
         if (daysDiff === 1) {
           // Consecutive daily completion
@@ -278,7 +396,7 @@ export const completeGoal = async (req: AuthenticatedRequest, res: Response, nex
       }
     }
 
-    const updatedStreak = await db.streaks.upsert(goal.id, userId, {
+    const updatedStreak = await db.streaks.upsert(syncedGoal.id, userId, {
       current_streak: newCurrentStreak,
       longest_streak: newLongestStreak,
       last_completed_at: isFullyCompletedToday ? todayStr : streak.last_completed_at,
@@ -291,7 +409,7 @@ export const completeGoal = async (req: AuthenticatedRequest, res: Response, nex
         await db.notifications.create({
           user_id: userId,
           type: "milestone",
-          message: `🔥 Amazing! You've reached a ${newCurrentStreak}-day streak for goal: "${goal.title}"! Keep it up!`,
+          message: `🔥 Amazing! You've reached a ${newCurrentStreak}-day streak for goal: "${syncedGoal.title}"! Keep it up!`,
         });
       }
     }
@@ -359,7 +477,7 @@ export const recalculateStreak = async (goalId: string, userId: string) => {
     if (prevDateStr === null) {
       currentStreakSegment = 1;
     } else {
-      const diff = getCalendarDaysDiff(prevDateStr, dateStr);
+      const diff = getCalendarDaysDiffTimezone(prevDateStr, dateStr, timezone);
       if (diff === 1) {
         currentStreakSegment += 1;
       } else if (diff > 1) {
@@ -378,7 +496,7 @@ export const recalculateStreak = async (goalId: string, userId: string) => {
     lastCompletedAtStr = lastCompletedDateStr;
 
     const todayLocalStr = getLocalDateString(new Date(), timezone);
-    const diff = getCalendarDaysDiff(lastCompletedDateStr, todayLocalStr);
+    const diff = getCalendarDaysDiffTimezone(lastCompletedDateStr, todayLocalStr, timezone);
 
     if (diff <= 1) {
       currentStreak = currentStreakSegment;
@@ -430,6 +548,10 @@ export const deleteLog = async (req: AuthenticatedRequest, res: Response, next: 
       status: isCompleted ? "completed" : "active",
     });
 
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const syncedGoal = await syncAndResetGoalProgress(updatedGoal, timezone);
+
     // 4. Recalculate streak
     const updatedStreak = await recalculateStreak(goal.id, userId);
 
@@ -437,7 +559,7 @@ export const deleteLog = async (req: AuthenticatedRequest, res: Response, next: 
       success: true,
       message: "Progress log deleted and goal progress updated.",
       goal: {
-        ...updatedGoal,
+        ...syncedGoal,
         streak: updatedStreak || { current_streak: 0, longest_streak: 0, last_completed_at: null },
       },
     });
