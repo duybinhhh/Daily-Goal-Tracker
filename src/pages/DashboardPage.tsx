@@ -779,10 +779,10 @@ export const DashboardPage: React.FC = () => {
             </div>
             <div>
               <h4 className="font-bold text-sm" style={{ color: "var(--color-on-surface)" }}>
-                Check-in nhanh 1 chạm trên di động!
+                1-Tap Quick Check-in on Mobile!
               </h4>
               <p className="text-xs mt-0.5 animate-pulse" style={{ color: "var(--color-on-surface-variant)" }}>
-                💡 Ghim phím tắt PWA ra màn hình chính để ghi nhận nhanh thói quen tức thì.
+                💡 Pin the PWA shortcut to your Home Screen for instant habit logging.
               </p>
             </div>
           </div>
@@ -794,7 +794,7 @@ export const DashboardPage: React.FC = () => {
               whiteSpace: "nowrap"
             }}
           >
-            <span>Mở Check-in</span>
+            <span>Open Check-in</span>
             <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>
               arrow_forward
             </span>

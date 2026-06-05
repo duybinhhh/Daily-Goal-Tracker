@@ -363,29 +363,29 @@ export function SettingsPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-sm text-on-surface">Cách thêm phím tắt Check-in nhanh ra màn hình chính</h4>
+                  <h4 className="font-semibold text-sm text-on-surface">How to add Quick Check-in shortcut to Home Screen</h4>
                   <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Để ghi nhận thói quen bằng 1 chạm tiện lợi từ màn hình điện thoại mà không cần mở trình duyệt:
+                    To log habits with a convenient 1-tap from your phone screen without opening the browser:
                   </p>
                   <ol className="list-decimal list-inside text-xs text-on-surface-variant space-y-1.5 ml-1">
-                    <li>Mở ứng dụng này trên trình duyệt điện thoại (Chrome/Safari).</li>
-                    <li>Chọn <strong>"Thêm vào Màn hình chính"</strong> (Add to Home Screen) trong menu chia sẻ hoặc tùy chọn trình duyệt.</li>
-                    <li>Sau khi cài đặt, bạn có thể nhấn giữ biểu tượng ứng dụng ngoài màn hình và chọn <strong>"Check-in nhanh"</strong>.</li>
-                    <li>Hoặc bạn có thể ghim trực tiếp đường dẫn này ra màn hình: <a href="/#/quick-checkin" className="text-primary hover:underline font-semibold">/#/quick-checkin</a></li>
+                    <li>Open this app in your mobile browser (Chrome/Safari).</li>
+                    <li>Select <strong>"Add to Home Screen"</strong> in the share menu or browser options.</li>
+                    <li>After installation, you can long-press the app icon on your home screen and select <strong>"Quick Check-in"</strong>.</li>
+                    <li>Or you can pin this link directly to your home screen: <a href="/#/quick-checkin" className="text-primary hover:underline font-semibold">/#/quick-checkin</a></li>
                   </ol>
                 </div>
                 <div className="flex flex-col justify-center items-center p-4 bg-surface-container-low/40 rounded-xl border border-white/5 text-center">
                   <span className="material-symbols-outlined text-4xl text-primary animate-pulse mb-3">install_mobile</span>
-                  <h5 className="font-bold text-sm text-on-surface mb-1">Thử nghiệm Check-in nhanh</h5>
+                  <h5 className="font-bold text-sm text-on-surface mb-1">Try Quick Check-in</h5>
                   <p className="text-xs text-on-surface-variant max-w-[240px] mb-4">
-                    Mở thử giao diện check-in tối giản được thiết kế riêng cho màn hình di động.
+                    Try the minimal check-in interface designed specifically for mobile screens.
                   </p>
                   <button
                     type="button"
                     onClick={() => navigate("/quick-checkin")}
                     className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
                   >
-                    <span>Mở ngay</span>
+                    <span>Open Now</span>
                     <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                   </button>
                 </div>
