@@ -12,6 +12,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
 import GoalsPage from "./pages/GoalsPage";
 import GroupsPage from "./pages/GroupsPage";
+import { QuickCheckInPage } from "./pages/QuickCheckInPage";
 
 import { useGoalStore } from "./store/goalStore";
 import { syncOfflineData } from "./services/syncManager";
@@ -134,6 +135,7 @@ function AppLayout() {
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/quick-checkin" element={<QuickCheckInPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

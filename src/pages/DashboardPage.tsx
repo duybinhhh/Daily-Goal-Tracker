@@ -753,6 +753,54 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
+        {/* ── Mobile Quick Check-In Promotion Banner ── */}
+        <div 
+          className="glass-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4"
+          style={{
+            border: "1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)",
+            background: "linear-gradient(135deg, rgba(192, 193, 255, 0.05), rgba(78, 222, 163, 0.03))",
+            boxShadow: "0 4px 24px rgba(192, 193, 255, 0.05)",
+            borderRadius: "1rem",
+          }}
+        >
+          <div className="flex items-center gap-3.5">
+            <div 
+              className="flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{
+                width: "42px",
+                height: "42px",
+                background: "rgba(192, 193, 255, 0.12)",
+                color: "var(--color-primary)",
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "22px" }}>
+                bolt
+              </span>
+            </div>
+            <div>
+              <h4 className="font-bold text-sm" style={{ color: "var(--color-on-surface)" }}>
+                Check-in nhanh 1 chạm trên di động!
+              </h4>
+              <p className="text-xs mt-0.5 animate-pulse" style={{ color: "var(--color-on-surface-variant)" }}>
+                💡 Ghim phím tắt PWA ra màn hình chính để ghi nhận nhanh thói quen tức thì.
+              </p>
+            </div>
+          </div>
+          <Link 
+            to="/quick-checkin" 
+            className="btn-primary text-xs py-2 px-4.5 flex items-center gap-1.5 self-stretch sm:self-auto text-center justify-center"
+            style={{ 
+              boxShadow: "0 4px 12px rgba(192, 193, 255, 0.15)",
+              whiteSpace: "nowrap"
+            }}
+          >
+            <span>Mở Check-in</span>
+            <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>
+              arrow_forward
+            </span>
+          </Link>
+        </div>
+
         {/* ── Two-Column Layout: Goals + Right Panel ── */}
         <div
           className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start flex-1"

@@ -353,6 +353,45 @@ export function SettingsPage() {
               </div>
             </section>
 
+            {/* Mobile Widget & Shortcut Setup Guide */}
+            <section className="glass-card p-6 space-y-6 md:col-span-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-secondary/10 rounded-xl text-secondary">
+                  <span className="material-symbols-outlined text-[22px] ms-filled">bolt</span>
+                </div>
+                <h3 className="font-bold text-lg text-on-surface">Mobile PWA Widget & Shortcuts</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm text-on-surface">Cách thêm phím tắt Check-in nhanh ra màn hình chính</h4>
+                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                    Để ghi nhận thói quen bằng 1 chạm tiện lợi từ màn hình điện thoại mà không cần mở trình duyệt:
+                  </p>
+                  <ol className="list-decimal list-inside text-xs text-on-surface-variant space-y-1.5 ml-1">
+                    <li>Mở ứng dụng này trên trình duyệt điện thoại (Chrome/Safari).</li>
+                    <li>Chọn <strong>"Thêm vào Màn hình chính"</strong> (Add to Home Screen) trong menu chia sẻ hoặc tùy chọn trình duyệt.</li>
+                    <li>Sau khi cài đặt, bạn có thể nhấn giữ biểu tượng ứng dụng ngoài màn hình và chọn <strong>"Check-in nhanh"</strong>.</li>
+                    <li>Hoặc bạn có thể ghim trực tiếp đường dẫn này ra màn hình: <a href="/#/quick-checkin" className="text-primary hover:underline font-semibold">/#/quick-checkin</a></li>
+                  </ol>
+                </div>
+                <div className="flex flex-col justify-center items-center p-4 bg-surface-container-low/40 rounded-xl border border-white/5 text-center">
+                  <span className="material-symbols-outlined text-4xl text-primary animate-pulse mb-3">install_mobile</span>
+                  <h5 className="font-bold text-sm text-on-surface mb-1">Thử nghiệm Check-in nhanh</h5>
+                  <p className="text-xs text-on-surface-variant max-w-[240px] mb-4">
+                    Mở thử giao diện check-in tối giản được thiết kế riêng cho màn hình di động.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/quick-checkin")}
+                    className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
+                  >
+                    <span>Mở ngay</span>
+                    <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                  </button>
+                </div>
+              </div>
+            </section>
+
             {/* Notifications & Reminders */}
             <section className="glass-card p-6 space-y-6">
               <div className="flex items-center gap-3">

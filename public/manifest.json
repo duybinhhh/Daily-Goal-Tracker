@@ -14,5 +14,19 @@
   "background_color": "#0b1326",
   "theme_color": "#494bd6",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "shortcuts": [
+    {
+      "name": "Check-in nhanh",
+      "short_name": "Check-in",
+      "description": "Ghi nhận thói quen nhanh bằng 1 chạm",
+      "url": "/#/quick-checkin",
+      "icons": [
+        {
+          "src": "/icon.png",
+          "sizes": "512x512"
+        }
+      ]
+    }
+  ]
 }

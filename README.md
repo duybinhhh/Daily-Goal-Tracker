@@ -32,6 +32,19 @@
 6. **Hệ Thống Streak Engine & Timezone-Aware**:
    - Thuật toán tự động nhóm log theo ngày địa phương dựa trên `timezone` của người dùng để xác định chuỗi ngày hiện tại (`current_streak`) và chuỗi kỷ lục (`longest_streak`).
    - Cung cấp tính năng cập nhật Profile (Tên, Email, Múi giờ) và Danger Zone (Xuất dữ liệu cá nhân dạng JSON, Xóa tài khoản vĩnh viễn).
+7. **Nhắc nhở chủ động chống đứt chuỗi (Active Reminders)**:
+   - Tích hợp Web Push Notifications (chuẩn VAPID) tự động quét và gửi thông báo đẩy lúc 21h00 tối hàng ngày theo múi giờ địa phương của người dùng nếu họ còn thói quen chưa làm xong.
+8. **Đồng đội giám sát (Habit Groups - `/groups`)**:
+   - Cho phép người dùng tạo/tham gia các nhóm thói quen chung, liên kết tự động mục tiêu cá nhân trên Dashboard và theo dõi bảng xếp hạng tiến độ Leaderboard của các thành viên.
+9. **Chia sẻ thành tích một chạm (Social Sharing)**:
+   - Modal chia sẻ kết xuất thẻ vinh danh (Milestone Card) hoặc lưới hoạt động (Consistency Heatmap) động trên **HTML5 Canvas** (1200x630px), hỗ trợ tải về PNG, Web Share API di động và liên kết đăng bài Twitter/Facebook.
+10. **Widget Check-in nhanh di động (Mobile Quick Widget & PWA Shortcuts)**:
+    - Hỗ trợ lối tắt **PWA Shortcuts** (nhấn giữ biểu tượng ứng dụng trên màn hình chính di động) dẫn thẳng tới màn hình check-in tối giản `/quick-checkin` 1 chạm có rung phản hồi haptic và hoàn tác nhanh 5 giây.
+11. **Chế độ Ngoại tuyến & Đồng bộ hóa sau (Offline Mode & Sync)**:
+    - Khả năng hoạt động và tải ứng dụng ngoại tuyến thông qua cơ chế lưu đệm Cache Storage của Service Worker (`sw.js`).
+    - Lưu đệm cục bộ thói quen và hàng đợi check-in offline thông qua **IndexedDB**.
+    - Tự động phát hiện trạng thái mạng và đồng bộ hóa hàng đợi check-in lên server ngay khi thiết bị trực tuyến (sự kiện `online`).
+    - Bảo vệ đồng bộ đa tab bằng **Web Locks API** (hỗ trợ fallback LocalStorage Lock) và chống trùng lặp dữ liệu tuyệt đối nhờ client-side UUID (`log_id`) làm khóa chính của GoalLog trong DB.
 
 ---
 
@@ -65,7 +78,8 @@ daily-goal-tracker/
 │   │   ├── ui/             # Các UI elements dùng chung (Button, Card, Input, ProgressBar)
 │   │   ├── GoalCard.tsx    # Component thẻ mục tiêu với bộ đếm ngược Undo
 │   │   ├── Navbar.tsx      # Thanh điều hướng ngang
-│   │   └── Sidebar.tsx     # Thanh điều hướng dọc chứa Avatar và Streak badge
+│   │   ├── Sidebar.tsx     # Thanh điều hướng dọc chứa Avatar và Streak badge
+│   │   └── ShareModal.tsx  # Component hiển thị ảnh thẻ vinh danh Canvas để chia sẻ
 │   ├── controllers/        # Logic xử lý API ở phía backend
 │   ├── hooks/              # Custom React hooks (quản lý truy vấn dữ liệu)
 │   ├── middleware/         # Middleware trung gian (Auth Guard, Error Handler)
@@ -73,7 +87,9 @@ daily-goal-tracker/
 │   │   ├── DashboardPage.tsx # Màn hình chính trong ngày
 │   │   ├── GoalFormPage.tsx  # Biểu mẫu tạo mới mục tiêu thói quen
 │   │   ├── GoalsPage.tsx     # Quản lý tất cả mục tiêu thói quen (Bento Grid)
+│   │   ├── GroupsPage.tsx    # Giao diện nhóm thói quen & Leaderboard tiến độ
 │   │   ├── LoginPage.tsx     # Trang Đăng nhập & Đăng ký
+│   │   ├── QuickCheckInPage.tsx # Giao diện check-in tối giản 1 chạm cho di động
 │   │   ├── SettingsPage.tsx  # Trang cấu hình Theme, Glass Opacity, Timezone & Danger Zone
 │   │   ├── Stats.tsx         # Bảng thống kê hiệu năng Momentum chi tiết
 │   │   └── TimelinePage.tsx  # Nhật ký hoạt động, Performance Grid & xuất CSV

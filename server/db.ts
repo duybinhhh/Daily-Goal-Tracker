@@ -393,12 +393,10 @@ class PrismaDB {
       return created;
     },
     delete: async (where: { group_id: string; user_id: string }) => {
-      const deleted = await prisma.habitGroupMember.delete({
+      const deleted = await prisma.habitGroupMember.deleteMany({
         where: {
-          group_id_user_id: {
-            group_id: where.group_id,
-            user_id: where.user_id,
-          }
+          group_id: where.group_id,
+          user_id: where.user_id,
         }
       });
       return deleted;

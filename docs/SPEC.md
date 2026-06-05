@@ -147,6 +147,16 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * **Chặn Concurrency từ giao diện (UI Concurrency Guard):** Tích hợp trạng thái khóa `completing` ở `GoalCard` để ngăn click dồn dập hoặc giữ phím Enter.
     * **Hợp nhất hàng đợi thông minh:** Cập nhật `fetchGoals` và `fetchHistory` để tự động cộng gộp các check-in đang chờ trong `syncQueue` vào dữ liệu fetch từ server, ngăn ngừa giật lag, quay ngược dữ liệu cũ khi online trở lại.
 
+#### US-14: Lối tắt check-in nhanh trên di động (Mobile Quick Widget / PWA Shortcuts)
+* **Độ ưu tiên:** High
+* **Story Point:** 3.0
+* **Tiêu chí chấp nhận (AC):**
+    * **PWA Shortcuts:** Cấu hình thuộc tính `shortcuts` trong `manifest.json` để cho phép người dùng mở ứng dụng trực tiếp từ màn hình chính điện thoại bằng cách nhấn giữ biểu tượng và chọn lối tắt "Check-in nhanh" (điều hướng đến `/#/quick-checkin`).
+    * **Giao diện tối giản:** Trang `/quick-checkin` hiển thị danh sách các thói quen ngày chưa hoàn thành dưới dạng các nút bấm siêu lớn giúp thao tác dễ dàng trên di động.
+    * **Rung phản hồi (Haptic):** Khi bấm check-in, gọi Web Vibration API (`navigator.vibrate`) để phát ra tín hiệu rung phản hồi nhẹ.
+    * **Cơ chế Hoàn tác nhanh:** Hiển thị lớp phủ đếm ngược 5 giây trên thẻ thói quen vừa hoàn thành với nút Undo để thu hồi check-in nếu chạm nhầm.
+    * **Trạng thái All-Done:** Hiển thị thông điệp vinh danh đầy cảm hứng khi người dùng hoàn thành toàn bộ mục tiêu trong ngày.
+
 ---
 
 ### 📦 Module 6: Accountability Partners & Social Sharing (Sprint 6 — 8.0 SP)

@@ -6,6 +6,14 @@
 
 Tất cả các thay đổi lớn của dự án sẽ được ghi nhận và cập nhật theo từng Sprint tại đây.
 
+## [Đã hoàn thành] - Mobile Quick Widget (PWA Shortcuts & Quick Check-in) - 2026-06-05 14:35 (GMT+7)
+### Đã thêm & Cải tiến (Added & Improved)
+* **Phím tắt check-in nhanh trên điện thoại (Mobile Quick Widget / PWA Shortcuts):**
+  - Cập nhật cấu hình [manifest.json](file:///d:/Download/daily-goal-tracker/public/manifest.json) khai báo mảng `shortcuts` trỏ đến `/#/quick-checkin`.
+  - Tạo mới trang [QuickCheckInPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/QuickCheckInPage.tsx) thiết kế tối giản, tối ưu cho di động, hỗ trợ rung phản hồi haptic (`navigator.vibrate`) và đếm ngược hoàn tác 5 giây.
+  - Đăng ký định tuyến `/quick-checkin` trong [App.tsx](file:///d:/Download/daily-goal-tracker/src/App.tsx) bảo vệ bởi Auth Guard.
+  - Thêm banner giới thiệu check-in nhanh trên Dashboard [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx) và bento card hướng dẫn cài đặt PWA chi tiết trên trang Cài đặt [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx).
+
 ## [Đã hoàn thành] - Accountability Partners (Habit Groups) & Social Sharing - 2026-06-05 14:15 (GMT+7)
 ### Đã thêm & Cải tiến (Added & Improved)
 * **Tính năng Đồng đội giám sát (Accountability Partners / Habit Groups):**

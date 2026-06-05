@@ -60,6 +60,15 @@ Khi bạn thực hiện check-in thói quen và đạt chỉ tiêu mục tiêu t
   - Các check-in được ghi nhận ngay lập tức trên màn hình và lưu tạm thời dưới trình duyệt (IndexedDB). Hệ thống có cơ chế bảo vệ thông minh, ngăn chặn click dồn dập (double-click) hoặc gửi trùng lặp bản ghi kể cả khi mạng chập chờn.
   - Khi thiết bị có mạng lại, hệ thống hiện huy hiệu xoay tròn **Syncing...** màu xanh lá và tự động đồng bộ hóa các lượt check-in cũ lên Server với đúng mốc giờ bạn check-in lúc offline. Quá trình đồng bộ này được đồng bộ hóa an toàn giữa các tab trình duyệt (sử dụng khóa hệ thống Web Locks) nên bạn hoàn toàn yên tâm nếu đang mở nhiều tab Momentum cùng lúc.
 
+### 2.4. Phím tắt Check-in nhanh ngoài màn hình chính (Mobile Quick Widget)
+Để giải quyết sự bất tiện khi phải mở trình duyệt, gõ URL và chờ đợi tải trang chỉ để check-in một cốc nước hoặc một cữ chạy bộ, Momentum cung cấp tiện ích phím tắt nhanh ngoài màn hình chính (App Shortcuts) và màn hình Check-in tối giản:
+* **Phím tắt ứng dụng (PWA Shortcuts):** Sau khi bạn cài đặt PWA ngoài màn hình chính điện thoại, chỉ cần **nhấn và giữ biểu tượng ứng dụng**. Một menu phím tắt sẽ hiện ra, chọn **"Check-in nhanh"** để truy cập tức thì.
+* **Trang Check-in nhanh tối giản (`/#/quick-checkin`):** 
+  - Giao diện được tinh gọn hoàn hảo, loại bỏ các chỉ số thống kê rườm rà, tập trung 100% vào việc check-in.
+  - **Check-in 1 chạm (Vibration feedback):** Nhấn trực tiếp vào thẻ thói quen để ghi nhận tiến độ, điện thoại sẽ phát ra phản hồi rung nhẹ vật lý tạo trải nghiệm tương tác xúc giác thực tế.
+  - **Hoàn tác tức thì (Undo):** Sau khi check-in, thẻ sẽ hiển thị đếm ngược 5 giây kèm nút **Hoàn tác**. Nếu lỡ tay bấm nhầm, bạn có thể hoàn tác ngay lập tức.
+  - **Thống kê đã hoàn thành:** Các mục tiêu đã làm xong sẽ tự động mờ đi và xếp gọn xuống phía dưới để giao diện luôn sạch sẽ.
+
 ---
 
 ## 3. Quản Lý Danh Sách Mục Tiêu (My Goals)

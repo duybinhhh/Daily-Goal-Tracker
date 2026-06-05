@@ -32,6 +32,9 @@ Giai đoạn này xác định mục tiêu, giải pháp kỹ thuật và sơ đ
 *   **Chia sẻ Heatmap & Huy hiệu đẹp mắt (Social Sharing)**:
     *   Yêu cầu: Tích hợp tính năng chia sẻ bảng Heatmap hoặc Huy hiệu thành tựu (Breakthrough Badge) chỉ với một click lên mạng xã hội để tăng tương tác.
     *   Giải pháp: Phát triển một hộp thoại Share Modal. Sử dụng HTML5 Canvas vẽ thẻ preview kính mờ (dark glassmorphism) thời thượng có độ phân giải 1200x630px chứa thông tin thành tích/Heatmap để tải ảnh PNG trực tiếp về thiết bị, đồng thời hỗ trợ Web Share API trên thiết bị và các link intent chia sẻ lên Facebook/Twitter.
+*   **Phím tắt check-in nhanh trên điện thoại (Mobile Quick Widget / PWA Shortcuts)**:
+    *   Yêu cầu: Người dùng lười mở app và tìm thói quen để check-in. Cần cung cấp phím tắt nhanh một chạm từ màn hình chính điện thoại (thông qua PWA Shortcuts) dẫn thẳng tới màn hình check-in tối giản.
+    *   Giải pháp: Cấu hình trường `shortcuts` trong `manifest.json` trỏ tới `/#/quick-checkin`. Thiết kế giao diện check-in nhanh tối giản `/quick-checkin` tải tức thì, nút bấm lớn, hỗ trợ chạm rung phản hồi (Web Vibration API), tích hợp đếm ngược hoàn tác 5 giây và đồng bộ offline.
 
 ---
 
@@ -40,6 +43,7 @@ Các tính năng và luồng xử lý mới được mô tả chi tiết trong h
 1.  **Định nghĩa User Stories**: Cập nhật các tiêu chí chấp nhận (AC) cho nút Undo và đếm ngược trong `US-05`, chức năng xóa log và tính lại Streak trong `US-09`, Sticky Action Bar trong `US-07`, theme mặc định trong `US-08`, Active Reminders chống đứt chuỗi trong tệp [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md), cũng như bổ sung yêu cầu nhóm thói quen (`US-10`) và chia sẻ thành tích (`US-11`).
 2.  **Định nghĩa API Endpoints**: Đăng ký API mới `DELETE /api/goals/logs/:logId`, `PUT /api/auth/push-subscription` (lưu đăng ký thông báo), và `GET /api/auth/vapid-public-key` (lấy khóa VAPID công khai) tại tệp [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md), kèm các API nhóm: `GET /api/groups`, `POST /api/groups`, `GET /api/groups/:id`, `POST /api/groups/:id/join`, `POST /api/groups/:id/leave`, và `DELETE /api/groups/:id`.
 3.  **Nhật ký phát triển**: Ghi nhận chi tiết lịch sử hoàn thành các tính năng mới với mốc thời gian cụ thể (GMT+7) trong tệp [CHANGELOG.md](file:///d:/Download/daily-goal-tracker/docs/CHANGELOG.md).
+4.  **Cấu hình phím tắt PWA**: Khai báo thuộc tính `shortcuts` hướng tới `/index.html#/quick-checkin` trong `public/manifest.json`.
 
 ---
 
@@ -70,6 +74,7 @@ Quá trình lập trình được tiến hành tuần tự từ cơ sở dữ li
     *   **Habit Groups Page:** Xây dựng [GroupsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/GroupsPage.tsx) hiển thị các nhóm và bảng xếp hạng thành viên.
     *   **Social Share Modal:** Xây dựng [ShareModal.tsx](file:///d:/Download/daily-goal-tracker/src/components/ShareModal.tsx) dùng HTML5 Canvas kết xuất ảnh thẻ vinh danh và Heatmap để tải về.
     *   **Stats & Navigation:** Cập nhật [Stats.tsx](file:///d:/Download/daily-goal-tracker/src/pages/Stats.tsx), [Sidebar.tsx](file:///d:/Download/daily-goal-tracker/src/components/Sidebar.tsx) và [BottomNav.tsx](file:///d:/Download/daily-goal-tracker/src/components/BottomNav.tsx) để khai báo menu.
+    *   **Quick Check-in Page:** Xây dựng [QuickCheckInPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/QuickCheckInPage.tsx) phục vụ giao diện check-in nhanh tối giản, chạm rung phản hồi và có Undo 5 giây. Đăng ký trong [App.tsx](file:///d:/Download/daily-goal-tracker/src/App.tsx) và cấu hình phím tắt trong [manifest.json](file:///d:/Download/daily-goal-tracker/public/manifest.json). Thêm hướng dẫn và banner trong [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx) và [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx).
 
 ---
 
@@ -116,3 +121,9 @@ Quá trình kiểm thử đã được chạy trực tiếp trên môi trường
 *   **Social Sharing Canvas Card Verification (Đạt)**:
     1. **Kiểm thử Tải ảnh một chạm**: Click biểu tượng Share trên Heatmap hoặc Milestones. Hộp thoại hiện lên ảnh preview sắc nét. Bấm Download Image, hệ thống tải tệp ảnh PNG về thiết bị chứa thông tin badge hoặc heatmap được vẽ động hoàn hảo bằng HTML5 Canvas.
     2. **Kiểm thử Tương tác Mạng xã hội**: Click Twitter/Facebook, trình duyệt chuyển hướng chính xác đến cửa sổ viết bài kèm theo thông điệp chia sẻ soạn sẵn truyền cảm hứng.
+*   **Mobile Quick Widget (PWA Shortcuts & Quick Check-in) Verification (Đạt)**:
+    1. **Kiểm thử Cấu hình Manifest**: Xác nhận DevTools tải đúng manifest.json và hiển thị mảng `shortcuts` trỏ tới `/#/quick-checkin`.
+    2. **Kiểm thử Một chạm Check-in**: Khi truy cập `/quick-checkin`, danh sách các mục tiêu hôm nay được hiển thị dưới dạng thẻ lớn. Chạm vào một thói quen chưa hoàn tất: hệ thống gọi `completeGoalProgress()`, kích hoạt rung phản hồi (Web Vibration API), tăng tiến độ tức thì, và hiển thị bộ đếm ngược Undo 5 giây.
+    3. **Kiểm thử Hoàn tác (Undo)**: Bấm Undo trong vòng 5 giây đếm ngược, tiến trình giảm đi 1, khôi phục trạng thái ban đầu của thói quen.
+    4. **Kiểm thử Offline & Sync**: Ngắt kết nối mạng, chạm check-in thói quen. Hệ thống lưu đệm offline thông qua IndexedDB. Bật lại mạng, hệ thống tự động đồng bộ lên server thành công.
+

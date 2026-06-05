@@ -8,7 +8,7 @@
 * **HTTP Client:** **Axios** với request/response Interceptor tự động xử lý và xoay vòng JWT tokens.
 * **Authentication:** **JWT** (Access Token 15 phút + Refresh Token 7 ngày), mã hóa mật khẩu bằng **bcryptjs**.
 * **Offline Caching & Queue:** **IndexedDB** (trình duyệt lưu đệm dữ liệu mục tiêu/chỉ số và hàng đợi đồng bộ offline).
-* **PWA Engine:** **Service Worker** (`sw.js` cache giao diện shell tĩnh và đón nhận sự kiện push/notificationclick) + **Web App Manifest** (`manifest.json` cho phép cài đặt lên màn hình chính).
+* **PWA Engine:** **Service Worker** (`sw.js` cache giao diện shell tĩnh và đón nhận sự kiện push/notificationclick) + **Web App Manifest** (`manifest.json` cho phép cài đặt lên màn hình chính và hỗ trợ lối tắt **PWA Shortcuts** chạm check-in nhanh từ icon).
 * **Web Push Notifications:** Sử dụng thư viện **web-push** ở Backend để đẩy thông báo về thiết bị/trình duyệt của người dùng thông qua chuẩn VAPID keys.
 * **Social Sharing Card Renderer:** **HTML5 Canvas API** (kết xuất thẻ vinh danh chất lượng cao phía client) kết hợp **Web Share API** của trình duyệt phục vụ chia sẻ một chạm.
 
@@ -185,3 +185,8 @@ model HabitGroupMember {
 10. **Chia sẻ vinh danh (Social Sharing)** [NEW]:
     *   **HTML5 Canvas Render Engine:** Khi người dùng mở ShareModal, component [ShareModal.tsx](file:///d:/Download/daily-goal-tracker/src/components/ShareModal.tsx) sẽ lấy dữ liệu tương ứng (milestone badge hoặc heatmap grid) vẽ lên một thẻ canvas 1200x630px được thiết kế dark glassmorphism sang trọng với metallic borders và glows.
     *   **Bất đối xứng mạng xã hội (Share API & Intents):** Hỗ trợ xuất ảnh từ canvas thành URL nhị phân (Data URL) để tải xuống dạng PNG, gọi Web Share API trên mobile để gửi ảnh trực tiếp đến Zalo/Telegram/Messenger, hoặc chuyển hướng người dùng tới X (Twitter) và Facebook kèm thông điệp soạn sẵn.
+11. **Phím tắt Check-in nhanh (Mobile Quick Widget / PWA Shortcuts)** [NEW]:
+    *   **PWA Shortcuts & Manifest Configuration:** Cấu hình thuộc tính `shortcuts` trong `manifest.json` ánh xạ tới `/index.html#/quick-checkin` để các bệ phóng trên di động (Mobile Launchers) hiển thị phím tắt khi nhấn giữ.
+    *   **Trang Check-in di động (`QuickCheckInPage.tsx`):** Xây dựng trang check-in tối giản có layout thích ứng, chỉ hiển thị danh sách mục tiêu ngày (phân tách hai nhóm Chưa hoàn thành / Đã hoàn thành).
+    *   **Web Vibration Haptic Feedback:** Tích hợp gọi `navigator.vibrate([80])` phản hồi xúc giác rung nhẹ khi check-in (hoặc rung kép `[40, 40]` khi hoàn tác) tạo cảm giác tương tác phản hồi xúc giác như widget gốc di động.
+    *   **Cơ chế đếm ngược hoàn tác:** Thể hiện trạng thái đếm ngược 5 giây trên thẻ thói quen sau khi bấm log tiến độ, cho phép người dùng bấm "Hoàn tác" (Undo) để thu hồi log từ hàng đợi IndexedDB hoặc API Backend.
