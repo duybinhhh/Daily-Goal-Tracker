@@ -236,7 +236,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
                 {goal.description}
               </p>
             )}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px" }}>
               <span className={`cat-pill ${config.pillClass}`}>
                 {goal.category}
               </span>
@@ -251,6 +251,26 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
               >
                 {goal.frequency}
               </span>
+              {goal.group_id && (
+                <span
+                  style={{
+                    fontSize: "9px",
+                    fontWeight: 700,
+                    backgroundColor: "rgba(99, 102, 241, 0.12)",
+                    color: "#a5b4fc",
+                    border: "1px solid rgba(99, 102, 241, 0.25)",
+                    padding: "2px 8px",
+                    borderRadius: "9999px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                  title="This goal belongs to an Accountability Habit Group"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>group</span>
+                  Group Habit
+                </span>
+              )}
             </div>
           </div>
         </div>

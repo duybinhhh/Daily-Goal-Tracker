@@ -136,6 +136,7 @@ export default function Sidebar() {
         <NavItem to="/stats" icon="query_stats" label="Statistics" />
         <NavItem to="/goals" icon="checklist" label="Goals" />
         <NavItem to="/timeline" icon="timeline" label="Timeline" />
+        <NavItem to="/groups" icon="group" label="Habit Groups" />
         <NavItem to="/settings" icon="settings" label="Settings" />
       </nav>
 

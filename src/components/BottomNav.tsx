@@ -51,6 +51,7 @@ export default function BottomNav() {
       <BottomNavItem to="/" icon="home" label="Home" end />
       <BottomNavItem to="/stats" icon="query_stats" label="Stats" />
       <BottomNavItem to="/goals" icon="checklist" label="Goals" />
+      <BottomNavItem to="/groups" icon="group" label="Groups" />
       <BottomNavItem to="/timeline" icon="timeline" label="Timeline" />
       <BottomNavItem to="/settings" icon="settings" label="Settings" />
     </nav>

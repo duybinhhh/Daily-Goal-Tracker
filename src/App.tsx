@@ -11,9 +11,11 @@ import { Stats } from "./pages/Stats";
 import { SettingsPage } from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
 import GoalsPage from "./pages/GoalsPage";
+import GroupsPage from "./pages/GroupsPage";
 
 import { useGoalStore } from "./store/goalStore";
 import { syncOfflineData } from "./services/syncManager";
+
 
 // Auth Guard for protected workspace screens
 interface ProtectedRouteProps {
@@ -130,6 +132,7 @@ function AppLayout() {
           <Route path="/stats" element={<Stats />} />
           <Route path="/goals" element={<GoalsPage />} />
           <Route path="/timeline" element={<TimelinePage />} />
+          <Route path="/groups" element={<GroupsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

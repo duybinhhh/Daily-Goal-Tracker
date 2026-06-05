@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useGoalStore } from "../store/goalStore";
 import { useAuthStore } from "../store/authStore";
 import api from "../services/api";
+import { ShareModal } from "../components/ShareModal";
 
 export const Stats: React.FC = () => {
   const { user, isAuthenticated } = useAuthStore();
@@ -12,6 +13,44 @@ export const Stats: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [seeding, setSeeding] = useState(false);
+
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareType, setShareType] = useState<"badge" | "heatmap">("badge");
+  const [shareData, setShareData] = useState<{ title: string; description: string; streakCount?: number; heatmapData?: { date: string; count: number }[] }>({
+    title: "",
+    description: "",
+  });
+
+  const handleShareHeatmap = () => {
+    const heatmapData = history.map(day => ({
+      date: day.date,
+      count: day.count
+    }));
+    setShareType("heatmap");
+    setShareData({
+      title: "Consistency Heatmap",
+      description: `I've logged ${history.reduce((sum, d) => sum + d.count, 0)} goal completions over the last 182 days!`,
+      heatmapData
+    });
+    setShowShareModal(true);
+  };
+
+  const handleShareMilestone = (milestone: any) => {
+    let streakCount = 0;
+    if (milestone.title.toLowerCase().includes("streak")) {
+      const match = milestone.title.match(/(\d+)-Day/);
+      if (match) streakCount = parseInt(match[1], 10);
+    }
+    setShareType("badge");
+    setShareData({
+      title: milestone.title,
+      description: milestone.desc,
+      streakCount
+    });
+    setShowShareModal(true);
+  };
+
 
   // 1. Fetch data on mount & align start date to Sunday for perfect heatmap grid layout
   useEffect(() => {
@@ -541,6 +580,14 @@ export const Stats: React.FC = () => {
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-primary text-2xl">calendar_month</span>
               <h2 className="text-xl font-bold text-on-surface">Consistency Heatmap</h2>
+              <button
+                onClick={handleShareHeatmap}
+                className="btn-ghost p-1 rounded-full flex items-center justify-center border-none cursor-pointer"
+                title="Share Heatmap"
+                style={{ display: "inline-flex" }}
+              >
+                <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: "18px" }}>share</span>
+              </button>
             </div>
             <div className="flex items-center gap-2 self-end">
               <span className="text-xs font-semibold text-on-surface-variant">Less</span>
@@ -665,9 +712,18 @@ export const Stats: React.FC = () => {
                   <h4 className="font-bold text-sm text-on-surface">{milestone.title}</h4>
                   <p className="text-sm text-on-surface-variant mt-0.5">{milestone.desc}</p>
                 </div>
-                <span className="text-xs font-semibold text-on-surface-variant opacity-70 whitespace-nowrap hidden sm:inline">
-                  {milestone.date}
-                </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs font-semibold text-on-surface-variant opacity-70 whitespace-nowrap hidden sm:inline">
+                    {milestone.date}
+                  </span>
+                  <button
+                    onClick={() => handleShareMilestone(milestone)}
+                    className="btn-ghost p-2 rounded-xl flex items-center justify-center border-none cursor-pointer"
+                    title="Share Badge"
+                  >
+                    <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: "16px" }}>share</span>
+                  </button>
+                </div>
               </div>
             ))}
             {filteredMilestones.length === 0 && (
@@ -689,6 +745,14 @@ export const Stats: React.FC = () => {
           <span className="material-symbols-outlined text-[32px]">add</span>
         </button>
       )}
+
+      {/* Share Modal overlay */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        type={shareType}
+        data={shareData}
+      />
     </div>
   );
 };

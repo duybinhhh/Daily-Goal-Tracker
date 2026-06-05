@@ -149,6 +149,32 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
 
 ---
 
+### 📦 Module 6: Accountability Partners & Social Sharing (Sprint 6 — 8.0 SP)
+
+#### US-12: Đồng đội giám sát (Accountability Partners / Habit Groups)
+* **Độ ưu tiên:** High
+* **Story Point:** 4.5
+* **Tiêu chí chấp nhận (AC):**
+    * **Tạo nhóm thói quen chung:** Cho phép người dùng tạo nhóm mới bằng cách khai báo: Tên nhóm, mô tả, tên thói quen chung, phân loại (Health, Fitness, Work, Learning, Routine, Finance), chỉ tiêu và chu kỳ thói quen. Người tạo tự động trở thành thành viên.
+    * **Tự động liên kết mục tiêu cá nhân:** Khi người dùng tạo hoặc tham gia nhóm, hệ thống tự động tạo một thói quen tương ứng (`Goal`) liên kết qua trường `group_id` trong tài khoản của họ. Tiến độ check-in thói quen này sẽ được cập nhật đồng thời lên Dashboard cá nhân và bảng tiến độ nhóm.
+    * **Bảng tiến độ nhóm (Leaderboard):** Trang chi tiết nhóm hiển thị danh sách các thành viên, số đếm hoàn thành hôm nay (ví dụ: 1/1 Completed, 0/2 Active) và chuỗi Streak hiện tại của từng người (có kèm biểu tượng lửa phát sáng).
+    * **Rời nhóm & Xóa nhóm:** Thành viên có thể rời nhóm bất kỳ lúc nào, khi đó hệ thống tự động xóa mục tiêu liên kết của họ để dọn dẹp Dashboard. Người tạo nhóm có quyền xóa nhóm, giải tán tất cả thành viên.
+    * **Tích hợp ngoại tuyến:** Check-in thói quen nhóm hoạt động bình thường khi offline qua IndexedDB và tự động đồng bộ khi online trở lại.
+
+#### US-13: Chia sẻ thành tích một chạm (Social Sharing)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 3.5
+* **Tiêu chí chấp nhận (AC):**
+    * **Điểm kích hoạt:** Nút Share được bố trí hợp lý cạnh tiêu đề Consistency Heatmap, các thẻ huy hiệu trong Key Milestones (Stats Page) và giao diện nhóm thói quen.
+    * **Thẻ vinh danh (Shareable Card):** Giao diện Modal hiển thị bản preview dạng thẻ kính mờ (dark glassmorphism) sang trọng chứa thông tin: Huy hiệu thành tựu (Emoji cúp/lửa lớn), tiêu đề thành tựu, tên người dùng, mô tả thành tích và logo thương hiệu "DailyGoal TRACKER".
+    * **HTML5 Canvas Dynamic Renderer:** Canvas ngầm kết xuất hình ảnh thẻ với độ phân giải cao 1200x630px (chuẩn hiển thị mạng xã hội) đảm bảo hiển thị sắc nét các hiệu ứng chuyển màu (gradient) và bo góc.
+    * **Thao tác một chạm:**
+        * **Download PNG:** Tải trực tiếp ảnh từ Canvas về thiết bị.
+        * **Web Share API:** Chia sẻ file ảnh hoặc link thành tích trực tiếp lên các ứng dụng trên thiết bị di động/máy tính hỗ trợ.
+        * **Social Share Intent:** Cung cấp link chia sẻ trực tiếp đi kèm thông điệp soạn sẵn lên Twitter và Facebook.
+
+---
+
 ## 4. Tech Stack Đề Xuất (Tinh gọn & Đồng bộ)
 *Áp dụng tư duy chọn Tech Stack thực tế để tối ưu hóa tốc độ hoàn thiện sản phẩm MVP.*
 

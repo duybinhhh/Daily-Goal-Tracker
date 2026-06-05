@@ -11,7 +11,9 @@ Chào mừng bạn đến với **Momentum**, hệ thống theo dõi và quản 
 4. [Bảng Thống Kê & Phân Tích Hiệu Năng (Premium Stats)](#4-bảng-thống-kê--phân-tích-hiệu-năng-premium-stats)
 5. [Trục Thời Gian Hoạt Động (Activity Timeline)](#5-trục-thời-gian-hoạt-động-activity-timeline)
 6. [Cấu Hình & Cài Đặt (Settings) & Nhắc nhở chủ động](#6-cấu-hình--cài-đặt-settings)
-7. [Các Câu Hỏi Thường Gặp (FAQs)](#7-các-câu-hỏi-thường-gặp-faqs)
+7. [Đồng Đội Giám Sát (Habit Groups)](#7-đồng-đội-giám-sát-habit-groups)
+8. [Chia Sẻ Thành Tích Một Chạm (Social Sharing)](#8-chia-sẻ-thành-tích-một-chạm-social-sharing)
+9. [Các Câu Hỏi Thường Gặp (FAQs)](#9-các-câu-hỏi-thường-gặp-faqs)
 
 ---
 
@@ -42,6 +44,7 @@ Màn hình Dashboard (`/`) là trung tâm kiểm soát các hoạt động cần
   - **Total Logged**: Tổng số lượt check-in đã thực hiện trên mọi thói quen.
 - **Mini Calendar (Lịch nhỏ)**: Giúp bạn theo dõi ngày hiện tại trong tháng và nhanh chóng nhận biết các ngày đã qua.
 - **Mục Tiêu Sắp Tới (Upcoming Milestones)**: Gợi ý các cột mốc bạn cần chinh phục tiếp theo, chẳng hạn như duy trì chuỗi lửa 7 ngày hoặc hoàn thành các mục tiêu còn lại trong ngày.
+- **Nhãn nhóm thói quen**: Các thói quen thuộc nhóm sẽ hiển thị nhãn `👥 Group Habit` trên Dashboard.
 
 ### 2.2. Cơ Chế Hoàn Tác Thông Minh (Undo Engine)
 Khi bạn thực hiện check-in thói quen và đạt chỉ tiêu mục tiêu trong ngày (ví dụ: uống đủ 5 cốc nước), thẻ mục tiêu đó sẽ hoàn thành:
@@ -102,9 +105,10 @@ Truy cập `/stats` để xem báo cáo trực quan về kỷ luật bản thân
   - Mỗi ô vuông đại diện cho 1 ngày, màu càng đậm chứng tỏ số lượng mục tiêu bạn hoàn thành trong ngày đó càng nhiều.
   - Hỗ trợ rê chuột (hover) để xem chi tiết số lượng goal đã đạt được vào ngày cụ thể đó.
   - Lưới được tự động căn chỉnh ngày bắt đầu về Chủ Nhật hàng tuần giúp bạn dễ dàng đối chiếu tuần làm việc.
+  - Tích hợp nút **Share** để kích hoạt tạo ảnh thẻ vinh danh cho heatmap của bạn.
 - **10-Week Trend Chart (Biểu đồ xu hướng 10 tuần)**: Gom nhóm dữ liệu tiến độ trong 70 ngày gần nhất vẽ thành các cột biểu đồ CSS động tự động điều chỉnh độ cao và hiển thị tooltip thông tin chi tiết khi rê chuột.
 - **Goal Distribution (Biểu đồ tròn phân bổ)**: Sử dụng kỹ thuật gradient conic hiện đại để chia tỷ lệ phần trăm thói quen của bạn theo danh mục (Sức khỏe, Công việc, v.v.), đi kèm bảng chú thích màu sắc tương tác.
-- **Milestone Feed**: Dòng thời gian vinh danh các cột mốc bạn đã đạt được (ví dụ: đạt Streak 7 ngày đầu tiên, hoàn thành thói quen đạt mốc đặc biệt, đạt cấp bậc "Achiever Elite Tier").
+- **Milestone Feed**: Dòng thời gian vinh danh các cột mốc bạn đã đạt được (ví dụ: đạt Streak 7 ngày đầu tiên, hoàn thành thói quen đạt mốc đặc biệt, đạt cấp bậc "Achiever Elite Tier"). Tích hợp nút **Share** trên từng thẻ cột mốc.
 
 ---
 
@@ -153,7 +157,47 @@ Trang cài đặt (`/settings`) giúp bạn cá nhân hóa hoàn toàn trải ng
 
 ---
 
-## 7. Các Câu Hỏi Thường Gặp (FAQs)
+## 7. Đồng Đội Giám Sát (Habit Groups)
+
+Tính năng **Đồng đội giám sát (Habit Groups)** giúp bạn không còn đơn độc trên hành trình kỷ luật. Bạn có thể kết nối với bạn bè hoặc những người dùng khác để cùng thực hiện một thói quen chung.
+
+*   **Tạo nhóm thói quen:**
+    1. Truy cập trang **Habit Groups** (`/groups`) qua thanh điều hướng.
+    2. Nhấn nút **Create Group** ở góc trên bên phải.
+    3. Điền Tên nhóm, mô tả thói quen, chọn danh mục, chỉ tiêu ngày/tuần/tháng.
+    4. Nhấn **Create Group Habit** để hoàn tất. Bạn sẽ tự động tham gia nhóm.
+*   **Liên kết Dashboard cá nhân:**
+    *   Khi bạn tạo hoặc tham gia một nhóm, hệ thống sẽ tự động sinh ra một thói quen tương ứng hiển thị trực tiếp trên Dashboard cá nhân của bạn, được đánh dấu bằng nhãn `👥 Group Habit`.
+    *   Bạn có thể check-in tiến trình này ngay trên Dashboard chính hoặc check-in trực tiếp từ bảng xếp hạng của nhóm.
+*   **Bảng xếp hạng nhóm (Leaderboard):**
+    *   Trang chi tiết của nhóm hiển thị trực quan danh sách các thành viên cùng tiến trình check-in hôm nay của từng người (ví dụ: `1/1 Completed` hoặc `0/2 Active`).
+    *   Chuỗi ngày Streak hiện tại của từng thành viên cũng được hiển thị kèm biểu tượng lửa 🔥.
+*   **Rời và xóa nhóm:**
+    *   Nếu muốn dừng tham gia, bạn có thể nhấn **Leave Group** ở cuối trang chi tiết nhóm. Hệ thống sẽ tự động xóa mục tiêu liên kết trên Dashboard của bạn.
+    *   Nếu bạn là người tạo nhóm, bạn có quyền nhấn **Delete Group** để giải tán nhóm thói quen chung.
+
+---
+
+## 8. Chia Sẻ Thành Tích Một Chạm (Social Sharing)
+
+Momentum cung cấp tính năng **Social Sharing** cao cấp cho phép bạn khoe thành quả rèn luyện của mình với bạn bè chỉ với một click chuột:
+
+*   **Điểm kích hoạt chia sẻ:**
+    *   Biểu tượng **Share** được tích hợp ngay cạnh tiêu đề **Consistency Heatmap** trên trang Thống kê.
+    *   Mỗi thẻ badge trong feed **Key Milestones** đều có nút **Share** riêng.
+    *   Trang chi tiết nhóm thói quen hỗ trợ nút **Share Team** để khoe tiến độ tập thể.
+*   **Hộp thoại Share Modal:**
+    *   Khi kích hoạt, một modal kính mờ nổi lên hiển thị bản preview dạng thẻ (Card) vô cùng bắt mắt.
+    *   Mẫu thẻ được vẽ tự động bằng **HTML5 Canvas API** với độ phân giải lớn 1200x630px (chuẩn ảnh chia sẻ của Facebook/Twitter), kết hợp hình ảnh huy hiệu (cúp vàng hoặc ngọn lửa lớn), tên của bạn, mô tả thành tích và logo Momentum.
+*   **Các tùy chọn chia sẻ một chạm:**
+    1.  **Download High-Res PNG:** Tải ảnh chất lượng cao trực tiếp về máy.
+    2.  **Share via Devices (Web Share API):** Trên các thiết bị di động/máy tính hỗ trợ, nút này sẽ gọi trình chia sẻ mặc định của hệ điều hành giúp bạn gửi ảnh qua Zalo, Messenger, AirDrop, v.v.
+    3.  **Copy Share Message:** Sao chép thông điệp thành tích kèm link giới thiệu vào bộ nhớ đệm.
+    4.  **Facebook & Twitter:** Nhấn nút mạng xã hội để chuyển hướng nhanh đến màn hình đăng bài kèm thông điệp khích lệ soạn sẵn.
+
+---
+
+## 9. Các Câu Hỏi Thường Gặp (FAQs)
 
 **Q: Làm sao để duy trì ngọn lửa Streak của thói quen?**
 > Bạn chỉ cần thực hiện check-in thói quen đạt chỉ tiêu tối thiểu trong ngày trước khi ngày đó kết thúc theo múi giờ bạn đã cài đặt. Chuỗi Streak sẽ tăng lên 1 sau mỗi ngày hoàn thành liên tục.

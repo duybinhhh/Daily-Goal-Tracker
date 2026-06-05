@@ -305,6 +305,106 @@ class PrismaDB {
       });
     },
   };
+
+  // Habit Groups Helpers
+  public groups = {
+    findMany: async (where?: { creator_id?: string }) => {
+      const prismaWhere: any = {};
+      if (where?.creator_id) {
+        prismaWhere.creator_id = where.creator_id;
+      }
+      const list = await prisma.habitGroup.findMany({
+        where: prismaWhere,
+        include: {
+          creator: true,
+          members: {
+            include: {
+              user: true
+            }
+          }
+        }
+      });
+      return list;
+    },
+    findUnique: async (where: { id: string }) => {
+      const group = await prisma.habitGroup.findUnique({
+        where: { id: where.id },
+        include: {
+          creator: true,
+          members: {
+            include: {
+              user: true
+            }
+          }
+        }
+      });
+      return group;
+    },
+    create: async (data: {
+      name: string;
+      description?: string | null;
+      creator_id: string;
+      goal_title: string;
+      goal_category: string;
+      goal_target_count: number;
+      goal_frequency: string;
+    }) => {
+      const created = await prisma.habitGroup.create({
+        data: {
+          name: data.name,
+          description: data.description || null,
+          creator_id: data.creator_id,
+          goal_title: data.goal_title,
+          goal_category: data.goal_category,
+          goal_target_count: data.goal_target_count,
+          goal_frequency: data.goal_frequency,
+        },
+      });
+      return created;
+    },
+    delete: async (id: string) => {
+      const deleted = await prisma.habitGroup.delete({ where: { id } });
+      return deleted;
+    }
+  };
+
+  // Group Memberships Helpers
+  public groupMembers = {
+    findMany: async (where: { group_id?: string; user_id?: string }) => {
+      const prismaWhere: any = {};
+      if (where.group_id) prismaWhere.group_id = where.group_id;
+      if (where.user_id) prismaWhere.user_id = where.user_id;
+      const list = await prisma.habitGroupMember.findMany({
+        where: prismaWhere,
+        include: {
+          user: true,
+          group: true,
+        }
+      });
+      return list;
+    },
+    create: async (data: { group_id: string; user_id: string }) => {
+      const created = await prisma.habitGroupMember.create({
+        data: {
+          group_id: data.group_id,
+          user_id: data.user_id,
+        },
+      });
+      return created;
+    },
+    delete: async (where: { group_id: string; user_id: string }) => {
+      const deleted = await prisma.habitGroupMember.delete({
+        where: {
+          group_id_user_id: {
+            group_id: where.group_id,
+            user_id: where.user_id,
+          }
+        }
+      });
+      return deleted;
+    }
+  };
 }
 
 export const db = new PrismaDB();
+

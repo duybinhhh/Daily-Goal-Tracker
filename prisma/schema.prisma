@@ -21,6 +21,8 @@ model User {
   notifications Notification[]
   push_subscription     String?
   last_reminder_sent_date String?
+  created_groups HabitGroup[] @relation("GroupCreator")
+  group_memberships HabitGroupMember[]
 }
 
 model Goal {
@@ -39,6 +41,8 @@ model Goal {
   updated_at    DateTime   @updatedAt
   logs          GoalLog[]
   streaks       Streak[]
+  group_id      String?
+  group         HabitGroup? @relation(fields: [group_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
 }
@@ -81,3 +85,33 @@ model Notification {
 
   @@index([user_id])
 }
+
+model HabitGroup {
+  id                String             @id @default(uuid())
+  name              String
+  description       String?
+  creator_id        String
+  creator           User               @relation("GroupCreator", fields: [creator_id], references: [id], onDelete: Cascade)
+  goal_title        String
+  goal_category     String
+  goal_target_count Int                @default(1)
+  goal_frequency    String             @default("daily")
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+  members           HabitGroupMember[]
+  goals             Goal[]
+}
+
+model HabitGroupMember {
+  id        String     @id @default(uuid())
+  group_id  String
+  group     HabitGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  user_id   String
+  user      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  joined_at DateTime   @default(now())
+
+  @@unique([group_id, user_id])
+  @@index([group_id])
+  @@index([user_id])
+}
+

@@ -6,6 +6,19 @@
 
 Tất cả các thay đổi lớn của dự án sẽ được ghi nhận và cập nhật theo từng Sprint tại đây.
 
+## [Đã hoàn thành] - Accountability Partners (Habit Groups) & Social Sharing - 2026-06-05 14:15 (GMT+7)
+### Đã thêm & Cải tiến (Added & Improved)
+* **Tính năng Đồng đội giám sát (Accountability Partners / Habit Groups):**
+  - Cập nhật [schema.prisma](file:///d:/Download/daily-goal-tracker/prisma/schema.prisma) để thêm các bảng `HabitGroup`, `HabitGroupMember` và liên kết trường `group_id` cho thói quen `Goal`.
+  - Triển khai các API backend trong [groups.ts](file:///d:/Download/daily-goal-tracker/src/routes/groups.ts) và [groupController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/groupController.ts) để quản lý nhóm thói quen chung và tính toán bảng xếp hạng tiến độ Leaderboard real-time của các thành viên.
+  - Xây dựng Zustand [groupStore.ts](file:///d:/Download/daily-goal-tracker/src/store/groupStore.ts) quản lý đồng bộ trạng thái nhóm.
+  - Xây dựng giao diện trang nhóm thói quen [GroupsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/GroupsPage.tsx) hiển thị các nhóm đang tham gia, khám phá nhóm mới và chi tiết nhóm kèm Leaderboard tiến độ và chuỗi ngày Streak của từng thành viên.
+  - Tích hợp nhãn `👥 Group Habit` trên Dashboard [GoalCard.tsx](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx) để biểu diễn các thói quen thuộc nhóm.
+* **Tính năng Chia sẻ thành tích một chạm (Social Sharing):**
+  - Xây dựng component [ShareModal.tsx](file:///d:/Download/daily-goal-tracker/src/components/ShareModal.tsx) sử dụng HTML5 Canvas vẽ thẻ vinh danh (Breakthrough Badge Card) và bảng Heatmap đẹp mắt theo phong cách dark glassmorphism (1200x630px).
+  - Tích hợp các nút Share một click trên trang thống kê [Stats.tsx](file:///d:/Download/daily-goal-tracker/src/pages/Stats.tsx) (cạnh tiêu đề Heatmap và trên từng Milestone Card) và trên trang nhóm thói quen [GroupsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/GroupsPage.tsx).
+  - Hỗ trợ một chạm tải ảnh PNG, gọi Web Share API chia sẻ trên các ứng dụng di động/máy tính và mở intent đăng bài trên Facebook/Twitter.
+
 ## [Đã hoàn thành] - Active Reminders Push Notifications - 2026-06-05 13:30 (GMT+7)
 ### Đã thêm & Cải tiến (Added & Improved)
 * **Tính năng Nhắc nhở chủ động chống đứt chuỗi (Active Reminders):**

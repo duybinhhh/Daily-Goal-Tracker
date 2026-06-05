@@ -39,6 +39,7 @@ export interface Goal {
   created_at: string;
   updated_at: string;
   streak?: Streak;
+  group_id?: string | null;
 }
 
 export interface DashboardStats {

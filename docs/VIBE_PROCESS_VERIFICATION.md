@@ -1,6 +1,6 @@
-# 🛡️ VIBE PROCESS VERIFICATION: ACTIVE REMINDERS, PWA OFFLINE MODE, UNDO LOG & UX OPTIMIZATION
+# 🛡️ VIBE PROCESS VERIFICATION: ACTIVE REMINDERS, PWA OFFLINE MODE, UNDO LOG, ACCOUNTABILITY GROUPS & SOCIAL SHARING
 
-Tài liệu này chứng minh và ghi nhận chi tiết quá trình phát triển các tính năng mới (**Nhắc nhở chủ động chống đứt chuỗi - Active Reminders**, **Chế độ Ngoại tuyến & Đồng bộ hóa sau - Offline Mode & Sync**, **Hoàn tác tiến độ - Undo Log**, **Hiệu ứng biến mất 5s trên Dashboard**, **Xóa log từ Timeline**, **Đồng bộ tính lại Streak**, **Cân đối màn Đăng nhập**, **Sticky Action Bar trong Settings** và **Mặc định Theme Sáng**) tuân thủ nghiêm ngặt theo quy trình 4 bước chuẩn hóa: **Plan (Lập kế hoạch) -> Doc (Tài liệu hóa) -> Build (Xây dựng) -> Test (Kiểm thử & Nghiệm thu)**.
+Tài liệu này chứng minh và ghi nhận chi tiết quá trình phát triển các tính năng mới (**Nhắc nhở chủ động chống đứt chuỗi - Active Reminders**, **Chế độ Ngoại tuyến & Đồng bộ hóa sau - Offline Mode & Sync**, **Hoàn tác tiến độ - Undo Log**, **Hiệu ứng biến mất 5s trên Dashboard**, **Xóa log từ Timeline**, **Đồng bộ tính lại Streak**, **Cân đối màn Đăng nhập**, **Sticky Action Bar trong Settings**, **Mặc định Theme Sáng**, **Đồng đội giám sát - Habit Groups** và **Chia sẻ thành tích một chạm - Social Sharing**) tuân thủ nghiêm ngặt theo quy trình 4 bước chuẩn hóa: **Plan (Lập kế hoạch) -> Doc (Tài liệu hóa) -> Build (Xây dựng) -> Test (Kiểm thử & Nghiệm thu)**.
 
 ---
 
@@ -26,41 +26,50 @@ Giai đoạn này xác định mục tiêu, giải pháp kỹ thuật và sơ đ
 *   **Nhắc nhở chủ động chống đứt chuỗi (Active Reminders)**:
     *   Yêu cầu: Người dùng hay quên mở ứng dụng, dẫn đến đứt chuỗi Streak. Cần gửi thông báo đẩy đến trình duyệt/mobile vào lúc 21h00 tối hàng ngày nếu họ vẫn còn thói quen chưa làm xong.
     *   Giải pháp: Tích hợp chuẩn Web Push sử dụng VAPID keys. Lưu trữ push subscription dưới dạng JSON trong bảng User. Chạy một luồng lập lịch nền (scheduler) kiểm tra mỗi phút, đối chiếu múi giờ cục bộ của người dùng để kích hoạt đẩy thông báo lúc 21h00 local time và lưu ngày gửi gần nhất (`last_reminder_sent_date`) để chống gửi trùng lặp.
+*   **Đồng đội giám sát (Accountability Partners / Habit Groups)**:
+    *   Yêu cầu: Người dùng tự kỷ luật một mình rất dễ bỏ cuộc. Cần cho phép họ tạo nhóm thói quen chung (ví dụ: nhóm "Chạy bộ 5km mỗi ngày cùng phòng") để cùng nhắc nhở và cạnh tranh.
+    *   Giải pháp: Thiết lập hai mô hình quan hệ cơ sở dữ liệu `HabitGroup` và `HabitGroupMember`. Khi một người dùng tham gia nhóm, hệ thống tự động sinh một `Goal` có liên kết `group_id` trên Dashboard của họ. Thành tích của từng thành viên (gồm tiến trình hôm nay và chuỗi Streak hiện tại) sẽ được hiển thị trực tiếp lên bảng xếp hạng (leaderboard) nhóm.
+*   **Chia sẻ Heatmap & Huy hiệu đẹp mắt (Social Sharing)**:
+    *   Yêu cầu: Tích hợp tính năng chia sẻ bảng Heatmap hoặc Huy hiệu thành tựu (Breakthrough Badge) chỉ với một click lên mạng xã hội để tăng tương tác.
+    *   Giải pháp: Phát triển một hộp thoại Share Modal. Sử dụng HTML5 Canvas vẽ thẻ preview kính mờ (dark glassmorphism) thời thượng có độ phân giải 1200x630px chứa thông tin thành tích/Heatmap để tải ảnh PNG trực tiếp về thiết bị, đồng thời hỗ trợ Web Share API trên thiết bị và các link intent chia sẻ lên Facebook/Twitter.
 
 ---
 
 ## 2. Doc (Tài liệu hóa kỹ thuật)
 Các tính năng và luồng xử lý mới được mô tả chi tiết trong hệ thống tài liệu dự án trước khi lập trình:
-1.  **Định nghĩa User Stories**: Cập nhật các tiêu chí chấp nhận (AC) cho nút Undo và đếm ngược trong `US-05`, chức năng xóa log và tính lại Streak trong `US-09`, Sticky Action Bar trong `US-07`, theme mặc định trong `US-08`, và Active Reminders chống đứt chuỗi trong tệp [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md).
-2.  **Định nghĩa API Endpoints**: Đăng ký API mới `DELETE /api/goals/logs/:logId`, `PUT /api/auth/push-subscription` (lưu đăng ký thông báo), và `GET /api/auth/vapid-public-key` (lấy khóa VAPID công khai) tại tệp [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md).
+1.  **Định nghĩa User Stories**: Cập nhật các tiêu chí chấp nhận (AC) cho nút Undo và đếm ngược trong `US-05`, chức năng xóa log và tính lại Streak trong `US-09`, Sticky Action Bar trong `US-07`, theme mặc định trong `US-08`, Active Reminders chống đứt chuỗi trong tệp [SPEC.md](file:///d:/Download/daily-goal-tracker/docs/SPEC.md), cũng như bổ sung yêu cầu nhóm thói quen (`US-10`) và chia sẻ thành tích (`US-11`).
+2.  **Định nghĩa API Endpoints**: Đăng ký API mới `DELETE /api/goals/logs/:logId`, `PUT /api/auth/push-subscription` (lưu đăng ký thông báo), và `GET /api/auth/vapid-public-key` (lấy khóa VAPID công khai) tại tệp [Plan.md](file:///d:/Download/daily-goal-tracker/docs/Plan.md), kèm các API nhóm: `GET /api/groups`, `POST /api/groups`, `GET /api/groups/:id`, `POST /api/groups/:id/join`, `POST /api/groups/:id/leave`, và `DELETE /api/groups/:id`.
 3.  **Nhật ký phát triển**: Ghi nhận chi tiết lịch sử hoàn thành các tính năng mới với mốc thời gian cụ thể (GMT+7) trong tệp [CHANGELOG.md](file:///d:/Download/daily-goal-tracker/docs/CHANGELOG.md).
 
 ---
 
-3.  **Build (Xây dựng & Triển khai mã nguồn)**
+## 3. Build (Xây dựng & Triển khai mã nguồn)
 Quá trình lập trình được tiến hành tuần tự từ cơ sở dữ liệu, API điều hướng, trạng thái Client đến giao diện người dùng:
 1.  **Backend & Database**:
-    *   Cập nhật tệp cơ sở dữ liệu [schema.prisma](file:///d:/Download/daily-goal-tracker/prisma/schema.prisma) để bổ sung trường `push_subscription` và `last_reminder_sent_date` cho mô hình `User`.
-    *   Cập nhật [db.ts](file:///d:/Download/daily-goal-tracker/server/db.ts) để thêm phương thức `delete` và `findUnique` cho Helper logs của Prisma, đồng thời mở rộng `users.update` và `users.findMany` phục vụ việc truy vấn người dùng đã đăng ký thông báo đẩy.
-    *   Xây dựng helper [vapidHelper.ts](file:///d:/Download/daily-goal-tracker/src/services/vapidHelper.ts) tự động kiểm tra và sinh khóa VAPID lưu vào tệp `.env` nếu chưa có.
-    *   Xây dựng dịch vụ lập lịch nền [reminderScheduler.ts](file:///d:/Download/daily-goal-tracker/src/services/reminderScheduler.ts) quét cơ sở dữ liệu mỗi phút để tìm các tài khoản đến mốc 21h00 cục bộ và còn thói quen chưa làm nhằm đẩy Push Notification.
-    *   Xây dựng controller `deleteLog` và hàm logic `recalculateStreak` dựa trên múi giờ của người dùng tại [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts).
-    *   Cập nhật controller `completeGoal` tại [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts) để chấp nhận tham số `completed_at` tùy chọn từ client nhằm đồng bộ chính xác thời gian ghi nhận thói quen lúc ngoại tuyến.
+    *   Cập nhật tệp cơ sở dữ liệu [schema.prisma](file:///d:/Download/daily-goal-tracker/prisma/schema.prisma) để bổ sung trường `push_subscription` và `last_reminder_sent_date` cho mô hình `User`, đồng thời thêm các bảng `HabitGroup`, `HabitGroupMember` và liên kết trường `group_id` cho mô hình `Goal`.
+    *   Cập nhật [db.ts](file:///d:/Download/daily-goal-tracker/server/db.ts) để thêm phương thức `delete` và `findUnique` cho Helper logs của Prisma, mở rộng `users.update` và `users.findMany` phục vụ thông báo đẩy, đồng thời tích hợp các hàm CRUD cho `groups` và `groupMembers`.
+    *   Xây dựng helper [vapidHelper.ts](file:///d:/Download/daily-goal-tracker/src/services/vapidHelper.ts) tự động kiểm tra và sinh khóa VAPID lưu vào tệp `.env`.
+    *   Xây dựng dịch vụ lập lịch nền [reminderScheduler.ts](file:///d:/Download/daily-goal-tracker/src/services/reminderScheduler.ts) quét cơ sở dữ liệu mỗi phút để đẩy thông báo Push.
+    *   Xây dựng controller `deleteLog` và hàm logic `recalculateStreak` tại [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts).
+    *   Xây dựng [groupController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/groupController.ts) xử lý logic nhóm thói quen, bao gồm cả việc liên kết tự động mục tiêu cho thành viên nhóm.
     *   Đăng ký tuyến đường `DELETE /logs/:logId` trong [goals.ts](file:///d:/Download/daily-goal-tracker/src/routes/goals.ts).
+    *   Đăng ký tuyến đường nhóm trong [groups.ts](file:///d:/Download/daily-goal-tracker/src/routes/groups.ts) và tích hợp vào [express-app.ts](file:///d:/Download/daily-goal-tracker/src/express-app.ts).
     *   Đăng ký tuyến đường `PUT /push-subscription` và `GET /vapid-public-key` trong [auth.ts](file:///d:/Download/daily-goal-tracker/src/routes/auth.ts).
 2.  **Zustand Store & Local Storage Services**:
-    *   Xây dựng lớp tiện ích client [pushNotification.ts](file:///d:/Download/daily-goal-tracker/src/services/pushNotification.ts) hỗ trợ kiểm tra quyền, đăng ký push và hủy đăng ký với Web Push Service của trình duyệt.
-    *   Xây dựng lớp tiện ích IndexedDB tại [indexedDb.ts](file:///d:/Download/daily-goal-tracker/src/services/indexedDb.ts) gồm hai kho lưu trữ `metadata` (lưu cache tĩnh cho goals, stats, history) và `syncQueue` (hàng đợi check-in offline).
-    *   Xây dựng trình đồng bộ dữ liệu tại [syncManager.ts](file:///d:/Download/daily-goal-tracker/src/services/syncManager.ts) tự động đẩy các tác vụ hoàn thành từ hàng đợi IndexedDB lên Server khi phục hồi kết nối. Tích hợp **Web Locks API** (`navigator.locks`) cùng fallback **LocalStorage Lock** (timeout 10s) để ngăn tranh chấp đồng bộ giữa nhiều tab trình duyệt đang mở cùng lúc.
-    *   Cập nhật [goalStore.ts](file:///d:/Download/daily-goal-tracker/src/store/goalStore.ts) hỗ trợ các biến trạng thái `isOffline`, `isSyncing` và tự động đọc dữ liệu từ cache IndexedDB kèm bù trừ số đếm tạm thời khi mất kết nối mạng. Đồng thời nâng cấp `fetchGoals` và `fetchHistory` để tự động gộp hàng đợi ngoại tuyến `syncQueue` vào dữ liệu server tải về, triệt tiêu lỗi quay ngược trạng thái khi chuyển mạng.
-    *   Thiết lập cơ chế sinh UUID ngẫu nhiên tại client (`log_id`) ngay khi nhấn check-in để làm Primary Key cho log check-in ở backend DB, đảm bảo tính idempotency tuyệt đối.
+    *   Xây dựng lớp tiện ích client [pushNotification.ts](file:///d:/Download/daily-goal-tracker/src/services/pushNotification.ts).
+    *   Xây dựng lớp tiện ích IndexedDB tại [indexedDb.ts](file:///d:/Download/daily-goal-tracker/src/services/indexedDb.ts).
+    *   Xây dựng trình đồng bộ dữ liệu tại [syncManager.ts](file:///d:/Download/daily-goal-tracker/src/services/syncManager.ts).
+    *   Cập nhật [goalStore.ts](file:///d:/Download/daily-goal-tracker/src/store/goalStore.ts) hỗ trợ các biến trạng thái ngoại tuyến và đồng bộ.
+    *   Xây dựng [groupStore.ts](file:///d:/Download/daily-goal-tracker/src/store/groupStore.ts) quản lý đồng bộ trạng thái nhóm.
+    *   Cập nhật [types.ts](file:///d:/Download/daily-goal-tracker/src/types.ts) bổ sung trường `group_id` cho Goal.
 3.  **UI & Components**:
-    *   **PWA Setup**: Tạo cấu hình [manifest.json](file:///d:/Download/daily-goal-tracker/public/manifest.json) để ứng dụng có thể cài đặt lên màn hình chính, viết Service Worker [sw.js](file:///d:/Download/daily-goal-tracker/public/sw.js) để cache giao diện chạy offline và đón sự kiện `push`/`notificationclick` để hiển thị/điều hướng thông báo đẩy, liên kết manifest trong [index.html](file:///d:/Download/daily-goal-tracker/index.html) và đăng ký Service Worker trong [main.tsx](file:///d:/Download/daily-goal-tracker/src/main.tsx).
-    *   **Dashboard & GoalCard:** Thêm state `disappearingGoals` quản lý bộ đếm thời gian 5s trong [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx). Thiết kế giao diện đếm ngược kèm nút "Undo" trong [GoalCard.tsx](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx). Thêm các huy hiệu hiển thị trạng thái mạng ("Offline Mode" màu cam và "Syncing..." màu xanh lá) nổi bật trên thanh Header tại [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx).
-    *   **Timeline:** Thêm nút xóa log check-in kế bên mỗi mục lịch sử và tích hợp hàm gọi xác nhận trong [TimelinePage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/TimelinePage.tsx).
-    *   **Settings:** Cài đặt mặc định theme là `light` thay vì `dark`. Di chuyển cụm Save/Discard vào khung kính mờ `glass-card sticky bottom-4 md:bottom-6 z-30` tại [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx). Thêm công tắc bật/tắt **Nhắc nhở chủ động (Active Reminders)** tích hợp luồng xin quyền thông báo và đồng bộ với backend.
-    *   **LoginPage:** Thêm class `w-full` và kiểu `width: "100%"` cho wrapper ngoài cùng để sửa lỗi căn lệch màn hình.
-    *   **GoalFormPage:** Đồng bộ các class Tailwind (`text-slate-400` -> `text-on-surface-variant`, `m-input`) cho biểu mẫu.
+    *   **PWA Setup**: Đăng ký Service Worker và manifests trong [index.html](file:///d:/Download/daily-goal-tracker/index.html) và [main.tsx](file:///d:/Download/daily-goal-tracker/src/main.tsx).
+    *   **Dashboard & GoalCard:** Thêm state `disappearingGoals` trong [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx). Thiết kế nút "Undo" và nhãn nhóm thói quen "Group Habit" trên GoalCard tại [GoalCard.tsx](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx).
+    *   **Timeline:** Thêm nút xóa log check-in tại [TimelinePage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/TimelinePage.tsx).
+    *   **Settings:** Cài đặt mặc định theme là `light`, floating action bar tại [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx).
+    *   **Habit Groups Page:** Xây dựng [GroupsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/GroupsPage.tsx) hiển thị các nhóm và bảng xếp hạng thành viên.
+    *   **Social Share Modal:** Xây dựng [ShareModal.tsx](file:///d:/Download/daily-goal-tracker/src/components/ShareModal.tsx) dùng HTML5 Canvas kết xuất ảnh thẻ vinh danh và Heatmap để tải về.
+    *   **Stats & Navigation:** Cập nhật [Stats.tsx](file:///d:/Download/daily-goal-tracker/src/pages/Stats.tsx), [Sidebar.tsx](file:///d:/Download/daily-goal-tracker/src/components/Sidebar.tsx) và [BottomNav.tsx](file:///d:/Download/daily-goal-tracker/src/components/BottomNav.tsx) để khai báo menu.
 
 ---
 
@@ -69,7 +78,7 @@ Quá trình kiểm thử đã được chạy trực tiếp trên môi trường
 *   **Compile Test (Đạt)**: Vite Dev Server xác nhận biên dịch thành công không có lỗi TypeScript hay lỗi biên dịch giao diện.
 *   **Undo & Disappearing Test (Đạt)**:
     1. Bấm hoàn thành một thói quen trên Dashboard.
-    2. Thẻ mục tiêu lập tức hiển thị lớp phủ mờ "Completed! Disappearing in 5s..." cùng bộ đếm ngược giảm dần và nút **Undo**.
+    2. Thẻ mục tiêu hiển thị lớp phủ mờ "Completed! Disappearing in 5s..." cùng bộ đếm ngược giảm dần và nút **Undo**.
     3. Bấm **Undo**: Tiến độ thói quen giảm đi 1, bộ đếm dừng lại và thẻ thói quen trở về bình thường.
     4. Bấm hoàn thành lại và đợi hết 5 giây: Thói quen tự động ẩn khỏi Dashboard.
 *   **Timeline Log Deletion Test (Đạt)**:
@@ -99,6 +108,11 @@ Quá trình kiểm thử đã được chạy trực tiếp trên môi trường
     1. **Kiểm thử đăng ký Push Subscription**: Truy cập màn Cài đặt, bật 'Active Reminders'. Hộp thoại xin quyền hiện lên và được chấp thuận. Gửi API `/push-subscription` đăng ký thành công chuỗi khóa trong DB của User.
     2. **Kiểm thử Lập lịch scheduler lúc 21h00**: Chạy scheduler và mock múi giờ của User để lúc này đang là 21h05 tối local time. Hệ thống phát hiện người dùng còn 1 thói quen hàng ngày chưa đạt mục tiêu (ví dụ: Drink Water 0/1). 
     3. **Kiểm thử Đẩy thông báo thành công**: Server gọi `webpush.sendNotification()` đẩy gói tin an toàn. Service Worker đón nhận và hiển thị thông báo "Chống đứt chuỗi! 🔥" trên thiết bị. Trạng thái `last_reminder_sent_date` của User được cập nhật thành ngày hôm nay, ngăn chặn đẩy lặp tin nhắn ở lần quét tiếp theo trong ngày.
-    4. **Kiểm thử Tự động dọn dẹp**: Thử nghiệm giả lập đăng ký đẩy hết hiệu lực (hủy đăng ký thủ công). Server nhận lỗi 410, tự động dọn sạch trường `push_subscription` về null trong cơ sở dữ liệu để tránh rác tài nguyên.
-
-
+    4. **Kiểm thử Tự động dọn dẹp**: Thủy nghiệm giả lập đăng ký đẩy hết hiệu lực (hủy đăng ký thủ công). Server nhận lỗi 410, tự động dọn sạch trường `push_subscription` về null trong cơ sở dữ liệu để tránh rác tài nguyên.
+*   **Habit Groups Functions Verification (Đạt)**:
+    1. **Kiểm thử Tạo nhóm**: Điền thông tin tạo nhóm thành công (ví dụ: nhóm "Chạy bộ 5km mỗi ngày cùng phòng"). Hệ thống tự động thêm Goal liên kết với ID nhóm vào tài khoản người tạo và hiển thị huy hiệu "Group Habit" trên GoalCard.
+    2. **Kiểm thử Bảng xếp hạng (Leaderboard)**: Đăng nhập tài khoản thứ hai và tham gia nhóm vừa tạo. Bảng xếp hạng nhóm hiển thị đầy đủ thông tin cả 2 thành viên kèm tiến trình hoàn thành và chuỗi streak cục bộ của từng người.
+    3. **Kiểm thử Rời nhóm**: Bấm rời nhóm, Goal liên kết tương ứng lập tức bị xóa khỏi Dashboard cá nhân một cách an toàn.
+*   **Social Sharing Canvas Card Verification (Đạt)**:
+    1. **Kiểm thử Tải ảnh một chạm**: Click biểu tượng Share trên Heatmap hoặc Milestones. Hộp thoại hiện lên ảnh preview sắc nét. Bấm Download Image, hệ thống tải tệp ảnh PNG về thiết bị chứa thông tin badge hoặc heatmap được vẽ động hoàn hảo bằng HTML5 Canvas.
+    2. **Kiểm thử Tương tác Mạng xã hội**: Click Twitter/Facebook, trình duyệt chuyển hướng chính xác đến cửa sổ viết bài kèm theo thông điệp chia sẻ soạn sẵn truyền cảm hứng.

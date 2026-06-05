@@ -4,12 +4,13 @@
 * **Backend:** Node.js (Express) với **Prisma ORM** kết hợp adapter PostgreSQL.
 * **Database:** **PostgreSQL** (hỗ trợ cascade deletion và chỉ mục tối ưu).
 * **Frontend:** React 19 + TypeScript + Vite 6 + Tailwind CSS v4 + React Router v6.
-* **State Management:** **Zustand** (quản lý trạng thái xác thực và mục tiêu).
+* **State Management:** **Zustand** (quản lý trạng thái xác thực, mục tiêu và nhóm thói quen).
 * **HTTP Client:** **Axios** với request/response Interceptor tự động xử lý và xoay vòng JWT tokens.
 * **Authentication:** **JWT** (Access Token 15 phút + Refresh Token 7 ngày), mã hóa mật khẩu bằng **bcryptjs**.
 * **Offline Caching & Queue:** **IndexedDB** (trình duyệt lưu đệm dữ liệu mục tiêu/chỉ số và hàng đợi đồng bộ offline).
 * **PWA Engine:** **Service Worker** (`sw.js` cache giao diện shell tĩnh và đón nhận sự kiện push/notificationclick) + **Web App Manifest** (`manifest.json` cho phép cài đặt lên màn hình chính).
 * **Web Push Notifications:** Sử dụng thư viện **web-push** ở Backend để đẩy thông báo về thiết bị/trình duyệt của người dùng thông qua chuẩn VAPID keys.
+* **Social Sharing Card Renderer:** **HTML5 Canvas API** (kết xuất thẻ vinh danh chất lượng cao phía client) kết hợp **Web Share API** của trình duyệt phục vụ chia sẻ một chạm.
 
 ---
 
@@ -29,6 +30,10 @@ model User {
   goals         Goal[]
   logs          GoalLog[]
   notifications Notification[]
+  push_subscription     String?
+  last_reminder_sent_date String?
+  created_groups HabitGroup[] @relation("GroupCreator")
+  group_memberships HabitGroupMember[]
 }
 
 model Goal {
@@ -47,6 +52,8 @@ model Goal {
   updated_at    DateTime   @updatedAt
   logs          GoalLog[]
   streaks       Streak[]
+  group_id      String?
+  group         HabitGroup? @relation(fields: [group_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
 }
@@ -89,6 +96,35 @@ model Notification {
 
   @@index([user_id])
 }
+
+model HabitGroup {
+  id                String             @id @default(uuid())
+  name              String
+  description       String?
+  creator_id        String
+  creator           User               @relation("GroupCreator", fields: [creator_id], references: [id], onDelete: Cascade)
+  goal_title        String
+  goal_category     String
+  goal_target_count Int                @default(1)
+  goal_frequency    String             @default("daily")
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+  members           HabitGroupMember[]
+  goals             Goal[]
+}
+
+model HabitGroupMember {
+  id        String     @id @default(uuid())
+  group_id  String
+  group     HabitGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  user_id   String
+  user      User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  joined_at DateTime   @default(now())
+
+  @@unique([group_id, user_id])
+  @@index([group_id])
+  @@index([user_id])
+}
 ```
 
 ---
@@ -96,11 +132,11 @@ model Notification {
 ## 3. Cấu trúc thư mục & Luồng hoạt động (Data Flow)
 
 ### 3.1 Cấu trúc thư mục chính (Key Directory)
-*   `src/components/`: Chứa các component dùng chung (ví dụ: `Sidebar`, `GoalCard`, các UI components như `Button`, `Input`, `Card`, `ProgressBar`).
-*   `src/pages/`: Các trang màn hình chính (`DashboardPage`, `GoalsPage`, `Stats`, `SettingsPage`, `LoginPage`, `GoalFormPage`, `TimelinePage`).
-*   `src/store/`: Zustand stores quản lý trạng thái client-side (`authStore`, `goalStore`).
+*   `src/components/`: Chứa các component dùng chung (ví dụ: `Sidebar`, `GoalCard`, `ShareModal`, các UI components như `Button`, `Input`, `Card`, `ProgressBar`).
+*   `src/pages/`: Các trang màn hình chính (`DashboardPage`, `GoalsPage`, `Stats`, `SettingsPage`, `LoginPage`, `GoalFormPage`, `TimelinePage`, `GroupsPage`).
+*   `src/store/`: Zustand stores quản lý trạng thái client-side (`authStore`, `goalStore`, `groupStore`).
 *   `src/services/api.ts`: Cấu hình Axios instance kèm cơ chế bắt lỗi 401 tự động refresh session.
-*   `server/db.ts`: Lớp wrapper Prisma Client giả lập mô hình dữ liệu cũ và đóng gói các API tương tác DB.
+*   `server/db.ts`: Lớp wrapper Prisma Client đóng gói các API tương tác DB (bao gồm mappers cho User, Goal, Streak, HabitGroup, HabitGroupMember).
 
 ### 3.2 Luồng xử lý dữ liệu cốt lõi (Core Flows)
 1.  **Xác thực & Bảo mật (Auth & Guards)**:
@@ -119,7 +155,7 @@ model Notification {
 4.  **Bảng thống kê và Heatmap (Premium Statistics Dashboard)**:
     *   Trang thống kê gọi API `GET /api/stats/dashboard` và `GET /api/stats/history` (với phạm vi 182 ngày để hiển thị 26 tuần thói quen).
     *   Căn chỉnh ngày bắt đầu của lịch hoạt động về Chủ Nhật để tạo lưới ô lịch hoàn hảo (7 dòng x 26 cột). Màu sắc các ô được điều khiển linh hoạt qua các lớp màu chủ đề `bg-primary`, `bg-primary/20`, v.v. thích ứng tự động với Light/Dark theme.
-    *   Biểu đồ xu hướng hiệu năng nhóm tiến độ 70 ngày gần nhất thành 10 tuần, hiển thị cột CSS trực quan với hiệu ứng hover tooltip.
+    *   Biểu đồ xu hiện năng nhóm tiến độ 70 ngày gần nhất thành 10 tuần, hiển thị cột CSS trực quan với hiệu ứng hover tooltip.
     *   Sử dụng CSS `conic-gradient` tạo biểu đồ tròn Donut động biểu diễn tỉ lệ phân loại thói quen của người dùng.
     *   Các hành động như tải file báo cáo CSV (`Export CSV`) và làm mới nhanh dữ liệu được tích hợp trực tiếp trên thanh tiêu đề sticky chuẩn hóa.
 5.  **Trục thời gian hoạt động (Activity Timeline)**:
@@ -132,28 +168,20 @@ model Notification {
     *   Trang Goals (`GoalsPage.tsx`) kết nối với kho dữ liệu thói quen qua `useGoals` hook.
     *   Hỗ trợ tương tác tạm dừng/hoạt động lại thông qua API cập nhật trạng thái mục tiêu (`PUT /api/goals/:id` truyền tham số `status`).
     *   Thực hiện tính toán tỷ lệ hoàn thành trung bình của các mục tiêu hoạt động ở Client-side và biểu diễn bằng vòng tròn SVG động cùng các danh hiệu khích lệ năng suất.
-7. Chế độ Ngoại tuyến & Đồng bộ hóa sau (Offline Mode & Sync):
-    *   **Khởi chạy offline:** Khi mất mạng, Service Worker (`sw.js`) đánh chặn yêu cầu và phục hồi app shell tĩnh từ Cache Storage. Zustand store (`goalStore.ts`) tự động bắt lỗi mạng và khôi phục dữ liệu thói quen/dashboard từ cache IndexedDB (`metadata` store).
+7.  **Chế độ Ngoại tuyến & Đồng bộ hóa sau (Offline Mode & Sync)**:
+    *   **Khởi chạy offline:** Khi mất mạng, Service Worker (`sw.js`) phục hồi app shell tĩnh từ Cache Storage. Zustand store (`goalStore.ts`) khôi phục dữ liệu từ cache IndexedDB (`metadata` store).
     *   **Ghi nhận thói quen offline:** Các check-in thực hiện lúc offline được lưu tạm dưới dạng tác vụ hoàn thành (`OfflineAction`) vào hàng đợi `syncQueue` trong IndexedDB, đồng thời cập nhật tăng trực tiếp số đếm hiển thị trên UI. Cơ chế Undo cũng hoạt động offline bằng cách xóa bản ghi khỏi hàng đợi cục bộ này.
     *   **Ngăn chặn trùng lặp bằng UUID & Idempotency:**
-        - Để ngăn ngừa các log check-in bị ghi nhận trùng lặp trong cơ sở dữ liệu khi có sự cố mạng hoặc thử lại, mỗi khi người dùng check-in (bất kể online hay offline), frontend lập tức tạo ra một mã UUID định danh duy nhất cho log đó (`log_id`) bằng `crypto.randomUUID` (hoặc thuật toán fallback sinh chuỗi ngẫu nhiên).
-        - Mã `log_id` này được gửi kèm lên Server qua API `POST /api/goals/:id/complete` và được lưu làm khóa chính (Primary Key) của bảng `GoalLog`. Nhờ cơ chế ràng buộc khóa chính của database, các lượt check-in bị lặp lại do gửi đúp request sẽ bị chặn đứng hoàn toàn ở phía Backend.
-    *   **Khóa Concurrency phía Giao diện (UI Concurrency Guard):**
-        - Tại `GoalCard.tsx`, khi người dùng bấm check-in, trạng thái `completing` được gán bằng `true` ngay lập tức để chặn các sự kiện nhấn chuột liên hoàn (double-click) hoặc giữ phím Enter. Điều này đảm bảo mỗi hành động check-in hợp lệ chỉ kích hoạt đúng một yêu cầu gửi đi và một UUID duy nhất, tránh việc sinh ra nhiều UUID khác nhau cho cùng một lần bấm.
-    *   **Khóa đồng bộ đa tab (Multi-tab Lock):**
-        - Trình quản lý `syncManager.ts` tích hợp cơ chế đồng bộ hóa giữa nhiều tab trình duyệt đang mở đồng thời. Hệ thống sử dụng **Web Locks API** (`navigator.locks.request` với lock name `sync_offline_data_lock`) để chắc chắn rằng chỉ có một tab duy nhất được quyền đọc ghi hàng đợi `syncQueue` và liên kết API lên Server.
-        - Khi chạy trong các trình duyệt cũ hoặc môi trường HTTP không bảo mật (non-secure context, nơi Web Locks bị chặn), trình quản lý sẽ tự động chuyển sang chế độ fallback sử dụng **LocalStorage Lock** (có gắn thời gian hết hạn 10 giây để tránh deadlock khi tab giữ lock bị crash đột ngột) và khóa bộ nhớ cục bộ `isSyncing`.
-    *   **Tính bền vững của hàng đợi (Queue Durability):**
-        - Các tác vụ check-in chỉ được xóa khỏi hàng đợi `syncQueue` *sau khi* API Server phản hồi mã thành công (HTTP status 2xx).
-        - Nếu gặp lỗi mạng hoặc lỗi Server (5xx), quá trình đồng bộ sẽ tạm dừng hoàn toàn để giữ nguyên dữ liệu trong hàng đợi cho lần thử lại tiếp theo. Nếu gặp lỗi yêu cầu sai từ phía client (4xx, ví dụ: thói quen đã bị xóa ở server), tác vụ lỗi đó sẽ được gỡ bỏ khỏi hàng đợi để tránh tắc nghẽn vĩnh viễn (poison pill).
-    *   **Hợp nhất hàng đợi thông minh chống giật lag (UI State Merging):**
-        - Trong quá trình kết nối lại (khi mạng chuyển sang online và sync manager đang đồng bộ), việc tải lại dữ liệu từ Server có thể diễn ra trước khi hàng đợi ngoại tuyến được dọn sạch hoàn toàn, dẫn đến việc dữ liệu giao diện bị quay về trạng thái cũ trước khi offline (flicker/reset).
-        - Để giải quyết vấn đề này, các hàm fetch dữ liệu `fetchGoals` và `fetchHistory` trong Zustand store (`goalStore.ts`) được thiết kế để *luôn luôn* đọc hàng đợi `syncQueue` từ IndexedDB và thực hiện cộng gộp/bù trừ số đếm, tự tạo bản ghi log giả định ngay tại client-side để hiển thị trước khi server phản hồi. Nhờ đó, giao diện người dùng luôn thống nhất với thực tế hành động của họ ở mọi thời điểm chuyển tiếp kết nối.
-    *   **Đồng bộ khi có mạng:** Hệ thống lắng nghe sự kiện `online` thông qua trình sự kiện toàn cục ở `App.tsx` để tránh đăng ký lặp lại. Khi phát hiện mạng phục hồi, trình quản lý `syncManager.ts` thực hiện khóa đồng bộ, quét hàng đợi IndexedDB và tuần tự đồng bộ các bản ghi check-in với đúng mốc giờ gốc của sự kiện (`completed_at`). Sau khi đồng bộ thành công, stores sẽ được cập nhật lại dữ liệu chuẩn từ server và tính toán lại Streak/Lịch sử thống kê một cách toàn vẹn.
-8. **Nhắc nhở chủ động chống đứt chuỗi (Active Reminders)**:
-    *   **Thiết lập phía Backend:** Khi ứng dụng khởi chạy, helper [vapidHelper.ts](file:///d:/Download/daily-goal-tracker/src/services/vapidHelper.ts) tự động khởi tạo VAPID keys lưu vào tệp `.env` nếu chưa tồn tại.
-    *   **Lập lịch gửi thông báo (Scheduler):** Dịch vụ [reminderScheduler.ts](file:///d:/Download/daily-goal-tracker/src/services/reminderScheduler.ts) được kích hoạt chạy ngầm trên máy chủ mỗi phút. Nó quét qua toàn bộ người dùng có lưu `push_subscription` trên DB. Đối với mỗi người dùng, hệ thống quy đổi thời gian hiện tại sang múi giờ (`timezone`) của họ.
-    *   **Xác định đứt chuỗi:** Khi giờ địa phương chạm hoặc vượt quá 21h00 tối và chưa gửi nhắc nhở trong ngày (`last_reminder_sent_date` khác ngày hiện tại), hệ thống sẽ đối chiếu danh sách thói quen của người dùng. Nếu phát hiện có thói quen hàng ngày (`frequency === "daily"`) chưa hoàn thành (`current_count < target_count`), hệ thống gọi thư viện `web-push` gửi thông báo đẩy và cập nhật `last_reminder_sent_date` về ngày hiện tại nhằm chống gửi lặp.
-    *   **Đăng ký & Hủy ở Client:** Người dùng bật tắt qua nút cấu hình tại Settings. Trình duyệt gọi Service Worker đăng ký hoặc hủy đăng ký dịch vụ đẩy thông báo với Browser Push Service thông qua tiện ích [pushNotification.ts](file:///d:/Download/daily-goal-tracker/src/services/pushNotification.ts) và gọi API `PUT /api/auth/push-subscription` cập nhật DB.
-    *   **Service Worker xử lý:** Service Worker lắng nghe sự kiện `push` hiển thị thông báo với tiêu đề `"Chống đứt chuỗi! 🔥"` và nội dung khuyến khích. Đồng thời, sự kiện `notificationclick` được lắng nghe để tự động mở/tập trung cửa sổ ứng dụng về màn hình chính.
-    *   **Cơ chế Tự dọn dẹp (Self-cleaning):** Nếu Service Worker của trình duyệt bị hủy hoặc hết hạn, Server nhận mã lỗi (404/410) khi gửi thông báo đẩy sẽ tự động xóa sạch `push_subscription` của người dùng đó khỏi cơ sở dữ liệu để bảo trì tài nguyên.
+        - Để ngăn ngừa các log check-in bị ghi nhận trùng lặp trong cơ sở dữ liệu khi có sự cố mạng hoặc thử lại, mỗi khi người dùng check-in, frontend tạo ra một mã UUID định danh duy nhất cho log đó (`log_id`).
+        - Mã `log_id` này được gửi kèm lên Server qua API và được lưu làm khóa chính (Primary Key) của bảng `GoalLog` trong database để chặn đứng hoàn toàn các lượt check-in bị lặp lại.
+    *   **Khóa Concurrency phía Giao diện (UI Concurrency Guard):** Tại `GoalCard.tsx`, trạng thái `completing` được gán bằng `true` ngay lập tức để chặn các sự kiện nhấn chuột liên hoàn.
+    *   **Khóa đồng bộ đa tab (Multi-tab Lock):** Trình quản lý `syncManager.ts` sử dụng **Web Locks API** (`navigator.locks.request` với lock name `sync_offline_data_lock`) để chắc chắn rằng chỉ có một tab duy nhất được quyền đồng bộ hóa lên Server (hoặc fallback sang LocalStorage Lock có timeout 10 giây).
+    *   **Hợp nhất hàng đợi thông minh chống giật lag (UI State Merging):** Các hàm fetch dữ liệu `fetchGoals` và `fetchHistory` trong Zustand store (`goalStore.ts`) được thiết kế để *luôn luôn* đọc hàng đợi `syncQueue` từ IndexedDB và thực hiện cộng gộp/bù trừ số đếm hiển thị trước khi server phản hồi.
+8.  **Nhắc nhở chủ động chống đứt chuỗi (Active Reminders)**:
+    *   **Scheduler:** Dịch vụ [reminderScheduler.ts](file:///d:/Download/daily-goal-tracker/src/services/reminderScheduler.ts) chạy ngầm trên máy chủ mỗi phút. Nó quét qua toàn bộ người dùng có lưu `push_subscription` trên DB và gửi thông báo đẩy lúc 21h00 tối theo giờ địa phương của họ nếu còn thói quen chưa đạt chỉ tiêu.
+9.  **Đồng đội giám sát (Habit Groups)** [NEW]:
+    *   **Gia nhập và tạo nhóm thói quen:** Khi tạo/tham gia một nhóm (`HabitGroup`), backend tạo bản ghi `HabitGroupMember` đồng thời sinh một `Goal` cá nhân tương ứng liên kết qua trường `group_id`.
+    *   **Leaderboard Real-time:** Khi truy vấn thông tin nhóm qua API `GET /api/groups/:id`, backend quét toàn bộ các goal có `group_id` này, đồng bộ chu kỳ và tính toán tiến độ hôm nay của từng thành viên trong nhóm dựa trên múi giờ riêng của họ, trả về bảng xếp hạng trực quan hiển thị số đếm hoàn thành và chuỗi Streak của từng thành viên.
+10. **Chia sẻ vinh danh (Social Sharing)** [NEW]:
+    *   **HTML5 Canvas Render Engine:** Khi người dùng mở ShareModal, component [ShareModal.tsx](file:///d:/Download/daily-goal-tracker/src/components/ShareModal.tsx) sẽ lấy dữ liệu tương ứng (milestone badge hoặc heatmap grid) vẽ lên một thẻ canvas 1200x630px được thiết kế dark glassmorphism sang trọng với metallic borders và glows.
+    *   **Bất đối xứng mạng xã hội (Share API & Intents):** Hỗ trợ xuất ảnh từ canvas thành URL nhị phân (Data URL) để tải xuống dạng PNG, gọi Web Share API trên mobile để gửi ảnh trực tiếp đến Zalo/Telegram/Messenger, hoặc chuyển hướng người dùng tới X (Twitter) và Facebook kèm thông điệp soạn sẵn.

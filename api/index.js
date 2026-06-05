@@ -274,6 +274,95 @@ var PrismaDB = class {
         });
       }
     };
+    // Habit Groups Helpers
+    this.groups = {
+      findMany: async (where) => {
+        const prismaWhere = {};
+        if (where?.creator_id) {
+          prismaWhere.creator_id = where.creator_id;
+        }
+        const list = await prisma.habitGroup.findMany({
+          where: prismaWhere,
+          include: {
+            creator: true,
+            members: {
+              include: {
+                user: true
+              }
+            }
+          }
+        });
+        return list;
+      },
+      findUnique: async (where) => {
+        const group = await prisma.habitGroup.findUnique({
+          where: { id: where.id },
+          include: {
+            creator: true,
+            members: {
+              include: {
+                user: true
+              }
+            }
+          }
+        });
+        return group;
+      },
+      create: async (data) => {
+        const created = await prisma.habitGroup.create({
+          data: {
+            name: data.name,
+            description: data.description || null,
+            creator_id: data.creator_id,
+            goal_title: data.goal_title,
+            goal_category: data.goal_category,
+            goal_target_count: data.goal_target_count,
+            goal_frequency: data.goal_frequency
+          }
+        });
+        return created;
+      },
+      delete: async (id) => {
+        const deleted = await prisma.habitGroup.delete({ where: { id } });
+        return deleted;
+      }
+    };
+    // Group Memberships Helpers
+    this.groupMembers = {
+      findMany: async (where) => {
+        const prismaWhere = {};
+        if (where.group_id) prismaWhere.group_id = where.group_id;
+        if (where.user_id) prismaWhere.user_id = where.user_id;
+        const list = await prisma.habitGroupMember.findMany({
+          where: prismaWhere,
+          include: {
+            user: true,
+            group: true
+          }
+        });
+        return list;
+      },
+      create: async (data) => {
+        const created = await prisma.habitGroupMember.create({
+          data: {
+            group_id: data.group_id,
+            user_id: data.user_id
+          }
+        });
+        return created;
+      },
+      delete: async (where) => {
+        const deleted = await prisma.habitGroupMember.delete({
+          where: {
+            group_id_user_id: {
+              group_id: where.group_id,
+              user_id: where.user_id
+            }
+          }
+        });
+        return deleted;
+      }
+    };
   }
 };
 var db = new PrismaDB();
@@ -1150,12 +1239,257 @@ router3.get("/dashboard", getDashboardStats);
 router3.get("/history", getHistory);
 var stats_default = router3;
 
+// src/routes/groups.ts
+import { Router as Router4 } from "express";
+
+// src/controllers/groupController.ts
+var getGroups = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const groups = await db.groups.findMany();
+    const formattedGroups = groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      creator_id: group.creator_id,
+      goal_title: group.goal_title,
+      goal_category: group.goal_category,
+      goal_target_count: group.goal_target_count,
+      goal_frequency: group.goal_frequency,
+      created_at: group.created_at,
+      memberCount: group.members.length,
+      isJoined: group.members.some((m) => m.user_id === userId)
+    }));
+    res.status(200).json({
+      success: true,
+      groups: formattedGroups
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var createGroup = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { name, description, goal_title, goal_category, goal_target_count, goal_frequency } = req.body;
+    if (!name || !goal_title || !goal_category) {
+      throw new AppError("Group name, goal title, and category are required.", 400);
+    }
+    const targetCount = goal_target_count ? parseInt(goal_target_count, 10) : 1;
+    if (isNaN(targetCount) || targetCount <= 0) {
+      throw new AppError("Target count must be a positive integer.", 400);
+    }
+    const group = await db.groups.create({
+      name,
+      description: description || null,
+      creator_id: userId,
+      goal_title,
+      goal_category,
+      goal_target_count: targetCount,
+      goal_frequency: goal_frequency || "daily"
+    });
+    await db.groupMembers.create({
+      group_id: group.id,
+      user_id: userId
+    });
+    const goal = await db.goals.create({
+      user_id: userId,
+      title: goal_title,
+      description: description ? `Group Habit: ${description}` : `Habit Group Goal: ${name}`,
+      category: goal_category,
+      target_count: targetCount,
+      frequency: goal_frequency || "daily",
+      due_date: null
+    });
+    await db.goals.update(goal.id, { group_id: group.id });
+    await db.streaks.create({
+      user_id: userId,
+      goal_id: goal.id
+    });
+    res.status(201).json({
+      success: true,
+      group
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var getGroupById = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+    const goals = await db.goals.findMany();
+    const groupGoals = goals.filter((g) => g.group_id === group.id);
+    const membersProgress = await Promise.all(
+      group.members.map(async (m) => {
+        const memberUser = m.user;
+        const memberGoal = groupGoals.find((g) => g.user_id === memberUser.id);
+        let current_count = 0;
+        let target_count = group.goal_target_count;
+        let streak = { current_streak: 0, longest_streak: 0 };
+        let status = "active";
+        if (memberGoal) {
+          const syncedGoal = await syncAndResetGoalProgress(memberGoal, memberUser.timezone || "UTC");
+          current_count = syncedGoal.current_count;
+          target_count = syncedGoal.target_count;
+          status = syncedGoal.status;
+          const memberStreak = await db.streaks.findUnique({ goal_id: syncedGoal.id });
+          if (memberStreak) {
+            streak = {
+              current_streak: memberStreak.current_streak,
+              longest_streak: memberStreak.longest_streak
+            };
+          }
+        }
+        return {
+          user_id: memberUser.id,
+          name: memberUser.name,
+          email: memberUser.email,
+          current_count,
+          target_count,
+          streak,
+          status
+        };
+      })
+    );
+    const isJoined = group.members.some((m) => m.user_id === userId);
+    res.status(200).json({
+      success: true,
+      group: {
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        creator_id: group.creator_id,
+        creator_name: group.creator.name,
+        goal_title: group.goal_title,
+        goal_category: group.goal_category,
+        goal_target_count: group.goal_target_count,
+        goal_frequency: group.goal_frequency,
+        created_at: group.created_at,
+        isJoined,
+        members: membersProgress
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var joinGroup = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+    const isMember = group.members.some((m) => m.user_id === userId);
+    if (isMember) {
+      throw new AppError("You are already a member of this group.", 400);
+    }
+    await db.groupMembers.create({
+      group_id: group.id,
+      user_id: userId
+    });
+    const goal = await db.goals.create({
+      user_id: userId,
+      title: group.goal_title,
+      description: group.description ? `Group Habit: ${group.description}` : `Habit Group Goal: ${group.name}`,
+      category: group.goal_category,
+      target_count: group.goal_target_count,
+      frequency: group.goal_frequency,
+      due_date: null
+    });
+    await db.goals.update(goal.id, { group_id: group.id });
+    await db.streaks.create({
+      user_id: userId,
+      goal_id: goal.id
+    });
+    res.status(200).json({
+      success: true,
+      message: "Successfully joined the habit group."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var leaveGroup = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+    const isMember = group.members.some((m) => m.user_id === userId);
+    if (!isMember) {
+      throw new AppError("You are not a member of this group.", 400);
+    }
+    await db.groupMembers.delete({
+      group_id: group.id,
+      user_id: userId
+    });
+    const goals = await db.goals.findMany();
+    const groupGoal = goals.find((g) => g.group_id === group.id && g.user_id === userId);
+    if (groupGoal) {
+      await db.goals.delete(groupGoal.id);
+    }
+    res.status(200).json({
+      success: true,
+      message: "Successfully left the habit group."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var deleteGroup = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+    if (group.creator_id !== userId) {
+      throw new AppError("Only the group creator can delete this group.", 403);
+    }
+    await db.groups.delete(id);
+    res.status(200).json({
+      success: true,
+      message: "Group successfully deleted."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// src/routes/groups.ts
+var router4 = Router4();
+router4.use(authMiddleware);
+router4.get("/", getGroups);
+router4.post("/", createGroup);
+router4.get("/:id", getGroupById);
+router4.post("/:id/join", joinGroup);
+router4.post("/:id/leave", leaveGroup);
+router4.delete("/:id", deleteGroup);
+var groups_default = router4;
+
 // src/express-app.ts
 var app = express();
 app.use(express.json());
 app.use("/api/auth", auth_default);
 app.use("/api/goals", goals_default);
 app.use("/api/stats", stats_default);
+app.use("/api/groups", groups_default);
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,

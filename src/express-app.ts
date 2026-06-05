@@ -3,6 +3,7 @@ import express from "express";
 import authRoutes from "./routes/auth";
 import goalRoutes from "./routes/goals";
 import statsRoutes from "./routes/stats";
+import groupRoutes from "./routes/groups";
 import { errorHandler } from "./middleware/errorHandler";
 import { db } from "../server/db";
 
@@ -15,6 +16,8 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/stats", statsRoutes);
+app.use("/api/groups", groupRoutes);
+
 
 // Database seed utility and simple API health endpoint
 app.get("/api/health", (req, res) => {
