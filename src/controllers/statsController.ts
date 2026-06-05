@@ -4,6 +4,14 @@ import { db } from "../../server/db";
 import { AuthenticatedRequest } from "../middleware/auth";
 import { AppError } from "../middleware/errorHandler";
 
+function getLogDedupeKey(log: { goal_id: string; completed_at: string; note?: string | null }): string {
+  return [
+    log.goal_id,
+    log.completed_at,
+    (log.note || "").trim(),
+  ].join("|");
+}
+
 export const getDashboardStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -67,6 +75,19 @@ export const getHistory = async (req: AuthenticatedRequest, res: Response, next:
       return logDate >= fromDate && logDate <= toDate;
     });
 
+    const seenLogIds = new Set<string>();
+    const seenLogKeys = new Set<string>();
+    const uniqueLogs = filteredLogs.filter((log) => {
+      const key = getLogDedupeKey(log);
+      if (seenLogIds.has(log.id) || seenLogKeys.has(key)) {
+        return false;
+      }
+
+      seenLogIds.add(log.id);
+      seenLogKeys.add(key);
+      return true;
+    });
+
     // Populate historical days index
     const historyMap: { [date: string]: any[] } = {};
     
@@ -79,7 +100,7 @@ export const getHistory = async (req: AuthenticatedRequest, res: Response, next:
     }
 
     // Populate active logged records
-    filteredLogs.forEach((log) => {
+    uniqueLogs.forEach((log) => {
       const dayKey = log.completed_at.split("T")[0];
       if (historyMap[dayKey]) {
         historyMap[dayKey].push(log);

@@ -2,6 +2,60 @@
 import { create } from "zustand";
 import api from "../services/api";
 import { Goal, GoalLog, DashboardStats, HistoryData } from "../types";
+import {
+  getCachedMetadata,
+  setCachedMetadata,
+  getPendingQueue,
+  addToSyncQueue,
+  removeFromSyncQueue,
+  getSyncAction,
+} from "../services/indexedDb";
+
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * Sanitize API errors: replace raw Prisma/DB technical messages with
+ * user-friendly text before they ever reach the UI.
+ */
+function sanitizeApiError(error: any): string {
+  const isNetworkOrServerError =
+    !error.response ||
+    error.code === "ERR_NETWORK" ||
+    (error.response?.status ?? 0) >= 500 ||
+    error.response?.status === 503;
+
+  if (isNetworkOrServerError) {
+    return "Unable to connect to the server. Please check your network connection and try again.";
+  }
+
+  const msg: string = error.response?.data?.message || error.message || "";
+
+  // Catch any Prisma/DB technical messages that slipped through
+  if (
+    msg.includes("prisma.") ||
+    msg.includes("Can't reach") ||
+    msg.includes("ECONNREFUSED") ||
+    msg.includes("Connection refused") ||
+    msg.includes("PrismaClient") ||
+    msg.includes("supabase.com") ||
+    msg.includes("server/db.ts") ||
+    msg.includes("D:\\Download")
+  ) {
+    return "Unable to connect to the server. Please check your network connection and try again.";
+  }
+
+  return msg || "An unexpected error occurred. Please try again.";
+}
 
 interface CompleteGoalResponse {
   success: boolean;
@@ -10,12 +64,51 @@ interface CompleteGoalResponse {
   log: GoalLog;
 }
 
+function getLogDedupeKey(log: Pick<GoalLog, "goal_id" | "completed_at" | "note">): string {
+  return [
+    log.goal_id,
+    log.completed_at,
+    (log.note || "").trim(),
+  ].join("|");
+}
+
+function normalizeHistory(history: HistoryData[]): HistoryData[] {
+  const seenIds = new Set<string>();
+  const seenKeys = new Set<string>();
+  const days = new Map<string, HistoryData>();
+
+  history.forEach((day) => {
+    const existingDay = days.get(day.date) || { date: day.date, count: 0, logs: [] };
+
+    (day.logs || []).forEach((log) => {
+      const key = getLogDedupeKey(log);
+      if (seenIds.has(log.id) || seenKeys.has(key)) {
+        return;
+      }
+
+      seenIds.add(log.id);
+      seenKeys.add(key);
+      existingDay.logs.push(log);
+    });
+
+    existingDay.count = existingDay.logs.length;
+    days.set(day.date, existingDay);
+  });
+
+  return Array.from(days.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 interface GoalState {
   goals: Goal[];
   stats: DashboardStats | null;
   history: HistoryData[];
   loading: boolean;
   error: string | null;
+  isOffline: boolean;
+  isSyncing: boolean;
+  setIsOffline: (isOffline: boolean) => void;
+  setIsSyncing: (isSyncing: boolean) => void;
+  clearError: () => void;
   fetchGoals: () => Promise<void>;
   fetchStats: () => Promise<void>;
   fetchHistory: (from?: string, to?: string) => Promise<void>;
@@ -39,36 +132,195 @@ export const useGoalStore = create<GoalState>((set, get) => ({
   history: [],
   loading: false,
   error: null,
+  isOffline: typeof navigator !== "undefined" ? !navigator.onLine : false,
+  isSyncing: false,
+
+  setIsOffline: (isOffline) => set({ isOffline }),
+  setIsSyncing: (isSyncing) => set({ isSyncing }),
+  clearError: () => set({ error: null }),
 
   fetchGoals: async () => {
     set({ loading: true, error: null });
+
+    const mergePending = async (fetchedGoals: Goal[]) => {
+      const pending = await getPendingQueue();
+      if (pending.length === 0) return fetchedGoals;
+      
+      return fetchedGoals.map((g: Goal) => {
+        const pendingCompletions = pending.filter((p) => p.goalId === g.id && p.action === "complete");
+        if (pendingCompletions.length > 0) {
+          const newCount = g.current_count + pendingCompletions.length;
+          return {
+            ...g,
+            current_count: newCount,
+            status: newCount >= g.target_count ? "completed" : g.status,
+          };
+        }
+        return g;
+      });
+    };
+
+    const loadCachedGoals = async () => {
+      const cached = await getCachedMetadata("goals");
+      if (cached) {
+        const goalsWithPending = await mergePending(cached);
+        set({ goals: goalsWithPending, loading: false });
+        return true;
+      }
+      return false;
+    };
+
+    if (!navigator.onLine) {
+      const loaded = await loadCachedGoals();
+      if (loaded) return;
+    }
+
     try {
       const response = await api.get("/api/goals");
-      set({ goals: response.data.goals, loading: false });
+      const serverGoals = response.data.goals;
+      
+      // Cache the raw server data
+      await setCachedMetadata("goals", serverGoals);
+      
+      // Always merge pending offline queue, in case sync hasn't finished yet
+      const goalsWithPending = await mergePending(serverGoals);
+      
+      set({ goals: goalsWithPending, loading: false });
     } catch (error: any) {
-      const msg = error.response?.data?.message || "Failed to fetch goals.";
+      const isNetworkOrServerError = !error.response || error.code === "ERR_NETWORK" || (error.response?.status ?? 0) >= 500;
+      if (isNetworkOrServerError) {
+        const loaded = await loadCachedGoals();
+        if (loaded) return;
+      }
+      // Don't show fetch error if we have cached data from a previous load
+      const hasCachedGoals = (await getCachedMetadata("goals")) !== null;
+      if (hasCachedGoals) {
+        set({ loading: false });
+        return;
+      }
+      const msg = sanitizeApiError(error);
       set({ error: msg, loading: false });
     }
   },
 
   fetchStats: async () => {
+    const loadCachedStats = async () => {
+      const cached = await getCachedMetadata("stats");
+      if (cached) {
+        set({ stats: cached });
+        return true;
+      }
+      return false;
+    };
+
+    if (!navigator.onLine) {
+      const loaded = await loadCachedStats();
+      if (loaded) return;
+    }
+
     try {
       const response = await api.get("/api/stats/dashboard");
       set({ stats: response.data.stats });
+      // Cache it
+      await setCachedMetadata("stats", response.data.stats);
     } catch (error: any) {
-      console.error("Failed to fetch dashboard stats", error);
+      const isNetworkOrServerError = !error.response || error.code === "ERR_NETWORK" || (error.response?.status ?? 0) >= 500;
+      if (isNetworkOrServerError) {
+        await loadCachedStats();
+        return;
+      }
+      console.error("Failed to fetch dashboard stats", sanitizeApiError(error));
     }
   },
 
   fetchHistory: async (from, to) => {
+    const mergeHistoryPending = async (fetchedHistory: HistoryData[]) => {
+      const pending = await getPendingQueue();
+      const normalizedHistory = normalizeHistory(fetchedHistory);
+      if (pending.length === 0) return normalizedHistory;
+      
+      // Deep clone to avoid mutating cache directly
+      const newHistory: HistoryData[] = JSON.parse(JSON.stringify(normalizedHistory));
+      const seenLogIds = new Set<string>();
+      const seenLogKeys = new Set<string>();
+
+      newHistory.forEach((h) => {
+        h.logs.forEach((log) => {
+          seenLogIds.add(log.id);
+          seenLogKeys.add(getLogDedupeKey(log));
+        });
+      });
+      
+      pending.forEach((p) => {
+        if (p.action === "complete") {
+          const dateStr = p.payload.completed_at?.split("T")[0] || new Date().toISOString().split("T")[0];
+          const newLog: GoalLog = {
+            id: p.id,
+            goal_id: p.goalId,
+            user_id: "local",
+            completed_at: p.payload.completed_at || new Date().toISOString(),
+            note: p.payload.note || null,
+            created_at: p.payload.completed_at || new Date().toISOString(),
+          };
+          const dedupeKey = getLogDedupeKey(newLog);
+
+          if (seenLogIds.has(newLog.id) || seenLogKeys.has(dedupeKey)) {
+            return;
+          }
+
+          seenLogIds.add(newLog.id);
+          seenLogKeys.add(dedupeKey);
+
+          const dayIndex = newHistory.findIndex((h: HistoryData) => h.date === dateStr);
+          
+          if (dayIndex >= 0) {
+            newHistory[dayIndex].logs.push(newLog);
+            newHistory[dayIndex].count++;
+          } else {
+            newHistory.push({
+              date: dateStr,
+              count: 1,
+              logs: [newLog]
+            });
+          }
+        }
+      });
+      return normalizeHistory(newHistory);
+    };
+
+    const loadCachedHistory = async () => {
+      const cached = await getCachedMetadata("history");
+      if (cached) {
+        const merged = await mergeHistoryPending(cached);
+        set({ history: merged });
+        return true;
+      }
+      return false;
+    };
+
+    if (!navigator.onLine) {
+      const loaded = await loadCachedHistory();
+      if (loaded) return;
+    }
+
     try {
       const params: any = {};
       if (from) params.from = from;
       if (to) params.to = to;
       const response = await api.get("/api/stats/history", { params });
-      set({ history: response.data.history });
+      
+      const serverHistory = normalizeHistory(response.data.history);
+      await setCachedMetadata("history", serverHistory);
+      
+      const mergedHistory = await mergeHistoryPending(serverHistory);
+      set({ history: mergedHistory });
     } catch (error: any) {
-      console.error("Failed to fetch statistics histories", error);
+      const isNetworkOrServerError = !error.response || error.code === "ERR_NETWORK" || (error.response?.status ?? 0) >= 500;
+      if (isNetworkOrServerError) {
+        await loadCachedHistory();
+        return;
+      }
+      console.error("Failed to fetch statistics histories", sanitizeApiError(error));
     }
   },
 
@@ -86,7 +338,7 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       // Automatically refresh overview stats
       get().fetchStats();
     } catch (error: any) {
-      const msg = error.response?.data?.message || "Failed to create a new goal.";
+      const msg = sanitizeApiError(error);
       set({ error: msg, loading: false });
       throw new Error(msg);
     }
@@ -105,7 +357,7 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
       get().fetchStats();
     } catch (error: any) {
-      const msg = error.response?.data?.message || "Failed to update the goal.";
+      const msg = sanitizeApiError(error);
       set({ error: msg, loading: false });
       throw new Error(msg);
     }
@@ -121,15 +373,67 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       }));
       get().fetchStats();
     } catch (error: any) {
-      const msg = error.response?.data?.message || "Failed to delete the goal.";
+      const msg = sanitizeApiError(error);
       set({ error: msg, loading: false });
       throw new Error(msg);
     }
   },
 
   completeGoalProgress: async (id, note) => {
+    const isOffline = !navigator.onLine;
+    const logId = generateUUID();
+    const completedAt = new Date().toISOString();
+
+    if (isOffline) {
+      // Save to syncQueue in IndexedDB
+      await addToSyncQueue({
+        id: logId,
+        action: "complete",
+        goalId: id,
+        payload: { note, completed_at: completedAt },
+        timestamp: Date.now(),
+      });
+
+      // Update local state in memory immediately
+      let updatedGoal: Goal | null = null;
+      set((state) => {
+        const newGoals = state.goals.map((g) => {
+          if (g.id === id) {
+            const nextCount = g.current_count + 1;
+            updatedGoal = {
+              ...g,
+              current_count: nextCount,
+              status: nextCount >= g.target_count ? "completed" : "active",
+            };
+            return updatedGoal;
+          }
+          return g;
+        });
+        return { goals: newGoals };
+      });
+
+      // Return simulated response so the dashboard countdown operates
+      return {
+        success: true,
+        message: "Offline progress queued.",
+        goal: updatedGoal!,
+        log: {
+          id: logId,
+          goal_id: id,
+          user_id: "offline",
+          completed_at: completedAt,
+          note: note || null,
+          created_at: completedAt,
+        },
+      };
+    }
+
     try {
-      const response = await api.post(`/api/goals/${id}/complete`, { note });
+      const response = await api.post(`/api/goals/${id}/complete`, {
+        note,
+        completed_at: completedAt,
+        log_id: logId,
+      });
       const updatedGoal = response.data.goal;
 
       set((state) => ({
@@ -143,13 +447,34 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       // Return log data so caller can use its ID
       return response.data;
     } catch (error: any) {
-      const msg = error.response?.data?.message || "Failed to complete goal progress.";
+      const msg = sanitizeApiError(error);
       set({ error: msg });
       throw new Error(msg);
     }
   },
 
-  deleteLogProgress: async (logId, _goalId) => {
+  deleteLogProgress: async (logId, goalId) => {
+    const pendingAction = await getSyncAction(logId);
+    if (pendingAction) {
+      const targetGoalId = goalId || pendingAction.goalId;
+      await removeFromSyncQueue(logId);
+      set((state) => {
+        const newGoals = state.goals.map((g) => {
+          if (g.id === targetGoalId) {
+            const nextCount = Math.max(0, g.current_count - 1);
+            return {
+              ...g,
+              current_count: nextCount,
+              status: nextCount >= g.target_count ? "completed" : "active",
+            };
+          }
+          return g;
+        });
+        return { goals: newGoals };
+      });
+      return;
+    }
+
     try {
       const response = await api.delete(`/api/goals/logs/${logId}`);
       const updatedGoal = response.data.goal;

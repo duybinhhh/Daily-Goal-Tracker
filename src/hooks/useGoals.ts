@@ -1,7 +1,7 @@
-// src/hooks/useGoals.ts
 import { useEffect, useState } from "react";
 import { useGoalStore } from "../store/goalStore";
 import { useAuthStore } from "../store/authStore";
+import { syncOfflineData } from "../services/syncManager";
 
 export const useGoals = (filterCategory: string = "All") => {
   const { isAuthenticated } = useAuthStore();
@@ -50,6 +50,7 @@ export const useGoals = (filterCategory: string = "All") => {
     loading,
     error,
     refreshAll: async () => {
+      await syncOfflineData();
       await Promise.all([fetchGoals(), fetchStats(), fetchHistory()]);
     },
     createGoal,

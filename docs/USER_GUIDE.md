@@ -50,6 +50,13 @@ Khi bạn thực hiện check-in thói quen và đạt chỉ tiêu mục tiêu t
 3. Nếu bạn vô tình click nhầm, hãy nhấn **Undo** ngay lập tức để rút lại lượt check-in đó.
 4. Sau 5 giây, nếu không có hành động hoàn tác, mục tiêu đã hoàn thành sẽ tự động **ẩn đi** để giảm tải thông tin, giữ cho màn hình chính luôn gọn gàng và tập trung vào các thói quen chưa làm.
 
+### 2.3. Cài đặt PWA & Chế độ Ngoại tuyến (Offline Mode & Sync)
+* **Cài đặt PWA lên điện thoại/máy tính:** Khi truy cập trang web, bạn sẽ thấy biểu tượng **Tải xuống/Cài đặt** (Install) ở thanh địa chỉ trình duyệt. Hãy nhấn cài đặt để tạo biểu tượng ứng dụng trực tiếp trên màn hình chính như một app di động thực thụ.
+* **Hoạt động Ngoại tuyến:** Khi đi chạy bộ ngoài công viên hoặc ở phòng tập gym tầng hầm không có sóng 4G/Wifi, bạn vẫn mở được app và check-in bình thường:
+  - Header Dashboard sẽ hiển thị huy hiệu màu cam **Offline Mode** báo hiệu bạn đang làm việc ngoại tuyến.
+  - Các check-in được ghi nhận ngay lập tức trên màn hình và lưu tạm thời dưới trình duyệt (IndexedDB). Hệ thống có cơ chế bảo vệ thông minh, ngăn chặn click dồn dập (double-click) hoặc gửi trùng lặp bản ghi kể cả khi mạng chập chờn.
+  - Khi thiết bị có mạng lại, hệ thống hiện huy hiệu xoay tròn **Syncing...** màu xanh lá và tự động đồng bộ hóa các lượt check-in cũ lên Server với đúng mốc giờ bạn check-in lúc offline. Quá trình đồng bộ này được đồng bộ hóa an toàn giữa các tab trình duyệt (sử dụng khóa hệ thống Web Locks) nên bạn hoàn toàn yên tâm nếu đang mở nhiều tab Momentum cùng lúc.
+
 ---
 
 ## 3. Quản Lý Danh Sách Mục Tiêu (My Goals)
@@ -148,7 +155,11 @@ Trang cài đặt (`/settings`) giúp bạn cá nhân hóa hoàn toàn trải ng
 > Khi bạn đổi múi giờ, thuật toán **Streak Engine** sẽ lập tức tính toán lại toàn bộ lịch sử check-in theo mốc giờ mới của bạn. Điều này đảm bảo tính trung thực của chuỗi ngày liên tục kể cả khi bạn di chuyển sang các quốc gia khác nhau.
 
 **Q: Tôi có thể sử dụng ứng dụng ngoại tuyến (Offline) không?**
-> Ứng dụng hiện tại yêu cầu kết nối mạng để đồng bộ thông tin với máy chủ lưu trữ. Nếu bạn muốn sao lưu ngoại tuyến, hãy sử dụng tính năng **Export My Data** trong trang Settings để tải file JSON về máy tính cá nhân.
+> **HOÀN TOÀN CÓ THỂ!** Momentum hiện tại đã là một Progressive Web App (PWA) đầy đủ. Bạn có thể cài đặt ứng dụng lên màn hình chính điện thoại hoặc máy tính. Khi mất kết nối mạng:
+> 1. Giao diện ứng dụng vẫn tải bình thường nhờ Service Worker cache.
+> 2. Dữ liệu thói quen và dashboard được khôi phục từ cơ sở dữ liệu IndexedDB của trình duyệt.
+> 3. Bạn có thể bấm check-in hoặc hoàn tác (Undo) bình thường. Bản ghi sẽ được xếp vào hàng đợi chờ đồng bộ. Trạng thái giao diện luôn hiển thị mượt mà và không lo bị gửi đúp log nhờ cơ chế khóa click dồn dập và cơ chế UUID định danh.
+> 4. Khi thiết bị có mạng trở lại, hệ thống sẽ tự động đồng bộ hóa an toàn (chỉ một tab xử lý đồng bộ nhờ Web Locks API) và gửi dữ liệu check-in lên máy chủ với đúng giờ giấc ban đầu bạn thực hiện, đảm bảo chuỗi Streak của bạn không bao giờ bị đứt gãy! Giao diện cũng sẽ tự động hợp nhất hàng đợi ngoại tuyến nên không hề có hiện tượng giật lag giật lại trạng thái cũ!
 
 ---
 *Chúc bạn có những trải nghiệm tuyệt vời và duy trì được kỷ luật bản thân xuất sắc cùng **Momentum**!*

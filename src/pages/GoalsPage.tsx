@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useGoals } from "../hooks/useGoals";
 import { useAuthStore } from "../store/authStore";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { useGoalStore } from "../store/goalStore";
+import { AlertCircle, RefreshCw, WifiOff } from "lucide-react";
 
 const CATEGORY_ICONS: Record<string, string> = {
   health: "water_drop",
@@ -42,6 +43,7 @@ const getCategoryStyles = (category: string) => {
 export default function GoalsPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { isOffline } = useGoalStore();
   const {
     goals,
     loading,
@@ -57,6 +59,7 @@ export default function GoalsPage() {
   const [sortBy, setSortBy] = useState<"priority" | "recent" | "streak">("priority");
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [offlineActionMsg, setOfflineActionMsg] = useState<string | null>(null);
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -74,6 +77,11 @@ export default function GoalsPage() {
   }, []);
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
+    if (isOffline) {
+      setOfflineActionMsg("Pausing or resuming goals requires a connection. Please try again when you are online.");
+      setActiveMenuId(null);
+      return;
+    }
     const nextStatus = currentStatus === "paused" ? "active" : "paused";
     try {
       await updateGoal(id, { status: nextStatus });
@@ -84,6 +92,11 @@ export default function GoalsPage() {
   };
 
   const handleDelete = async (id: string, title: string) => {
+    if (isOffline) {
+      setOfflineActionMsg("Deleting goals requires a connection. Please try again when you are online.");
+      setActiveMenuId(null);
+      return;
+    }
     if (window.confirm(`Delete goal "${title}"?`)) {
       try {
         await deleteGoal(id);
@@ -195,41 +208,97 @@ export default function GoalsPage() {
               <span>{bestCurrentStreak} Day Streak</span>
             </div>
           )}
+          {isOffline && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ background: "rgba(255,140,0,0.12)", color: "#fb923c", border: "1px solid rgba(255,140,0,0.25)" }}>
+              <WifiOff size={12} />
+              Offline
+            </div>
+          )}
           <button onClick={refreshAll} className="btn-ghost" title="Refresh">
             <RefreshCw size={14} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
-          <Link to="/new-goal" className="btn-primary">
-            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
-              add
-            </span>
-            <span className="hidden sm:inline">New Goal</span>
-          </Link>
+          {isOffline ? (
+            <div className="btn-primary opacity-50 cursor-not-allowed" style={{ pointerEvents: "none" }} title="Network required">
+              <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>cloud_off</span>
+              <span className="hidden sm:inline">New Goal</span>
+            </div>
+          ) : (
+            <Link to="/new-goal" className="btn-primary">
+              <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>add</span>
+              <span className="hidden sm:inline">New Goal</span>
+            </Link>
+          )}
         </div>
       </header>
 
       {/* ── Main Canvas ── */}
       <main className="flex-1 flex flex-col gap-6 py-5 px-4 md:p-6">
         
-        {/* Error Banner */}
-        {error && (
+        {/* Offline Action Error Banner */}
+        {offlineActionMsg && (
           <div
             style={{
               padding: "12px 16px",
-              background: "rgba(255, 180, 171, 0.08)",
-              border: "1px solid rgba(255, 180, 171, 0.2)",
+              background: "rgba(255, 140, 0, 0.08)",
+              border: "1px solid rgba(255, 140, 0, 0.25)",
               borderRadius: "0.75rem",
-              color: "var(--color-error)",
+              color: "#fb923c",
               fontSize: "13px",
               display: "flex",
               alignItems: "center",
+              justifyContent: "space-between",
               gap: "8px",
             }}
           >
-            <AlertCircle size={16} />
-            {error}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <WifiOff size={16} />
+              {offlineActionMsg}
+            </div>
+            <button
+              onClick={() => setOfflineActionMsg(null)}
+              style={{ fontSize: "18px", lineHeight: 1, cursor: "pointer", opacity: 0.7, background: "none", border: "none", color: "#fb923c" }}
+            >
+              &times;
+            </button>
           </div>
         )}
+
+        {/* Error Banner — orange for connection issues, red for real errors */}
+        {error && (() => {
+          const isConnErr = error.toLowerCase().includes("unable to connect") ||
+            error.toLowerCase().includes("network") ||
+            error.toLowerCase().includes("database server") ||
+            error.toLowerCase().includes("check your") ||
+            error.toLowerCase().includes("try again");
+          return (
+            <div
+              style={{
+                padding: "12px 16px",
+                background: isConnErr ? "rgba(255, 140, 0, 0.08)" : "rgba(255, 180, 171, 0.08)",
+                border: isConnErr ? "1px solid rgba(255, 140, 0, 0.25)" : "1px solid rgba(255, 180, 171, 0.2)",
+                borderRadius: "0.75rem",
+                color: isConnErr ? "#fb923c" : "var(--color-error)",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "8px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {isConnErr ? <WifiOff size={16} /> : <AlertCircle size={16} />}
+                {error}
+              </div>
+              <button
+                onClick={() => useGoalStore.getState().clearError()}
+                style={{ fontSize: "18px", lineHeight: 1, cursor: "pointer", opacity: 0.6, background: "none", border: "none", color: "inherit" }}
+              >
+                &times;
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Filters & Status Section */}
         <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -355,22 +424,39 @@ export default function GoalsPage() {
                             <button
                               onClick={() => handleToggleStatus(goal.id, goal.status)}
                               className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
+                              disabled={isOffline}
+                              style={isOffline ? { opacity: 0.45, cursor: "not-allowed" } : {}}
+                              title={isOffline ? "Requires connection" : undefined}
                             >
                               <span className="material-symbols-outlined text-[16px]">
                                 {isPaused ? "play_arrow" : "pause"}
                               </span>
                               {isPaused ? "Resume" : "Pause"}
                             </button>
-                            <Link
-                              to={`/edit-goal/${goal.id}`}
-                              className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
-                            >
-                              <span className="material-symbols-outlined text-[16px]">edit</span>
-                              Edit
-                            </Link>
+                            {isOffline ? (
+                              <div
+                                className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 rounded text-left w-full"
+                                style={{ opacity: 0.45, cursor: "not-allowed", color: "var(--color-on-surface)" }}
+                                title="Requires connection"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">edit</span>
+                                Edit
+                              </div>
+                            ) : (
+                              <Link
+                                to={`/edit-goal/${goal.id}`}
+                                className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">edit</span>
+                                Edit
+                              </Link>
+                            )}
                             <button
                               onClick={() => handleDelete(goal.id, goal.title)}
                               className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-rose-500/10 hover:text-rose-400 rounded text-left w-full text-rose-400"
+                              disabled={isOffline}
+                              style={isOffline ? { opacity: 0.45, cursor: "not-allowed" } : {}}
+                              title={isOffline ? "Requires connection" : undefined}
                             >
                               <span className="material-symbols-outlined text-[16px]">delete</span>
                               Delete
@@ -456,17 +542,19 @@ export default function GoalsPage() {
             })}
 
             {/* Create New Goal button card */}
-            <button
-              onClick={() => navigate("/new-goal")}
-              className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-on-surface-variant hover:border-primary/50 hover:bg-white/5 transition-all group active:scale-95 duration-200"
-              style={{ minHeight: "220px" }}
-            >
-              <div className="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
-                <span className="material-symbols-outlined text-[28px] group-hover:text-primary">add_circle</span>
-              </div>
-              <p className="text-md font-bold mb-1">Create New Goal</p>
-              <p className="text-xs opacity-60">Set a target and start tracking</p>
-            </button>
+            {!isOffline && (
+              <button
+                onClick={() => navigate("/new-goal")}
+                className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-on-surface-variant hover:border-primary/50 hover:bg-white/5 transition-all group active:scale-95 duration-200"
+                style={{ minHeight: "220px" }}
+              >
+                <div className="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
+                  <span className="material-symbols-outlined text-[28px] group-hover:text-primary">add_circle</span>
+                </div>
+                <p className="text-md font-bold mb-1">Create New Goal</p>
+                <p className="text-xs opacity-60">Set a target and start tracking</p>
+              </button>
+            )}
 
           </div>
         )}
@@ -525,14 +613,16 @@ export default function GoalsPage() {
 
       </main>
 
-      {/* Floating Action Button (FAB) */}
-      <button
-        onClick={() => navigate("/new-goal")}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary text-on-primary shadow-[0_0_24px_rgba(192,193,255,0.4)] flex items-center justify-center group hover:scale-110 active:scale-95 transition-all duration-300 z-40"
-      >
-        <span className="material-symbols-outlined text-[28px]">add</span>
-        <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-20 group-hover:opacity-40 pointer-events-none"></div>
-      </button>
+      {/* Floating Action Button (FAB) - hidden offline */}
+      {!isOffline && (
+        <button
+          onClick={() => navigate("/new-goal")}
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary text-on-primary shadow-[0_0_24px_rgba(192,193,255,0.4)] flex items-center justify-center group hover:scale-110 active:scale-95 transition-all duration-300 z-40"
+        >
+          <span className="material-symbols-outlined text-[28px]">add</span>
+          <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-20 group-hover:opacity-40 pointer-events-none"></div>
+        </button>
+      )}
     </div>
   );
 }

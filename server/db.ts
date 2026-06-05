@@ -177,9 +177,10 @@ class PrismaDB {
       const log = await prisma.goalLog.findUnique({ where: { id: where.id } });
       return mapGoalLog(log);
     },
-    create: async (data: { goal_id: string; user_id: string; completed_at?: string; note?: string | null }) => {
+    create: async (data: { id?: string; goal_id: string; user_id: string; completed_at?: string; note?: string | null }) => {
       const created = await prisma.goalLog.create({
         data: {
+          id: data.id,
           goal_id: data.goal_id,
           user_id: data.user_id,
           completed_at: data.completed_at ? new Date(data.completed_at) : new Date(),

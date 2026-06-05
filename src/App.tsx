@@ -12,6 +12,9 @@ import { SettingsPage } from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
 import GoalsPage from "./pages/GoalsPage";
 
+import { useGoalStore } from "./store/goalStore";
+import { syncOfflineData } from "./services/syncManager";
+
 // Auth Guard for protected workspace screens
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -27,9 +30,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
 export default function App() {
   const { checkAuth } = useAuthStore();
+  const { setIsOffline } = useGoalStore();
+  const syncInitialized = React.useRef(false);
 
   useEffect(() => {
     checkAuth();
+    
     const savedTheme = localStorage.getItem("setting_theme") || "light";
     if (savedTheme === "light") {
       document.documentElement.classList.add("light");
@@ -38,7 +44,40 @@ export default function App() {
       document.documentElement.classList.add("dark");
       document.documentElement.classList.remove("light");
     }
-  }, [checkAuth]);
+
+    // Debounce timer ref for online event
+    let onlineDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleOnline = () => {
+      setIsOffline(false);
+      // Debounce: network "online" can fire multiple times in quick succession
+      if (onlineDebounceTimer) clearTimeout(onlineDebounceTimer);
+      onlineDebounceTimer = setTimeout(() => {
+        syncOfflineData();
+      }, 500);
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      if (onlineDebounceTimer) clearTimeout(onlineDebounceTimer);
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // Run initial connectivity verification — only once (guards against StrictMode double-invoke)
+    setIsOffline(!navigator.onLine);
+    if (navigator.onLine && !syncInitialized.current) {
+      syncInitialized.current = true;
+      syncOfflineData();
+    }
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      if (onlineDebounceTimer) clearTimeout(onlineDebounceTimer);
+    };
+  }, [checkAuth, setIsOffline]);
+
 
   return (
     <HashRouter>

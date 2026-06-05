@@ -1,6 +1,6 @@
-# 🛡️ VIBE PROCESS VERIFICATION: UNDO LOG, DISAPPEARING GOALS & UX OPTIMIZATION
+# 🛡️ VIBE PROCESS VERIFICATION: PWA OFFLINE MODE, UNDO LOG & UX OPTIMIZATION
 
-Tài liệu này chứng minh và ghi nhận chi tiết quá trình phát triển các tính năng mới (**Hoàn tác tiến độ - Undo Log**, **Hiệu ứng biến mất 5s trên Dashboard**, **Xóa log từ Timeline**, **Đồng bộ tính lại Streak**, **Cân đối màn Đăng nhập**, **Sticky Action Bar trong Settings** và **Mặc định Theme Sáng**) tuân thủ nghiêm ngặt theo quy trình 4 bước chuẩn hóa: **Plan (Lập kế hoạch) -> Doc (Tài liệu hóa) -> Build (Xây dựng) -> Test (Kiểm thử & Nghiệm thu)**.
+Tài liệu này chứng minh và ghi nhận chi tiết quá trình phát triển các tính năng mới (**Chế độ Ngoại tuyến & Đồng bộ hóa sau - Offline Mode & Sync**, **Hoàn tác tiến độ - Undo Log**, **Hiệu ứng biến mất 5s trên Dashboard**, **Xóa log từ Timeline**, **Đồng bộ tính lại Streak**, **Cân đối màn Đăng nhập**, **Sticky Action Bar trong Settings** và **Mặc định Theme Sáng**) tuân thủ nghiêm ngặt theo quy trình 4 bước chuẩn hóa: **Plan (Lập kế hoạch) -> Doc (Tài liệu hóa) -> Build (Xây dựng) -> Test (Kiểm thử & Nghiệm thu)**.
 
 ---
 
@@ -19,6 +19,10 @@ Giai đoạn này xác định mục tiêu, giải pháp kỹ thuật và sơ đ
     *   Đăng nhập/Đăng ký: Cân đối và căn giữa màn hình Login/Register (`width: 100%`).
     *   Cài đặt (Settings): Chuyển đổi các nút Save/Discard thành một thanh nổi cố định (Sticky Floating Bar) ở cuối trang để người dùng không phải cuộn màn hình xuống dưới. Thiết lập Theme sáng làm mặc định ban đầu.
     *   Form tạo mục tiêu: Thay thế các mã màu Tailwind cứng bằng mã màu biến ngữ nghĩa để thích ứng động với hai chế độ sáng/tối.
+*   **Chế độ Ngoại tuyến & Đồng bộ hóa sau (Offline Mode & Sync)**:
+    *   Yêu cầu: Người dùng có thể check-in thói quen ngay cả khi không có sóng 4G/Wifi (ví dụ: chạy bộ ở công viên, tập gym tầng hầm, trên máy bay).
+    *   Hạ tầng: Chuyển đổi ứng dụng thành PWA (Progressive Web App) với Web App Manifest và Service Worker để lưu cache giao diện shell hoàn toàn ngoại tuyến.
+    *   Giải pháp: Tích hợp IndexedDB dưới trình duyệt làm kho lưu trữ đệm cho dữ liệu danh sách mục tiêu/chỉ số và làm hàng đợi (syncQueue) lưu tạm các check-in offline. Tự động lắng nghe sự kiện `online` để kích hoạt trình đồng bộ `syncOfflineData` đưa dữ liệu lên Server, đồng thời tính toán lại Streak chính xác theo mốc thời gian thực hiện ban đầu (`completed_at`).
 
 ---
 
@@ -35,11 +39,16 @@ Quá trình lập trình được tiến hành tuần tự từ cơ sở dữ li
 1.  **Backend & Database**:
     *   Cập nhật [db.ts](file:///d:/Download/daily-goal-tracker/server/db.ts) để thêm phương thức `delete` và `findUnique` cho Helper logs của Prisma.
     *   Xây dựng controller `deleteLog` và hàm logic `recalculateStreak` dựa trên múi giờ của người dùng tại [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts).
+    *   Cập nhật controller `completeGoal` tại [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts) để chấp nhận tham số `completed_at` tùy chọn từ client nhằm đồng bộ chính xác thời gian ghi nhận thói quen lúc ngoại tuyến.
     *   Đăng ký tuyến đường `DELETE /logs/:logId` trong [goals.ts](file:///d:/Download/daily-goal-tracker/src/routes/goals.ts).
-2.  **Zustand Store**:
-    *   Thêm action `deleteLogProgress` vào [goalStore.ts](file:///d:/Download/daily-goal-tracker/src/store/goalStore.ts) để gọi API xóa log và tự động làm mới thống kê (`fetchStats()`, `fetchHistory()`).
+2.  **Zustand Store & Local Storage Services**:
+    *   Xây dựng lớp tiện ích IndexedDB tại [indexedDb.ts](file:///d:/Download/daily-goal-tracker/src/services/indexedDb.ts) gồm hai kho lưu trữ `metadata` (lưu cache tĩnh cho goals, stats, history) và `syncQueue` (hàng đợi check-in offline).
+    *   Xây dựng trình đồng bộ dữ liệu tại [syncManager.ts](file:///d:/Download/daily-goal-tracker/src/services/syncManager.ts) tự động đẩy các tác vụ hoàn thành từ hàng đợi IndexedDB lên Server khi phục hồi kết nối. Tích hợp **Web Locks API** (`navigator.locks`) cùng fallback **LocalStorage Lock** (timeout 10s) để ngăn tranh chấp đồng bộ giữa nhiều tab trình duyệt đang mở cùng lúc.
+    *   Cập nhật [goalStore.ts](file:///d:/Download/daily-goal-tracker/src/store/goalStore.ts) hỗ trợ các biến trạng thái `isOffline`, `isSyncing` và tự động đọc dữ liệu từ cache IndexedDB kèm bù trừ số đếm tạm thời khi mất kết nối mạng. Đồng thời nâng cấp `fetchGoals` và `fetchHistory` để tự động gộp hàng đợi ngoại tuyến `syncQueue` vào dữ liệu server tải về, triệt tiêu lỗi quay ngược trạng thái khi chuyển mạng.
+    *   Thiết lập cơ chế sinh UUID ngẫu nhiên tại client (`log_id`) ngay khi nhấn check-in để làm Primary Key cho log check-in ở backend DB, đảm bảo tính idempotency tuyệt đối.
 3.  **UI & Components**:
-    *   **Dashboard & GoalCard:** Thêm state `disappearingGoals` quản lý bộ đếm thời gian 5s trong [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx). Thiết kế giao diện đếm ngược kèm nút "Undo" trong [GoalCard.tsx](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx).
+    *   **PWA Setup**: Tạo cấu hình [manifest.json](file:///d:/Download/daily-goal-tracker/public/manifest.json) để ứng dụng có thể cài đặt lên màn hình chính, viết Service Worker [sw.js](file:///d:/Download/daily-goal-tracker/public/sw.js) để cache giao diện chạy offline, liên kết manifest trong [index.html](file:///d:/Download/daily-goal-tracker/index.html) và đăng ký Service Worker trong [main.tsx](file:///d:/Download/daily-goal-tracker/src/main.tsx).
+    *   **Dashboard & GoalCard:** Thêm state `disappearingGoals` quản lý bộ đếm thời gian 5s trong [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx). Thiết kế giao diện đếm ngược kèm nút "Undo" trong [GoalCard.tsx](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx). Thêm các huy hiệu hiển thị trạng thái mạng ("Offline Mode" màu cam và "Syncing..." màu xanh lá) nổi bật trên thanh Header tại [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx).
     *   **Timeline:** Thêm nút xóa log check-in kế bên mỗi mục lịch sử và tích hợp hàm gọi xác nhận trong [TimelinePage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/TimelinePage.tsx).
     *   **Settings:** Cài đặt mặc định theme là `light` thay vì `dark`. Di chuyển cụm Save/Discard vào khung kính mờ `glass-card sticky bottom-4 md:bottom-6 z-30` tại [SettingsPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/SettingsPage.tsx).
     *   **LoginPage:** Thêm class `w-full` và kiểu `width: "100%"` cho wrapper ngoài cùng để sửa lỗi căn lệch màn hình.
@@ -68,3 +77,11 @@ Quá trình kiểm thử đã được chạy trực tiếp trên môi trường
     - Truy cập `/settings`, thanh tác vụ chứa nút Save Preferences và Discard Changes luôn nổi cố định ở cuối trang với nền kính mờ sang trọng, giúp thao tác nhanh chóng và tiện lợi ở mọi độ cuộn.
 *   **Default Theme Test (Đạt)**:
     - Xóa bộ nhớ `localStorage` và tải lại trang, hệ thống tự động khởi tạo bằng giao diện màu sáng (Light Theme) dịu mắt, các thẻ kính mờ trắng đục hiển thị sắc nét.
+*   **PWA & Offline Mode & Sync Test (Đạt)**:
+    1. **Kiểm thử Cài đặt PWA**: DevTools xác nhận đăng ký thành công Service Worker `/sw.js` và đọc đúng tệp `manifest.json` chứa cấu hình ứng dụng.
+    2. **Kiểm thử Hoạt động Ngoại tuyến**: Ngắt kết nối mạng (Network Offline trong DevTools). Tải lại trang, ứng dụng vẫn hiển thị đầy đủ giao diện cùng danh sách thói quen (đọc từ cache IndexedDB) mà không bị lỗi kết nối hay trắng trang.
+    3. **Kiểm thử Check-in & Hoàn tác Ngoại tuyến**: Bấm check-in thói quen khi offline. Tiến trình tăng lên tức thì trong UI, hệ thống hiện khung đếm ngược 5 giây cùng nút **Undo**. Khi thời gian hết, thẻ ẩn đi và bản ghi được đẩy vào hàng đợi `syncQueue` trong IndexedDB. Thử nghiệm bấm **Undo** khi offline: bản ghi tương ứng được xóa khỏi hàng đợi IndexedDB và tiến độ giảm trở lại bình thường.
+    4. **Kiểm thử Ngăn chặn Trùng lặp (UI Concurrency & Idempotency)**: Click dồn dập nhiều lần hoặc giữ phím Enter trên nút check-in khi offline. Nhờ trạng thái guard `completing` ở `GoalCard`, giao diện chỉ ghi nhận đúng 1 check-in và chỉ sinh ra duy nhất 1 bản ghi `syncQueue` tương ứng với 1 mã UUID. Khi đồng bộ hóa, Backend nhận UUID làm Primary Key của bảng GoalLog, loại bỏ hoàn toàn nguy cơ sinh nhiều log lặp trong DB. Đã chạy tệp dọn dẹp cơ sở dữ liệu `cleanup_db.ts` loại bỏ các bản ghi cũ trùng lặp thành công.
+    5. **Kiểm thử Tranh chấp Đồng bộ đa tab**: Mở đồng thời 3 tab trình duyệt Momentum, ngắt mạng và thực hiện check-in offline, sau đó bật lại mạng. Cơ chế Web Locks (và fallback LocalStorage Lock) đảm bảo chỉ đúng 1 tab duy nhất chạy quá trình đồng bộ hóa hàng đợi, các tab còn lại phát hiện khóa đang bị giữ và bỏ qua đồng bộ an toàn mà không xung đột hay gửi lặp request.
+    6. **Kiểm thử Chuyển tiếp Trạng thái không reset (Smart Merging)**: Check-in thói quen offline, sau đó bật lại kết nối mạng. Khi `fetchGoals` và `fetchHistory` thực thi lúc bắt đầu online, dữ liệu trả về từ server (chưa kịp đồng bộ hoàn tất) được tự động gộp với hàng đợi `syncQueue` ở IndexedDB, giúp trạng thái hiển thị của thói quen trên UI giữ nguyên đúng tiến độ, không bị nhảy giật lùi về trạng thái cũ.
+    7. **Kiểm thử Tự động Đồng bộ**: Bật lại kết nối mạng. Hệ thống tự động phát hiện, hiển thị huy hiệu "Syncing...", đẩy thành công các yêu cầu check-in lưu tạm lên server, làm sạch hàng đợi trong IndexedDB, và cập nhật lại Streak/Thống kê chính xác dựa trên thời gian thực tế người dùng thao tác ngoại tuyến.

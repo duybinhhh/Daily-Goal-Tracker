@@ -7,7 +7,7 @@ import api from "../services/api";
 
 export const Stats: React.FC = () => {
   const { user, isAuthenticated } = useAuthStore();
-  const { stats, history, loading, fetchStats, fetchHistory, goals, fetchGoals } = useGoalStore();
+  const { stats, history, loading, fetchStats, fetchHistory, goals, fetchGoals, isOffline } = useGoalStore();
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -440,12 +440,21 @@ export const Stats: React.FC = () => {
             </span>
             <span className="hidden sm:inline">Update Data</span>
           </button>
-          <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4">
-            <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>
-              add
-            </span>
-            <span className="hidden sm:inline">New Goal</span>
-          </Link>
+          {isOffline ? (
+            <div
+              className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4 opacity-50 cursor-not-allowed"
+              style={{ pointerEvents: "none" }}
+              title="Network connection required"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>cloud_off</span>
+              <span className="hidden sm:inline">New Goal</span>
+            </div>
+          ) : (
+            <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4">
+              <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>add</span>
+              <span className="hidden sm:inline">New Goal</span>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -460,7 +469,7 @@ export const Stats: React.FC = () => {
         </section>
 
         {/* Dynamic Warning for empty database */}
-        {goals.length === 0 && (
+        {goals.length === 0 && !isOffline && (
           <div className="glass-card p-6 border-t-2 border-tertiary/40 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-tertiary text-3xl">auto_awesome</span>
@@ -672,14 +681,16 @@ export const Stats: React.FC = () => {
         </section>
       </main>
 
-      {/* Floating Action Button (FAB) */}
-      <button
-        onClick={() => navigate("/new-goal")}
-        className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-[0_8px_24px_rgba(192,193,255,0.3)] hover:scale-110 active:scale-95 hover:shadow-[0_12px_28px_rgba(192,193,255,0.45)] transition-all z-50 border-none cursor-pointer"
-        title="Add New Goal"
-      >
-        <span className="material-symbols-outlined text-[32px]">add</span>
-      </button>
+      {/* Floating Action Button (FAB) - hidden offline */}
+      {!isOffline && (
+        <button
+          onClick={() => navigate("/new-goal")}
+          className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-[0_8px_24px_rgba(192,193,255,0.3)] hover:scale-110 active:scale-95 hover:shadow-[0_12px_28px_rgba(192,193,255,0.45)] transition-all z-50 border-none cursor-pointer"
+          title="Add New Goal"
+        >
+          <span className="material-symbols-outlined text-[32px]">add</span>
+        </button>
+      )}
     </div>
   );
 };

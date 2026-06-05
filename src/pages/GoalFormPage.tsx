@@ -12,7 +12,20 @@ export const GoalFormPage: React.FC = () => {
   const isEdit = !!id;
   const navigate = useNavigate();
 
-  const { goals, createGoal, updateGoal, loading, error } = useGoalStore();
+  const { goals, createGoal, updateGoal, loading, error, isOffline, clearError } = useGoalStore();
+
+  // Treat as effectively offline when: browser says offline OR store has a connection error
+  const isConnectionError = Boolean(
+    error &&
+    (
+      error.toLowerCase().includes("unable to connect") ||
+      error.toLowerCase().includes("network") ||
+      error.toLowerCase().includes("database server") ||
+      error.toLowerCase().includes("check your") ||
+      error.toLowerCase().includes("try again")
+    )
+  );
+  const effectivelyOffline = isOffline || isConnectionError;
 
   const [formData, setFormData] = useState({
     title: "",
@@ -24,6 +37,11 @@ export const GoalFormPage: React.FC = () => {
   });
 
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+
+  useEffect(() => {
+    // Clear any previous store errors when mounting GoalFormPage
+    clearError();
+  }, []);
 
   useEffect(() => {
     if (isEdit && id) {
@@ -69,6 +87,13 @@ export const GoalFormPage: React.FC = () => {
     e.preventDefault();
     if (!validate()) return;
 
+    if (!navigator.onLine) {
+      useGoalStore.setState({ 
+        error: "Unable to connect to the database server. Please check your network connection and try again." 
+      });
+      return;
+    }
+
     try {
       const payload = {
         ...formData,
@@ -88,6 +113,28 @@ export const GoalFormPage: React.FC = () => {
   };
 
   const categories = ["Learning", "Fitness", "Work", "Health", "Finance", "Routine"];
+
+  if (effectivelyOffline) {
+    return (
+      <div className="min-h-screen bg-background text-on-background py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+        <div className="max-w-md w-full glass-card p-8 text-center space-y-4">
+          <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-full bg-orange-500/15 text-orange-400">
+            <span className="material-symbols-outlined" style={{ fontSize: "28px" }}>cloud_off</span>
+          </div>
+          <h2 className="text-lg font-bold text-on-surface">Connection Required</h2>
+          <p className="text-xs text-on-surface-variant leading-relaxed">
+            Creating or editing goals requires a connection to the server database. 
+            Please check your network connection and try again when you are back online.
+          </p>
+          <div className="pt-2">
+            <Link to="/" className="btn-primary inline-flex">
+              Back to Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-on-background py-8 px-4 sm:px-6 lg:px-8">
@@ -117,8 +164,14 @@ export const GoalFormPage: React.FC = () => {
             </div>
           </div>
  
-          {error && (
+          {error && !isConnectionError && (
             <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold rounded-lg text-center">
+              {error}
+            </div>
+          )}
+          {isConnectionError && (
+            <div className="mb-6 p-3 bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold rounded-lg text-center flex items-center gap-2 justify-center">
+              <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>wifi_off</span>
               {error}
             </div>
           )}

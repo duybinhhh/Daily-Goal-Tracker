@@ -3,6 +3,7 @@ import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
+import { syncOfflineData } from "../services/syncManager";
 
 interface NavItemProps {
   to: string;
@@ -28,7 +29,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, end }) => (
 
 export default function Sidebar() {
   const { user, logout, isAuthenticated } = useAuthStore();
-  const { goals } = useGoalStore();
+  const { goals, isOffline, isSyncing } = useGoalStore();
   const navigate = useNavigate();
 
   if (!isAuthenticated) return null;
@@ -38,6 +39,10 @@ export default function Sidebar() {
   const handleLogout = async () => {
     await logout();
     navigate("/login");
+  };
+
+  const handleSyncNow = () => {
+    if (navigator.onLine) syncOfflineData();
   };
 
   return (
@@ -80,6 +85,35 @@ export default function Sidebar() {
           </span>
         </div>
       </div>
+
+      {/* Offline / Syncing status banner */}
+      {isOffline && (
+        <div
+          className="mx-3 mb-3 px-3 py-2 rounded-xl flex items-center gap-2"
+          style={{
+            background: "rgba(255, 140, 0, 0.12)",
+            border: "1px solid rgba(255, 140, 0, 0.25)",
+          }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: "16px", color: "#fb923c" }}>cloud_off</span>
+          <div className="flex flex-col leading-tight">
+            <span style={{ fontSize: "11px", fontWeight: 700, color: "#fb923c" }}>Offline Mode</span>
+            <span style={{ fontSize: "9px", color: "rgba(251,146,60,0.8)", fontWeight: 500 }}>Check-ins are queued</span>
+          </div>
+        </div>
+      )}
+      {!isOffline && isSyncing && (
+        <div
+          className="mx-3 mb-3 px-3 py-2 rounded-xl flex items-center gap-2"
+          style={{
+            background: "rgba(192, 193, 255, 0.08)",
+            border: "1px solid rgba(192, 193, 255, 0.2)",
+          }}
+        >
+          <div className="spinner" style={{ width: "14px", height: "14px", color: "var(--color-primary)" }} />
+          <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-primary)" }}>Syncing data…</span>
+        </div>
+      )}
 
       {/* Streak Badge */}
       {bestStreak > 0 && (
@@ -153,12 +187,23 @@ export default function Sidebar() {
 
       {/* New Goal Button */}
       <div className="px-3 pb-5">
-        <NavLink to="/new-goal" className="btn-primary w-full">
-          <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
-            add
-          </span>
-          New Goal
-        </NavLink>
+        {isOffline ? (
+          <div
+            className="btn-primary w-full opacity-50 cursor-not-allowed"
+            title="Network connection required to create goals"
+            style={{ pointerEvents: "none" }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>cloud_off</span>
+            New Goal
+          </div>
+        ) : (
+          <NavLink to="/new-goal" className="btn-primary w-full">
+            <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
+              add
+            </span>
+            New Goal
+          </NavLink>
+        )}
       </div>
     </aside>
   );

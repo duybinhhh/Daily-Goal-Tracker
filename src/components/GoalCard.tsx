@@ -55,6 +55,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
   const longestStreak = goal.streak?.longest_streak || 0;
 
   const handleComplete = async () => {
+    if (completing) return;
     setCompleting(true);
     try {
       await onComplete(goal.id, noteText.trim() || undefined);

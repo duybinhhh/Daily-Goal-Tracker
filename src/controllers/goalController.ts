@@ -192,7 +192,7 @@ export const completeGoal = async (req: AuthenticatedRequest, res: Response, nex
   try {
     const userId = req.user?.id;
     const { id } = req.params;
-    const { note } = req.body;
+    const { note, completed_at, log_id } = req.body;
 
     if (!userId) throw new AppError("Unauthorized access.", 401);
 
@@ -201,10 +201,30 @@ export const completeGoal = async (req: AuthenticatedRequest, res: Response, nex
       throw new AppError("Goal not found.", 404);
     }
 
-    const todayStr = new Date().toISOString();
+    // Check for duplicate check-in using log_id
+    if (log_id) {
+      const existingLog = await db.logs.findUnique({ id: log_id });
+      if (existingLog) {
+        console.log(`[Goal Controller] Duplicate check-in detected for log_id: ${log_id}. Returning existing log.`);
+        const currentStreak = await db.streaks.findUnique({ goal_id: goal.id });
+        res.status(200).json({
+          success: true,
+          message: "Progress already logged.",
+          goal: {
+            ...goal,
+            streak: currentStreak || { current_streak: 0, longest_streak: 0, last_completed_at: null },
+          },
+          log: existingLog,
+        });
+        return;
+      }
+    }
+
+    const todayStr = completed_at || new Date().toISOString();
     
     // 1. Log progress
     const newLog = await db.logs.create({
+      id: log_id || undefined,
       goal_id: goal.id,
       user_id: userId,
       completed_at: todayStr,

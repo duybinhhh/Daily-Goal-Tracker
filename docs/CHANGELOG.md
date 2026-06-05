@@ -6,6 +6,41 @@
 
 Tất cả các thay đổi lớn của dự án sẽ được ghi nhận và cập nhật theo từng Sprint tại đây.
 
+## [Đã hoàn thành] - Offline Sync Reliability & Concurrency Overhaul - 2026-06-05 11:20 (GMT+7)
+### Đã thêm & Cải tiến (Added & Improved)
+* **Khóa đồng bộ đa tab (Multi-tab Synchronization Locking):**
+  - Tích hợp **Web Locks API** (`navigator.locks`) trong [syncManager.ts](file:///d:/Download/daily-goal-tracker/src/services/syncManager.ts) nhằm đảm bảo chỉ có duy nhất một tab trình duyệt thực hiện quá trình đồng bộ hóa dữ liệu ngoại tuyến tại một thời điểm, tránh xung đột cuộc đua (race conditions).
+  - Triển khai giải pháp fallback tự động sử dụng **LocalStorage Lock** kết hợp với cơ chế hết hạn khóa (10 giây) và khóa trong bộ nhớ (in-memory lock) cho các trình duyệt cũ hoặc môi trường HTTP không bảo mật (non-secure contexts).
+* **Cơ chế Đảm bảo Tính Tuần Tự & Bền Vững (Durability & Ordering):**
+  - Các phần tử trong hàng đợi `syncQueue` chỉ bị xóa đi *sau khi* nhận được phản hồi thành công (HTTP status 2xx) từ Server API.
+  - Các lỗi mạng hoặc lỗi phía Server (5xx) sẽ dừng quá trình đồng bộ hóa để thử lại sau, trong khi lỗi người dùng (4xx) sẽ loại bỏ phần tử lỗi khỏi hàng đợi để tránh làm tắc nghẽn quá trình đồng bộ.
+* **Cơ chế Chống Trùng lặp & Bảo đảm Idempotency (Deduplication & Idempotency):**
+  - Frontend tự động tạo mã UUID định danh duy nhất (`log_id`) cho từng sự kiện check-in ngay khi người dùng nhấn nút. Mã này được đẩy vào `syncQueue` và gửi lên API Backend `POST /api/goals/:id/complete`.
+  - Backend sử dụng `log_id` làm khóa chính (Primary Key) cho bảng `GoalLog`, loại bỏ hoàn toàn khả năng ghi nhận trùng lặp log check-in ở cơ sở dữ liệu nếu có request bị gửi lặp lại.
+* **Ngăn chặn Xung đột Giao diện do Thao tác nhanh (UI Concurrency Guards):**
+  - Tích hợp trạng thái khóa `completing` trong [GoalCard.tsx](file:///d:/Download/daily-goal-tracker/src/components/GoalCard.tsx) để vô hiệu hóa/ngăn chặn hành vi nhấn nút check-in dồn dập (double-click) hoặc giữ phím Enter, tránh việc tạo ra nhiều UUID cục bộ trùng lặp cho một lần tương tác.
+* **Hợp nhất Dữ liệu Ngoại tuyến Thông minh (Smart Cache & Sync Queue Merging):**
+  - Cải tiến hàm `fetchGoals` và `fetchHistory` trong [goalStore.ts](file:///d:/Download/daily-goal-tracker/src/store/goalStore.ts) luôn tự động hợp nhất các hành động đang chờ trong `syncQueue` vào dữ liệu tải về từ server.
+  - Giúp loại bỏ hoàn toàn lỗi giật màn hình (UI reset/flicker) trong giai đoạn chuyển tiếp từ offline sang online khi dữ liệu server chưa đồng bộ kịp.
+
+## [Đã hoàn thành] - Offline Mode & Synchronization (PWA & IndexedDB) - 2026-06-05 09:45 (GMT+7)
+### Đã thêm & Cải tiến (Added & Improved)
+* **Tính năng Progressive Web App (PWA):**
+  - Khởi tạo tệp cấu hình ứng dụng [manifest.json](file:///d:/Download/daily-goal-tracker/public/manifest.json) và tích hợp logo PWA glassmorphism [icon.png](file:///d:/Download/daily-goal-tracker/public/icon.png).
+  - Viết Service Worker [sw.js](file:///d:/Download/daily-goal-tracker/public/sw.js) để thực hiện lưu trữ cache giao diện (HTML, CSS, JS, hình ảnh, phông chữ) và hỗ trợ ứng dụng tải hoàn toàn offline.
+  - Tích hợp và đăng ký Service Worker khi tải trang tại [main.tsx](file:///d:/Download/daily-goal-tracker/src/main.tsx) và liên kết manifest trong [index.html](file:///d:/Download/daily-goal-tracker/index.html).
+* **Đệm dữ liệu & Hàng đợi Ngoại tuyến (IndexedDB Caching & Offline Queue):**
+  - Xây dựng lớp dịch vụ cơ sở dữ liệu IndexedDB tại [indexedDb.ts](file:///d:/Download/daily-goal-tracker/src/services/indexedDb.ts) gồm kho lưu trữ `metadata` (để lưu cache danh sách thói quen, thống kê và lịch sử) và `syncQueue` (hàng đợi lưu tạm check-in offline).
+  - Cập nhật Zustand [goalStore.ts](file:///d:/Download/daily-goal-tracker/src/store/goalStore.ts) để khi mất mạng (Offline), hệ thống tự động đọc dữ liệu từ cache IndexedDB kèm cộng bù trừ số lượng thói quen đã hoàn thành tạm thời trong hàng đợi.
+  - Hỗ trợ thao tác Check-in và Hoàn tác (Undo) hoạt động hoàn toàn offline mà không cần kết nối mạng.
+* **Tự động đồng bộ hóa & Xử lý thời gian phía Backend (Background Synchronization):**
+  - Xây dựng trình đồng bộ dữ liệu tại [syncManager.ts](file:///d:/Download/daily-goal-tracker/src/services/syncManager.ts) tự động lắng nghe sự kiện `online` để gửi các check-in lưu tạm trong hàng đợi lên server và làm sạch hàng đợi.
+  - Cập nhật controller `completeGoal` tại [goalController.ts](file:///d:/Download/daily-goal-tracker/src/controllers/goalController.ts) để chấp nhận tham số `completed_at` tùy chọn do client gửi lên, đảm bảo lưu trữ chính xác mốc thời gian thực hiện thói quen khi offline để tính toán streak và timeline.
+* **Huy hiệu Trực quan & Đồng bộ Trạng thái Mạng (UI Connectivity Badges):**
+  - Thêm các huy hiệu hiển thị trạng thái kết nối mạng ("Offline Mode" màu cam và "Syncing..." màu xanh lá) sắc nét trên thanh Header tại [DashboardPage.tsx](file:///d:/Download/daily-goal-tracker/src/pages/DashboardPage.tsx).
+  - Cập nhật định tuyến ứng dụng và trình quản lý sự kiện mạng trong [App.tsx](file:///d:/Download/daily-goal-tracker/src/App.tsx) để đồng bộ trạng thái `isOffline` toàn cục.
+  - Tích hợp đồng bộ hóa tự động trước khi tải dữ liệu mới khi nhấn nút "Refresh" tại [useGoals.ts](file:///d:/Download/daily-goal-tracker/src/hooks/useGoals.ts).
+
 ## [Đã hoàn thành] - Undo Progress Log, Disappearing Goals & UX Optimization - 2026-06-04 13:30 (GMT+7)
 ### Đã thêm & Cải tiến (Added & Improved)
 * **Tính năng Hủy ghi nhận tiến độ thói quen (Undo Progress Log):**

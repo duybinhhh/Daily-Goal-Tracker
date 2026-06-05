@@ -4,9 +4,13 @@ import { Link } from "react-router-dom";
 import { useGoalStore } from "../store/goalStore";
 import { useAuthStore } from "../store/authStore";
 
+function getTimelineLogKey(log: { goalId: string; completedAt: string; note: string | null }) {
+  return [log.goalId, log.completedAt, (log.note || "").trim()].join("|");
+}
+
 export default function TimelinePage() {
   const { user } = useAuthStore();
-  const { goals, history, stats, fetchHistory, fetchGoals, fetchStats, deleteLogProgress } = useGoalStore();
+  const { goals, history, stats, fetchHistory, fetchGoals, fetchStats, deleteLogProgress, isOffline } = useGoalStore();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -126,17 +130,29 @@ export default function TimelinePage() {
       category: string;
     }> = [];
 
+    const seenIds = new Set<string>();
+    const seenKeys = new Set<string>();
+
     history.forEach((h) => {
       h.logs.forEach((log) => {
         const goalInfo = goals.find((g) => g.id === log.goal_id);
-        logsList.push({
+        const timelineLog = {
           logId: log.id,
           goalId: log.goal_id,
           completedAt: log.completed_at,
           note: log.note,
           goalTitle: goalInfo?.title || "Completed Goal",
           category: goalInfo?.category || "Routine",
-        });
+        };
+        const dedupeKey = getTimelineLogKey(timelineLog);
+
+        if (seenIds.has(timelineLog.logId) || seenKeys.has(dedupeKey)) {
+          return;
+        }
+
+        seenIds.add(timelineLog.logId);
+        seenKeys.add(dedupeKey);
+        logsList.push(timelineLog);
       });
     });
 
@@ -213,6 +229,10 @@ export default function TimelinePage() {
   };
 
   const handleDeleteLog = async (logId: string, goalTitle: string) => {
+    if (isOffline) {
+      alert("Deleting log entries requires a network connection. Please try again when you are online.");
+      return;
+    }
     if (window.confirm(`Delete check-in log for "${goalTitle}"?`)) {
       try {
         const fromDate = new Date(year, month, 1).toISOString().split("T")[0];
@@ -279,12 +299,21 @@ export default function TimelinePage() {
               <span>{bestCurrentStreak} Day Streak</span>
             </div>
           )}
-          <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4">
-            <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>
-              add
-            </span>
-            <span className="hidden sm:inline">New Goal</span>
-          </Link>
+          {isOffline ? (
+            <div
+              className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4 opacity-50 cursor-not-allowed"
+              style={{ pointerEvents: "none" }}
+              title="Network connection required"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>cloud_off</span>
+              <span className="hidden sm:inline">New Goal</span>
+            </div>
+          ) : (
+            <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4">
+              <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>add</span>
+              <span className="hidden sm:inline">New Goal</span>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -551,8 +580,9 @@ export default function TimelinePage() {
                           <button
                             onClick={() => handleDeleteLog(log.logId, log.goalTitle)}
                             className="btn-danger-ghost shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded-lg"
-                            title="Delete log"
-                            style={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}
+                            title={isOffline ? "Requires connection" : "Delete log"}
+                            style={{ display: "inline-flex", alignItems: "center", cursor: isOffline ? "not-allowed" : "pointer", pointerEvents: isOffline ? "none" : "auto", opacity: isOffline ? 0 : undefined }}
+                            disabled={isOffline}
                           >
                             <span className="material-symbols-outlined text-[16px]">delete</span>
                           </button>

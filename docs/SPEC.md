@@ -129,6 +129,25 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
 
 ---
 
+### 📦 Module 5: Offline Mode & Progressive Web App (Sprint 5 — 6.0 SP)
+
+#### US-11: Chế độ Ngoại tuyến & Đồng bộ hóa sau (Offline Mode & Sync)
+* **Độ ưu tiên:** High
+* **Story Point:** 6.0
+* **Tiêu chí chấp nhận (AC):**
+    * **Khả năng cài đặt (PWA):** Ứng dụng cung cấp tệp cấu hình `manifest.json` và Service Worker `sw.js` để có thể cài đặt trực tiếp lên màn hình điện thoại hoặc máy tính dưới dạng ứng dụng độc lập (standalone).
+    * **Hoạt động Ngoại tuyến (Offline App Shell):** Khi thiết bị mất mạng, Service Worker sẽ tự động tải các tài nguyên giao diện shell (HTML, CSS, JS, phông chữ, biểu tượng) từ bộ nhớ cache, đảm bảo ứng dụng mở lên hoạt động bình thường thay vì hiển thị màn hình lỗi.
+    * **Đệm dữ liệu cục bộ (IndexedDB Cache):** Các tài nguyên danh sách thói quen, chỉ số Dashboard và dữ liệu lịch sử sẽ được lưu vào cache IndexedDB. Khi ứng dụng khởi động ở trạng thái offline, hệ thống tự động tải từ cache này và cộng bù trừ số đếm tiến trình cho các thói quen được check-in trong phiên offline.
+    * **Hàng đợi Check-in Offline (Sync Queue):** Cho phép người dùng bấm check-in hoặc hoàn tác thói quen khi mất kết nối mạng. Hệ thống tự động tạo mã log tạm thời và đẩy yêu cầu check-in vào hàng đợi `syncQueue` lưu trong IndexedDB.
+    * **Đồng bộ hóa Tự động (Auto Sync):** Tự động phát hiện khi thiết bị có mạng trở lại (sự kiện `online`) và kích hoạt gửi các yêu cầu lưu trong hàng đợi lên backend Server. Các check-in được đồng bộ với mốc thời gian thực hiện ban đầu (`completed_at`) để đảm bảo tính đúng đắn cho công cụ Streak Engine và nhật ký Timeline.
+    * **Trạng thái Giao diện (Connectivity Badges):** Hiển thị huy hiệu trạng thái mạng "Offline Mode" (màu cam) hoặc "Syncing..." (màu xanh lá xoay tròn) trực quan trên Header để nâng cao trải nghiệm người dùng.
+    * **Khóa đồng bộ đa tab (Multi-tab Lock):** Ngăn chặn tranh chấp hàng đợi khi mở ứng dụng ở nhiều tab cùng lúc bằng cơ chế Web Locks API, hoặc tự động fallback sang LocalStorage Lock (có timeout 10 giây tránh deadlock).
+    * **Idempotency & Chống trùng lặp:** Sinh UUID định danh duy nhất (`log_id`) ngay khi bấm check-in ở client để gửi lên API. Server sử dụng ID này làm Primary Key cho bảng GoalLog để triệt tiêu việc tạo các log trùng lặp khi thử lại request.
+    * **Chặn Concurrency từ giao diện (UI Concurrency Guard):** Tích hợp trạng thái khóa `completing` ở `GoalCard` để ngăn click dồn dập hoặc giữ phím Enter.
+    * **Hợp nhất hàng đợi thông minh:** Cập nhật `fetchGoals` và `fetchHistory` để tự động cộng gộp các check-in đang chờ trong `syncQueue` vào dữ liệu fetch từ server, ngăn ngừa giật lag, quay ngược dữ liệu cũ khi online trở lại.
+
+---
+
 ## 4. Tech Stack Đề Xuất (Tinh gọn & Đồng bộ)
 *Áp dụng tư duy chọn Tech Stack thực tế để tối ưu hóa tốc độ hoàn thiện sản phẩm MVP.*
 
@@ -149,6 +168,9 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
 * **Bài toán:** Nếu tính toán chuỗi ngày real-time bằng cách quét qua toàn bộ bảng `GoalLog` mỗi lần tải trang, hệ thống sẽ bị tụt giảm hiệu năng trầm trọng (`Performance Drop`) khi tập dữ liệu lớn dần. Ngược lại, nếu chỉ lưu một biến số `streak_count` tĩnh trong bảng Goal, dữ liệu rất dễ bị sai lệch khi người dùng có hành vi sửa đổi log cũ hoặc log bù ngày hôm trước.
 * **Giải pháp thiết kế:** Lưu trữ cố định hai trường dữ liệu `current_streak` và `longest_streak` ngay trong bảng dữ liệu Goal. Đồng thời, xây dựng một hàm dịch vụ riêng biệt (`Streak Engine`) chuyên trách việc kiểm tra, đánh giá điểm đứt gãy của chuỗi thói quen tại thời điểm người dùng check-in phát súng đầu tiên trong ngày mới, hoặc khi phát hiện có thao tác can thiệp thay đổi dữ liệu quá khứ.
 
-### ⚠️ Trạng thái đồng bộ giao diện (Race Condition)
-* **Bài toán:** Người dùng bấm nút hoàn thành liên tiếp nhiều lần do kết nối mạng chập chờn (hiện tượng Double Click), hệ thống Backend có nguy cơ tạo ra nhiều bản ghi log trùng lặp trong cùng một khoảng thời gian cực ngắn, làm sai lệch nghiêm trọng chỉ số mục tiêu.
-* **Giải pháp thiết kế:** Triển khai cơ chế giới hạn tần suất gửi request (`Debounce` / `Throttling`) trực tiếp tại nút bấm phía giao diện Client. Ở tầng dữ liệu, thiết lập một chỉ mục duy nhất (**Unique Index**) kết hợp bởi bộ đôi thuộc tính `goal_id` + `date_string` để chặn đứng hoàn toàn mọi bản ghi trùng lặp cố ý hoặc vô ý.
+### ⚠️ Trạng thái đồng bộ giao diện & Trùng lặp dữ liệu (Race Condition & Duplication)
+* **Bài toán:** Người dùng bấm nút hoàn thành liên tiếp nhiều lần do kết nối mạng chập chờn hoặc thao tác nhanh (hiện tượng Double Click / giữ phím Enter), hệ thống backend và hàng đợi offline có nguy cơ tạo ra nhiều bản ghi log trùng lặp trong cùng một khoảng thời gian cực ngắn, gây sai lệch nghiêm trọng chỉ số mục tiêu và chuỗi Streak. Đồng thời, trong giai đoạn chuyển đổi offline-to-online, giao diện có thể bị reset tạm thời về trạng thái cũ do server chưa kịp xử lý hàng đợi.
+* **Giải pháp thiết kế:** 
+    1. **Khóa phía giao diện:** Triển khai cơ chế khóa concurrency trạng thái `completing` tại component `GoalCard` để chặn lập tức các click liên tiếp hoặc phím tắt dồn dập.
+    2. **Đảm bảo Idempotency:** Sinh UUID định danh duy nhất (`log_id`) cho check-in ngay tại thời điểm click ở client. Server nhận mã này và lưu trực tiếp làm khóa chính (Primary Key) cho bảng GoalLog trong database, tận dụng cơ chế cưỡng chế khóa chính duy nhất của database để bác bỏ hoàn toàn các yêu cầu gửi trùng lắp.
+    3. **Hợp nhất hàng đợi (Smart Merging):** Cải tiến store (`fetchGoals`, `fetchHistory`) tự động đọc hàng đợi `syncQueue` IndexedDB và hợp nhất cục bộ các tác vụ check-in đang chờ đồng bộ vào dữ liệu nhận từ server để giữ trạng thái UI thống nhất, không bị giật lag quay lại trạng thái cũ.

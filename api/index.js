@@ -161,6 +161,7 @@ var PrismaDB = class {
       create: async (data) => {
         const created = await prisma.goalLog.create({
           data: {
+            id: data.id,
             goal_id: data.goal_id,
             user_id: data.user_id,
             completed_at: data.completed_at ? new Date(data.completed_at) : /* @__PURE__ */ new Date(),
@@ -279,15 +280,45 @@ var AppError = class extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 };
+function getPrismaFriendlyMessage(err) {
+  const msg = err?.message || "";
+  const code = err?.code || "";
+  if (/^P[125]\d{3}$/.test(code)) {
+    if (code.startsWith("P1")) {
+      return "Unable to reach the database server. Please check your connection and try again later.";
+    }
+    if (code.startsWith("P2")) {
+      return "A database operation failed. The record may not exist or a constraint was violated.";
+    }
+    return "Database error occurred. Please try again later.";
+  }
+  if (msg.includes("prisma.") || msg.includes("Can't reach database server") || msg.includes("Connection refused") || msg.includes("ECONNREFUSED") || msg.includes("Invalid `prisma.") || msg.includes("PrismaClientKnownRequestError") || msg.includes("PrismaClientUnknownRequestError") || msg.includes("PrismaClientInitializationError") || msg.includes("PrismaClientRustPanicError") || msg.includes("pooler.supabase.com") || msg.includes("supabase.com") || msg.includes("D:\\Download\\") || // Local file path leak guard
+  msg.includes("server/db.ts")) {
+    if (msg.includes("Can't reach") || msg.includes("ECONNREFUSED") || msg.includes("Connection refused")) {
+      return "Unable to reach the database server. Please check your network connection and try again.";
+    }
+    return "A database error occurred. Please try again later.";
+  }
+  return null;
+}
 var errorHandler = (err, req, res, next) => {
   const statusCode = err.statusCode || 500;
+  console.error(`[Error] ${req.method} ${req.url} - Status: ${statusCode}`, err.message);
+  const prismaMessage = getPrismaFriendlyMessage(err);
+  if (prismaMessage) {
+    res.status(503).json({
+      success: false,
+      message: prismaMessage,
+      errors: null
+    });
+    return;
+  }
   const message = err.message || "Internal Server Error";
-  console.error(`[Error] ${req.method} ${req.url} - Status: ${statusCode} - Message: ${message}`, err.stack);
+  const safeMessage = statusCode >= 500 ? "Internal server error. Please try again later." : message;
   res.status(statusCode).json({
     success: false,
-    message,
-    errors: err.errors || null,
-    stack: process.env.NODE_ENV === "development" ? err.stack : void 0
+    message: safeMessage,
+    errors: err.errors || null
   });
 };
 
@@ -671,14 +702,32 @@ var completeGoal = async (req, res, next) => {
   try {
     const userId = req.user?.id;
     const { id } = req.params;
-    const { note } = req.body;
+    const { note, completed_at, log_id } = req.body;
     if (!userId) throw new AppError("Unauthorized access.", 401);
     const goal = await db.goals.findUnique({ id });
     if (!goal || goal.user_id !== userId) {
       throw new AppError("Goal not found.", 404);
     }
-    const todayStr = (/* @__PURE__ */ new Date()).toISOString();
+    if (log_id) {
+      const existingLog = await db.logs.findUnique({ id: log_id });
+      if (existingLog) {
+        console.log(`[Goal Controller] Duplicate check-in detected for log_id: ${log_id}. Returning existing log.`);
+        const currentStreak = await db.streaks.findUnique({ goal_id: goal.id });
+        res.status(200).json({
+          success: true,
+          message: "Progress already logged.",
+          goal: {
+            ...goal,
+            streak: currentStreak || { current_streak: 0, longest_streak: 0, last_completed_at: null }
+          },
+          log: existingLog
+        });
+        return;
+      }
+    }
+    const todayStr = completed_at || (/* @__PURE__ */ new Date()).toISOString();
     const newLog = await db.logs.create({
+      id: log_id || void 0,
       goal_id: goal.id,
       user_id: userId,
       completed_at: todayStr,
@@ -863,6 +912,13 @@ var goals_default = router2;
 import { Router as Router3 } from "express";
 
 // src/controllers/statsController.ts
+function getLogDedupeKey(log) {
+  return [
+    log.goal_id,
+    log.completed_at,
+    (log.note || "").trim()
+  ].join("|");
+}
 var getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -910,6 +966,17 @@ var getHistory = async (req, res, next) => {
       const logDate = new Date(log.completed_at);
       return logDate >= fromDate && logDate <= toDate;
     });
+    const seenLogIds = /* @__PURE__ */ new Set();
+    const seenLogKeys = /* @__PURE__ */ new Set();
+    const uniqueLogs = filteredLogs.filter((log) => {
+      const key = getLogDedupeKey(log);
+      if (seenLogIds.has(log.id) || seenLogKeys.has(key)) {
+        return false;
+      }
+      seenLogIds.add(log.id);
+      seenLogKeys.add(key);
+      return true;
+    });
     const historyMap = {};
     const loopDate = new Date(fromDate);
     while (loopDate <= toDate) {
@@ -917,7 +984,7 @@ var getHistory = async (req, res, next) => {
       historyMap[dayStr] = [];
       loopDate.setDate(loopDate.getDate() + 1);
     }
-    filteredLogs.forEach((log) => {
+    uniqueLogs.forEach((log) => {
       const dayKey = log.completed_at.split("T")[0];
       if (historyMap[dayKey]) {
         historyMap[dayKey].push(log);

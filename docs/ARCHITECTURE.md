@@ -7,6 +7,8 @@
 * **State Management:** **Zustand** (quản lý trạng thái xác thực và mục tiêu).
 * **HTTP Client:** **Axios** với request/response Interceptor tự động xử lý và xoay vòng JWT tokens.
 * **Authentication:** **JWT** (Access Token 15 phút + Refresh Token 7 ngày), mã hóa mật khẩu bằng **bcryptjs**.
+* **Offline Caching & Queue:** **IndexedDB** (trình duyệt lưu đệm dữ liệu mục tiêu/chỉ số và hàng đợi đồng bộ offline).
+* **PWA Engine:** **Service Worker** (`sw.js` cache giao diện shell tĩnh) + **Web App Manifest** (`manifest.json` cho phép cài đặt lên màn hình chính).
 
 ---
 
@@ -128,3 +130,21 @@ model Notification {
     *   Trang Goals (`GoalsPage.tsx`) kết nối với kho dữ liệu thói quen qua `useGoals` hook.
     *   Hỗ trợ tương tác tạm dừng/hoạt động lại thông qua API cập nhật trạng thái mục tiêu (`PUT /api/goals/:id` truyền tham số `status`).
     *   Thực hiện tính toán tỷ lệ hoàn thành trung bình của các mục tiêu hoạt động ở Client-side và biểu diễn bằng vòng tròn SVG động cùng các danh hiệu khích lệ năng suất.
+7. Chế độ Ngoại tuyến & Đồng bộ hóa sau (Offline Mode & Sync):
+    *   **Khởi chạy offline:** Khi mất mạng, Service Worker (`sw.js`) đánh chặn yêu cầu và phục hồi app shell tĩnh từ Cache Storage. Zustand store (`goalStore.ts`) tự động bắt lỗi mạng và khôi phục dữ liệu thói quen/dashboard từ cache IndexedDB (`metadata` store).
+    *   **Ghi nhận thói quen offline:** Các check-in thực hiện lúc offline được lưu tạm dưới dạng tác vụ hoàn thành (`OfflineAction`) vào hàng đợi `syncQueue` trong IndexedDB, đồng thời cập nhật tăng trực tiếp số đếm hiển thị trên UI. Cơ chế Undo cũng hoạt động offline bằng cách xóa bản ghi khỏi hàng đợi cục bộ này.
+    *   **Ngăn chặn trùng lặp bằng UUID & Idempotency:**
+        - Để ngăn ngừa các log check-in bị ghi nhận trùng lặp trong cơ sở dữ liệu khi có sự cố mạng hoặc thử lại, mỗi khi người dùng check-in (bất kể online hay offline), frontend lập tức tạo ra một mã UUID định danh duy nhất cho log đó (`log_id`) bằng `crypto.randomUUID` (hoặc thuật toán fallback sinh chuỗi ngẫu nhiên).
+        - Mã `log_id` này được gửi kèm lên Server qua API `POST /api/goals/:id/complete` và được lưu làm khóa chính (Primary Key) của bảng `GoalLog`. Nhờ cơ chế ràng buộc khóa chính của database, các lượt check-in bị lặp lại do gửi đúp request sẽ bị chặn đứng hoàn toàn ở phía Backend.
+    *   **Khóa Concurrency phía Giao diện (UI Concurrency Guard):**
+        - Tại `GoalCard.tsx`, khi người dùng bấm check-in, trạng thái `completing` được gán bằng `true` ngay lập tức để chặn các sự kiện nhấn chuột liên hoàn (double-click) hoặc giữ phím Enter. Điều này đảm bảo mỗi hành động check-in hợp lệ chỉ kích hoạt đúng một yêu cầu gửi đi và một UUID duy nhất, tránh việc sinh ra nhiều UUID khác nhau cho cùng một lần bấm.
+    *   **Khóa đồng bộ đa tab (Multi-tab Lock):**
+        - Trình quản lý `syncManager.ts` tích hợp cơ chế đồng bộ hóa giữa nhiều tab trình duyệt đang mở đồng thời. Hệ thống sử dụng **Web Locks API** (`navigator.locks.request` với lock name `sync_offline_data_lock`) để chắc chắn rằng chỉ có một tab duy nhất được quyền đọc ghi hàng đợi `syncQueue` và liên kết API lên Server.
+        - Khi chạy trong các trình duyệt cũ hoặc môi trường HTTP không bảo mật (non-secure context, nơi Web Locks bị chặn), trình quản lý sẽ tự động chuyển sang chế độ fallback sử dụng **LocalStorage Lock** (có gắn thời gian hết hạn 10 giây để tránh deadlock khi tab giữ lock bị crash đột ngột) và khóa bộ nhớ cục bộ `isSyncing`.
+    *   **Tính bền vững của hàng đợi (Queue Durability):**
+        - Các tác vụ check-in chỉ được xóa khỏi hàng đợi `syncQueue` *sau khi* API Server phản hồi mã thành công (HTTP status 2xx).
+        - Nếu gặp lỗi mạng hoặc lỗi Server (5xx), quá trình đồng bộ sẽ tạm dừng hoàn toàn để giữ nguyên dữ liệu trong hàng đợi cho lần thử lại tiếp theo. Nếu gặp lỗi yêu cầu sai từ phía client (4xx, ví dụ: thói quen đã bị xóa ở server), tác vụ lỗi đó sẽ được gỡ bỏ khỏi hàng đợi để tránh tắc nghẽn vĩnh viễn (poison pill).
+    *   **Hợp nhất hàng đợi thông minh chống giật lag (UI State Merging):**
+        - Trong quá trình kết nối lại (khi mạng chuyển sang online và sync manager đang đồng bộ), việc tải lại dữ liệu từ Server có thể diễn ra trước khi hàng đợi ngoại tuyến được dọn sạch hoàn toàn, dẫn đến việc dữ liệu giao diện bị quay về trạng thái cũ trước khi offline (flicker/reset).
+        - Để giải quyết vấn đề này, các hàm fetch dữ liệu `fetchGoals` và `fetchHistory` trong Zustand store (`goalStore.ts`) được thiết kế để *luôn luôn* đọc hàng đợi `syncQueue` từ IndexedDB và thực hiện cộng gộp/bù trừ số đếm, tự tạo bản ghi log giả định ngay tại client-side để hiển thị trước khi server phản hồi. Nhờ đó, giao diện người dùng luôn thống nhất với thực tế hành động của họ ở mọi thời điểm chuyển tiếp kết nối.
+    *   **Đồng bộ khi có mạng:** Hệ thống lắng nghe sự kiện `online` thông qua trình sự kiện toàn cục ở `App.tsx` để tránh đăng ký lặp lại. Khi phát hiện mạng phục hồi, trình quản lý `syncManager.ts` thực hiện khóa đồng bộ, quét hàng đợi IndexedDB và tuần tự đồng bộ các bản ghi check-in với đúng mốc giờ gốc của sự kiện (`completed_at`). Sau khi đồng bộ thành công, stores sẽ được cập nhật lại dữ liệu chuẩn từ server và tính toán lại Streak/Lịch sử thống kê một cách toàn vẹn.

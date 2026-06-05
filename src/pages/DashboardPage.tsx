@@ -299,6 +299,7 @@ const UpcomingMilestones: React.FC<MilestoneProps> = ({
 /* ─── Main Dashboard Page ─── */
 export const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
+  const { isOffline, isSyncing } = useGoalStore();
   const {
     filteredGoals,
     categories,
@@ -456,6 +457,44 @@ export const DashboardPage: React.FC = () => {
         </h1>
 
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Offline status badge */}
+          {isOffline && (
+            <div
+              className="py-1 px-2.5 text-[11px] sm:text-xs flex items-center gap-1.5 rounded-full border border-orange-500/20 bg-orange-500/10 text-orange-400 font-semibold"
+              style={{
+                backdropFilter: "blur(10px)",
+              }}
+              title="You are currently working offline. Changes will be synced when you go online."
+            >
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: "14px" }}
+              >
+                cloud_off
+              </span>
+              <span>Offline Mode</span>
+            </div>
+          )}
+
+          {/* Syncing status badge */}
+          {isSyncing && (
+            <div
+              className="py-1 px-2.5 text-[11px] sm:text-xs flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 text-green-400 font-semibold"
+              style={{
+                backdropFilter: "blur(10px)",
+              }}
+              title="Syncing offline progress with the server..."
+            >
+              <span
+                className="material-symbols-outlined animate-spin"
+                style={{ fontSize: "14px" }}
+              >
+                sync
+              </span>
+              <span>Syncing...</span>
+            </div>
+          )}
+
           {/* Streak badge in header */}
           {bestCurrentStreak > 0 && (
             <div className="streak-badge py-1 px-2.5 text-[11px] sm:text-xs">
@@ -472,15 +511,26 @@ export const DashboardPage: React.FC = () => {
             <RefreshCw size={14} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
-          <Link to="/new-goal" className="btn-primary">
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: "16px" }}
+          {isOffline ? (
+            <div
+              className="btn-primary opacity-50 cursor-not-allowed"
+              style={{ pointerEvents: "none" }}
+              title="Network connection required to create goals"
             >
-              add
-            </span>
-            <span className="hidden sm:inline">Add Goal</span>
-          </Link>
+              <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>cloud_off</span>
+              <span className="hidden sm:inline">Add Goal</span>
+            </div>
+          ) : (
+            <Link to="/new-goal" className="btn-primary">
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: "16px" }}
+              >
+                add
+              </span>
+              <span className="hidden sm:inline">Add Goal</span>
+            </Link>
+          )}
         </div>
       </header>
 

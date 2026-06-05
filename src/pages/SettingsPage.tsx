@@ -6,7 +6,7 @@ import { useGoalStore } from "../store/goalStore";
 
 export function SettingsPage() {
   const { user, updateProfile, deleteAccount, logout, loading, error, clearError } = useAuthStore();
-  const { goals, fetchGoals } = useGoalStore();
+  const { goals, fetchGoals, isOffline } = useGoalStore();
   const navigate = useNavigate();
 
   // Local settings states (saved to localStorage for client preferences, or server for profile)
@@ -87,6 +87,10 @@ export function SettingsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isOffline) {
+      setErrorMessage("Saving profile requires a network connection. Local preferences (theme, notifications) are saved automatically.");
+      return;
+    }
     setSaving(true);
     setErrorMessage(null);
     setSaveSuccess(false);
@@ -126,6 +130,11 @@ export function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
+    if (isOffline) {
+      setErrorMessage("Deleting account requires a network connection. Please try again when online.");
+      setShowDeleteConfirm(false);
+      return;
+    }
     try {
       await deleteAccount();
       navigate("/login");
