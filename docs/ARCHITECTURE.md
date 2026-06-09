@@ -190,3 +190,72 @@ model HabitGroupMember {
     *   **Trang Check-in di động (`QuickCheckInPage.tsx`):** Xây dựng trang check-in tối giản có layout thích ứng, chỉ hiển thị danh sách mục tiêu ngày (phân tách hai nhóm Chưa hoàn thành / Đã hoàn thành).
     *   **Web Vibration Haptic Feedback:** Tích hợp gọi `navigator.vibrate([80])` phản hồi xúc giác rung nhẹ khi check-in (hoặc rung kép `[40, 40]` khi hoàn tác) tạo cảm giác tương tác phản hồi xúc giác như widget gốc di động.
     *   **Cơ chế đếm ngược hoàn tác:** Thể hiện trạng thái đếm ngược 5 giây trên thẻ thói quen sau khi bấm log tiến độ, cho phép người dùng bấm "Hoàn tác" (Undo) để thu hồi log từ hàng đợi IndexedDB hoặc API Backend.
+## Bổ sung 2026-06-09: Ghi chú kiến trúc AI Coach, Streak Freeze và local dev
+
+### AI Coach
+Frontend:
+- `src/components/AICoachDrawer.tsx`: drawer chat/report AI Coach.
+- `src/store/aiCoachStore.ts`: store điều khiển trạng thái mở/đóng.
+- `src/components/Sidebar.tsx`: thêm nút AI Coach.
+- `src/components/BottomNav.tsx`: thêm nút AI Coach cho mobile.
+- `src/App.tsx`: render AI Coach drawer trong layout chính.
+
+Backend:
+- `src/controllers/aiController.ts`: gọi Gemini và tạo fallback.
+- `src/routes/ai.ts`: route AI có auth middleware.
+- `src/express-app.ts`: đăng ký `/api/ai`.
+
+Environment:
+- `GEMINI_API_KEY` bắt buộc nếu muốn gọi Gemini thật.
+- Nếu key hết quota, Gemini có thể trả `429 RESOURCE_EXHAUSTED`.
+
+### Streak Freeze
+Frontend:
+- `src/components/GoalCard.tsx`: hiển thị nút `Protect Streak` và gọi API activate.
+- `src/pages/Stats.tsx`: hiển thị marker ngày frozen.
+- `src/pages/TimelinePage.tsx`: hiển thị marker ngày frozen.
+- `src/index.css`: thêm style cho ngày frozen.
+- `src/types.ts`: thêm type `StreakFreeze` và `FreezeToken`.
+
+Backend:
+- `src/controllers/freezeController.ts`: xử lý token, activate, danh sách ngày frozen.
+- `src/routes/freeze.ts`: route freeze có auth middleware.
+- `src/express-app.ts`: đăng ký `/api/freeze`.
+- `server/db.ts`: thêm wrapper `freezeTokens`, `streakFreezes`, mapper `mapFreeze`.
+- `src/controllers/goalController.ts`: cập nhật logic streak để xét ngày đã frozen khi bị miss một ngày.
+- `src/services/reminderScheduler.ts`: thêm logic nhắc đóng băng streak.
+
+Database cần có:
+```prisma
+model User {
+  last_freeze_reminder_date String?
+}
+
+model StreakFreeze {
+  id          String   @id @default(uuid())
+  user_id     String
+  goal_id     String
+  frozen_date String
+  created_at  DateTime @default(now())
+
+  @@unique([goal_id, frozen_date])
+  @@index([user_id])
+  @@index([goal_id])
+}
+
+model FreezeToken {
+  id          String   @id @default(uuid())
+  user_id     String   @unique
+  tokens_left Int      @default(3)
+  month_year  String
+  updated_at  DateTime @updatedAt
+}
+```
+
+### Ổn định local dev
+- `authStore` đọc `localStorage.user` bằng try/catch để tránh trắng trang khi JSON bị hỏng.
+- Trên `localhost`, `main.tsx` không đăng ký service worker production.
+- `sw.js` tự xóa cache và unregister khi chạy local.
+- Fetch handler không intercept request local.
+
+Lý do: service worker cũ có thể cache app shell/JS lỗi và gây trắng trang dù server vẫn trả HTTP 200.
