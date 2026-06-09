@@ -46,6 +46,7 @@ model Goal {
   freezes       StreakFreeze[]
   group_id      String?
   group         HabitGroup? @relation(fields: [group_id], references: [id], onDelete: SetNull)
+  reminder_time String?   // Format "HH:mm" (e.g. "08:30"), null = dùng nhắc chung 21h
 
   @@index([user_id])
 }

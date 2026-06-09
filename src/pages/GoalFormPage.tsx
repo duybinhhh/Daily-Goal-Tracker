@@ -18,6 +18,16 @@ export const GoalFormPage: React.FC = () => {
 
   const { goals, createGoal, updateGoal, loading, error, isOffline, clearError } = useGoalStore();
 
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    category: "Learning",
+    target_count: 1,
+    frequency: "daily",
+    due_date: "",
+    reminder_time: "",   // ← thêm mới, chuỗi "HH:mm" hoặc ""
+  });
+
   // Treat as effectively offline when: browser says offline OR store has a connection error
   const isConnectionError = Boolean(
     error &&
@@ -26,19 +36,22 @@ export const GoalFormPage: React.FC = () => {
       error.toLowerCase().includes("network") ||
       error.toLowerCase().includes("database server") ||
       error.toLowerCase().includes("check your") ||
-      error.toLowerCase().includes("try again")
+      error.toLowerCase().includes("try again") ||
+      // Vietnamese keywords for connection/server errors
+      error.toLowerCase().includes("kết nối") ||
+      error.toLowerCase().includes("máy chủ") ||
+      error.toLowerCase().includes("mạng") ||
+      error.toLowerCase().includes("thử lại")
     )
   );
-  const effectivelyOffline = isOffline || isConnectionError;
-
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    category: "Learning",
-    target_count: 1,
-    frequency: "daily",
-    due_date: "",
-  });
+  
+  // State to force-bypass the offline check if the browser is lying
+  const [ignoreOffline, setIgnoreOffline] = useState(false);
+  
+  // Show full-page block ONLY if browser is hard-offline and user hasn't started typing yet
+  // or if we are in Edit mode and cannot fetch the goal.
+  const isHardOffline = isOffline && !formData.title && !ignoreOffline;
+  const effectivelyOffline = isHardOffline;
 
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -59,6 +72,7 @@ export const GoalFormPage: React.FC = () => {
           target_count: activeGoal.target_count || 1,
           frequency: activeGoal.frequency || "daily",
           due_date: activeGoal.due_date ? activeGoal.due_date.split("T")[0] : "",
+          reminder_time: activeGoal.reminder_time || "",
         });
       } else {
         // Fallback navigate back if goal not found
@@ -75,6 +89,7 @@ export const GoalFormPage: React.FC = () => {
       target_count: template.target_count,
       frequency: template.frequency,
       due_date: "", // không pre-fill due_date – user tự điền
+      reminder_time: "",
     });
     setFormErrors({}); // xoá validation errors cũ nếu có
     setShowTemplateModal(false);
@@ -117,6 +132,7 @@ export const GoalFormPage: React.FC = () => {
         ...formData,
         target_count: Number(formData.target_count),
         due_date: formData.due_date || null,
+        reminder_time: formData.reminder_time || null,
       };
 
       if (isEdit && id) {
@@ -143,10 +159,16 @@ export const GoalFormPage: React.FC = () => {
           <p className="text-xs text-on-surface-variant leading-relaxed">
             {t("goals.offlineFormError")}
           </p>
-          <div className="pt-2">
-            <Link to="/" className="btn-primary inline-flex">
+          <div className="pt-4 flex flex-col gap-3">
+            <Link to="/" className="btn-primary w-full justify-center">
               {t("goals.backToDashboard")}
             </Link>
+            <button
+              onClick={() => setIgnoreOffline(true)}
+              className="text-xs text-on-surface-variant hover:text-primary transition-colors underline underline-offset-4"
+            >
+              Tôi vẫn đang online, cho tôi tiếp tục
+            </button>
           </div>
         </div>
       </div>
@@ -304,6 +326,43 @@ export const GoalFormPage: React.FC = () => {
                   className="m-input"
                 />
               </div>
+            </div>
+
+            {/* Reminder Time */}
+            <div className="space-y-2">
+              <label
+                className="flex items-center gap-2 text-sm font-medium"
+                style={{ color: 'var(--color-on-surface)' }}
+              >
+                <Clock size={16} style={{ color: 'var(--color-primary)' }} />
+                Nhắc nhở lúc
+                <span
+                  className="text-xs font-normal"
+                  style={{ color: 'var(--color-on-surface-variant)' }}
+                >
+                  (Tùy chọn — mặc định nhắc chung lúc 21h)
+                </span>
+              </label>
+              <Input
+                type="time"
+                value={formData.reminder_time}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, reminder_time: e.target.value }))
+                }
+                placeholder="Chọn giờ nhắc nhở"
+                style={{ maxWidth: '160px' }}
+              />
+              {formData.reminder_time && (
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, reminder_time: "" }))}
+                  className="text-xs flex items-center gap-1"
+                  style={{ color: 'var(--color-on-surface-variant)' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>close</span>
+                  Xóa giờ nhắc riêng (dùng lại nhắc 21h)
+                </button>
+              )}
             </div>
  
             {/* Buttons panel */}

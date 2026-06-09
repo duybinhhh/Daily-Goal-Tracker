@@ -57,6 +57,7 @@ export interface Goal {
   updated_at: string;
   streak?: Streak;
   group_id?: string | null;
+  reminder_time?: string | null;  // "HH:mm" hoặc null
 }
 
 export interface DashboardStats {

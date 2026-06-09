@@ -7,6 +7,25 @@
 ## [Đã hoàn thành] - Sprint 7 - Ổn định hệ thống, AI Coach và Streak Freeze - 2026-06-09 (GMT+7)
 
 ### Đã thêm & cải tiến
+* **Hệ thống Mẫu mục tiêu (Goal Templates):**
+  - Tạo mới component `GoalTemplateModal.tsx` cho phép người dùng chọn nhanh các thói quen mẫu từ thư viện có sẵn.
+  - Xây dựng danh mục mẫu đa dạng: Sức khỏe, Học tập, Thể lực, Công việc, Tài chính và Thói quen hàng ngày (`goalTemplates.ts`).
+  - Tích hợp nút "Chọn từ Template" vào trang tạo mục tiêu (`GoalFormPage.tsx`), hỗ trợ pre-fill thông tin tiêu đề, mô tả, danh mục, mục tiêu và tần suất.
+  - Hỗ trợ tìm kiếm template theo từ khóa và lọc theo danh mục ngay trong modal.
+
+* **Nhắc nhở riêng từng mục tiêu (US-19):**
+  - Thêm trường tùy chọn "Nhắc nhở lúc" (Time picker HH:mm) vào trang tạo và chỉnh sửa mục tiêu.
+  - Hiển thị giờ nhắc nhở nhỏ dưới tên mục tiêu trên GoalCard.
+  - Cải tiến Scheduler scan DB mỗi phút, bắn push notification đúng giờ đã cài và đúng timezone của người dùng.
+  - Nội dung thông báo cá nhân hóa: `⏰ [{Goal Title}] — Đừng quên mục tiêu của bạn hôm nay!`.
+  - Tự động bỏ qua thông báo nếu mục tiêu đã hoàn thành trước giờ nhắc.
+  - Tối ưu hệ thống nhắc chung 21h: Tự động loại trừ các mục tiêu đã cài đặt giờ nhắc riêng để tránh làm phiền người dùng quá nhiều.
+
+* **Cải tiến xử lý lỗi kết nối (Goal Form):**
+  - Thêm tùy chọn "Tôi vẫn đang online, cho tôi tiếp tục" để người dùng có thể bỏ qua cảnh báo offline của trình duyệt trong trường hợp nhận diện nhầm.
+  - Tối ưu logic hiển thị: Không tự động chặn toàn màn hình khi người dùng đã bắt đầu nhập liệu, giúp tránh mất dữ liệu khi mạng chập chờn.
+  - Cập nhật bộ lọc từ khóa tiếng Việt giúp nhận diện chính xác các lỗi kết nối từ máy chủ.
+
 * **AI Coach Drawer:**
   - Thêm drawer AI Coach mở trực tiếp từ Sidebar và BottomNav, không cần route riêng.
   - Thêm store `aiCoachStore` để điều khiển trạng thái mở/đóng drawer.

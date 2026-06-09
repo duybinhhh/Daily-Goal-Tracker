@@ -37,6 +37,26 @@ const getLocalHour = (date: Date, timezone: string): number => {
   }
 };
 
+// Helper to get HH:mm string in user's timezone
+const getLocalTimeString = (date: Date, timezone: string): string => {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(date);
+    const hour = parts.find(p => p.type === "hour")?.value?.padStart(2, "0") ?? "00";
+    const minute = parts.find(p => p.type === "minute")?.value?.padStart(2, "0") ?? "00";
+    return `${hour}:${minute}`; // "HH:mm" — e.g. "08:30"
+  } catch {
+    const h = String(date.getUTCHours()).padStart(2, "0");
+    const m = String(date.getUTCMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+  }
+};
+
 // Main check function
 export async function checkAndSendReminders() {
   try {
@@ -51,14 +71,83 @@ export async function checkAndSendReminders() {
 
       const timezone = user.timezone || "UTC";
       const localHour = getLocalHour(now, timezone);
-      const goals = await db.goals.findMany({ user_id: user.id });
+      const localTimeStr = getLocalTimeString(now, timezone);
+      const localDateStr = getLocalDateString(now, timezone);
+      
+      const goals = await db.goals.findMany({ user_id: user.id, status: "active" });
 
+      // ─────────────────────────────────────────────────────
+      // PHẦN 1: Per-goal reminders (AC-3, AC-4, AC-5)
+      // ─────────────────────────────────────────────────────
+      for (const goal of goals) {
+        // Chỉ xử lý goal có reminder_time riêng
+        if (!goal.reminder_time) continue;
+
+        // Kiểm tra đúng phút (so sánh "HH:mm")
+        if (localTimeStr !== goal.reminder_time) continue;
+
+        // AC-5: Kiểm tra goal đã hoàn thành hôm nay chưa
+        const syncedGoal = await syncAndResetGoalProgress(goal, timezone);
+        if (syncedGoal.current_count >= syncedGoal.target_count) {
+          console.log(`[Reminder Scheduler] Goal "${goal.title}" already completed — skipping per-goal reminder.`);
+          continue;
+        }
+
+        // Kiểm tra đã gửi per-goal reminder hôm nay chưa
+        const existingNotifs = await db.notifications.findMany({ user_id: user.id });
+        const alreadySentToday = existingNotifs.some(
+          (n: any) =>
+            n.message.includes(`per_goal_reminder:${goal.id}:`) &&
+            n.created_at &&
+            getLocalDateString(new Date(n.created_at), timezone) === localDateStr
+        );
+
+        if (alreadySentToday) {
+          console.log(`[Reminder Scheduler] Per-goal reminder for "${goal.title}" already sent today — skipping.`);
+          continue;
+        }
+
+        // AC-4: Gửi push notification với nội dung chuẩn
+        try {
+          const subscription = JSON.parse(user.push_subscription);
+          const payload = JSON.stringify({
+            title: "Nhắc nhở mục tiêu ⏰",
+            body: `[${goal.title}] — Đừng quên mục tiêu của bạn hôm nay!`,
+            icon: "/icon.png",
+            badge: "/icon.png",
+            data: { url: "/#/goals" },
+          });
+
+          await webpush.sendNotification(subscription, payload);
+          console.log(`[Reminder Scheduler] Per-goal reminder sent: "${goal.title}" to user ${user.name}`);
+
+          // Lưu record để dedup
+          await db.notifications.create({
+            user_id: user.id,
+            type: "per_goal_reminder",
+            message: `per_goal_reminder:${goal.id}:${goal.title}`,
+          });
+        } catch (pushError: any) {
+          console.error(`[Reminder Scheduler] Push error for goal "${goal.title}":`, pushError.message);
+          if (pushError.statusCode === 410 || pushError.statusCode === 404) {
+            await db.users.update(user.id, { push_subscription: null });
+          }
+        }
+      }
+
+      // ─────────────────────────────────────────────────────
+      // PHẦN 2: Nhắc chung 21h — GIỮ NGUYÊN LOGIC GỐC
+      // Chỉ thay đổi: loại trừ các goal đã có reminder_time (AC-6)
+      // ─────────────────────────────────────────────────────
+
+      // Freeze risk reminder at 20h
       if (localHour === 20) {
-        const localDateStr = getLocalDateString(now, timezone);
-
         if (user.last_freeze_reminder_date !== localDateStr) {
           const atRiskGoals = [];
           for (const goal of goals) {
+            // AC-6: skip goal has individual reminder
+            if (goal.reminder_time) continue;
+
             const synced = await syncAndResetGoalProgress(goal, timezone);
             const streak = await db.streaks.findUnique({ goal_id: synced.id });
             const currentStreak = streak?.current_streak ?? 0;
@@ -101,8 +190,6 @@ export async function checkAndSendReminders() {
 
       // Check if it's 21:00 (9:00 PM) or later in the user's local timezone
       if (localHour >= 21) {
-        const localDateStr = getLocalDateString(now, timezone);
-
         // Check if we already sent a reminder today
         if (user.last_reminder_sent_date === localDateStr) {
           continue;
@@ -111,6 +198,9 @@ export async function checkAndSendReminders() {
         let hasIncompleteDailyGoals = false;
 
         for (const goal of goals) {
+          // AC-6: BỎ QUA goal đã cài reminder_time riêng
+          if (goal.reminder_time) continue;
+
           // Sync and reset progress to ensure current day's count is updated
           const syncedGoal = await syncAndResetGoalProgress(goal, timezone);
 

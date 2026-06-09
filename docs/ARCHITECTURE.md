@@ -48,6 +48,7 @@ model Goal {
   frequency     String     @default("daily") // daily, weekly, monthly
   status        String     @default("active") // active, paused, completed
   due_date      DateTime?
+  reminder_time String?   // Format "HH:mm" (e.g. "08:30")
   created_at    DateTime   @default(now())
   updated_at    DateTime   @updatedAt
   logs          GoalLog[]
