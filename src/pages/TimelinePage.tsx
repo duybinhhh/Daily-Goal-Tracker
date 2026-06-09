@@ -3,12 +3,15 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useGoalStore } from "../store/goalStore";
 import { useAuthStore } from "../store/authStore";
+import { useTranslation } from "../i18n";
+import api from "../services/api";
 
 function getTimelineLogKey(log: { goalId: string; completedAt: string; note: string | null }) {
   return [log.goalId, log.completedAt, (log.note || "").trim()].join("|");
 }
 
 export default function TimelinePage() {
+  const { t, language } = useTranslation();
   const { user } = useAuthStore();
   const { goals, history, stats, fetchHistory, fetchGoals, fetchStats, deleteLogProgress, isOffline } = useGoalStore();
 
@@ -17,11 +20,15 @@ export default function TimelinePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
+  const [frozenDatesSet, setFrozenDatesSet] = useState<Set<string>>(new Set());
 
   // Fetch initial data
   useEffect(() => {
     fetchGoals();
     fetchStats();
+    api.get("/api/freeze/dates?all=true")
+      .then((res) => setFrozenDatesSet(new Set<string>(res.data.frozen_dates)))
+      .catch(() => {});
   }, [fetchGoals, fetchStats]);
 
   // Fetch history when current month/year changes
@@ -37,7 +44,7 @@ export default function TimelinePage() {
     setSelectedDay(null);
   }, [year, month, fetchHistory]);
 
-  const monthName = currentDate.toLocaleString("en-US", {
+  const monthName = currentDate.toLocaleString(language === "vi" ? "vi-VN" : "en-US", {
     month: "long",
     year: "numeric",
   });
@@ -46,6 +53,10 @@ export default function TimelinePage() {
   const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startOffset = (firstDay + 6) % 7; // Convert Sun=0 to Mon=0
+
+  const weekdays = language === "vi"
+    ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+    : ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
   const prevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -230,10 +241,10 @@ export default function TimelinePage() {
 
   const handleDeleteLog = async (logId: string, goalTitle: string) => {
     if (isOffline) {
-      alert("Deleting log entries requires a network connection. Please try again when you are online.");
+      alert(t("timeline.offlineDeleteError"));
       return;
     }
-    if (window.confirm(`Delete check-in log for "${goalTitle}"?`)) {
+    if (window.confirm(t("timeline.confirmDeleteLog", { title: goalTitle }))) {
       try {
         const fromDate = new Date(year, month, 1).toISOString().split("T")[0];
         const toDate = new Date(year, month + 1, 0).toISOString().split("T")[0];
@@ -270,7 +281,7 @@ export default function TimelinePage() {
               color: "var(--color-on-surface)",
             }}
           >
-            Activity Timeline
+            {t("timeline.title")}
           </h2>
           <div className="relative w-full xs:w-[240px]">
             <span
@@ -282,7 +293,7 @@ export default function TimelinePage() {
             <input
               className="bg-surface-container-high border-none rounded-full py-1.5 pl-9 pr-4 text-xs focus:ring-2 focus:ring-primary w-full text-on-surface outline-none transition-all duration-300"
               style={{ border: "1px solid var(--border-subtle)" }}
-              placeholder="Search check-ins and notes..."
+              placeholder={t("common.search")}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -296,22 +307,22 @@ export default function TimelinePage() {
               <span className="material-symbols-outlined ms-filled" style={{ fontSize: "14px" }}>
                 local_fire_department
               </span>
-              <span>{bestCurrentStreak} Day Streak</span>
+              <span>{t("goalCard.streakDays", { days: bestCurrentStreak })}</span>
             </div>
           )}
           {isOffline ? (
             <div
               className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4 opacity-50 cursor-not-allowed"
               style={{ pointerEvents: "none" }}
-              title="Network connection required"
+              title={t("goals.connectionRequired")}
             >
               <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>cloud_off</span>
-              <span className="hidden sm:inline">New Goal</span>
+              <span className="hidden sm:inline">{t("goals.newGoal")}</span>
             </div>
           ) : (
             <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4">
               <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>add</span>
-              <span className="hidden sm:inline">New Goal</span>
+              <span className="hidden sm:inline">{t("goals.newGoal")}</span>
             </Link>
           )}
         </div>
@@ -330,7 +341,7 @@ export default function TimelinePage() {
                 <div className="relative z-10">
                   <h3 className="font-bold text-xl text-on-surface mb-1">{monthName}</h3>
                   <p className="text-on-surface-variant text-xs">
-                    You've completed <span className="text-secondary font-bold">{totalMonthlyCompletions} goals</span> this month. Keep the momentum!
+                    {t("timeline.monthlySummary", { count: totalMonthlyCompletions })}
                   </p>
                 </div>
                 <div className="absolute -right-4 -bottom-4 opacity-10">
@@ -344,10 +355,10 @@ export default function TimelinePage() {
                   <span className="material-symbols-outlined text-secondary" style={{ fontSize: "18px" }}>
                     bolt
                   </span>
-                  <p className="font-bold text-[10px] text-secondary uppercase tracking-wider">Current Streak</p>
+                  <p className="font-bold text-[10px] text-secondary uppercase tracking-wider">{t("dashboard.streakBadge")}</p>
                 </div>
                 <p className="text-3xl font-black text-on-surface">
-                  {bestCurrentStreak} <span className="text-xs font-medium text-on-surface-variant">Days</span>
+                  {bestCurrentStreak} <span className="text-xs font-medium text-on-surface-variant">{t("common.days")}</span>
                 </p>
               </div>
             </div>
@@ -355,7 +366,7 @@ export default function TimelinePage() {
             {/* Monthly Calendar View */}
             <div className="glass-card p-6">
               <div className="flex items-center justify-between mb-6">
-                <h4 className="font-bold text-base text-on-surface">Performance Grid</h4>
+                <h4 className="font-bold text-base text-on-surface">{t("timeline.performanceGrid")}</h4>
                 <div className="flex gap-1">
                   <button onClick={prevMonth} className="p-1.5 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors">
                     <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>chevron_left</span>
@@ -368,7 +379,7 @@ export default function TimelinePage() {
 
               {/* Day-of-week headers */}
               <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((d) => (
+                {weekdays.map((d) => (
                   <div key={d} className="text-on-surface-variant font-bold text-[10px] tracking-wider py-1">
                     {d}
                   </div>
@@ -389,6 +400,7 @@ export default function TimelinePage() {
                   const historyDay = historyMap.get(dateStr);
                   const isCompleted = historyDay && historyDay.count > 0;
                   const completionsCount = historyDay?.count || 0;
+                  const isFrozen = frozenDatesSet.has(dateStr);
 
                   const isSelected = selectedDay === dayNum;
 
@@ -433,9 +445,15 @@ export default function TimelinePage() {
                         </span>
                       )}
 
+                      {isFrozen && (
+                        <span className="text-[10px] leading-none absolute top-1 left-1 text-sky-400" title="Frozen day">
+                          ❄
+                        </span>
+                      )}
+
                       {/* Tooltip bubble on hover */}
                       <div className="pointer-events-none absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 bg-surface-container-high border border-white/5 text-on-surface font-semibold text-[9px] rounded-lg px-2 py-0.5 whitespace-nowrap z-30 transition-all shadow-xl font-sans">
-                        {completionsCount} completions
+                        {t("timeline.completions", { count: completionsCount })}
                       </div>
                     </div>
                   );
@@ -455,7 +473,7 @@ export default function TimelinePage() {
                     <span className="material-symbols-outlined text-primary ms-filled" style={{ fontSize: "20px" }}>
                       workspace_premium
                     </span>
-                    <p className="font-bold text-xs text-on-surface uppercase tracking-wider">Consistent Leader</p>
+                    <p className="font-bold text-xs text-on-surface uppercase tracking-wider">{t("timeline.consistentLeader")}</p>
                   </div>
                 </div>
                 <div className="p-4 border-t border-white/5">
@@ -463,10 +481,10 @@ export default function TimelinePage() {
                     {bestCurrentStreak >= 10 ? (
                       <span className="text-secondary font-bold flex items-center gap-1">
                         <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                        Unlocked! (Streak {bestCurrentStreak}d &ge; 10 days)
+                        {t("timeline.consistentLeaderUnlocked", { days: bestCurrentStreak })}
                       </span>
                     ) : (
-                      `Keep a streak of 10 days to unlock. Current: ${bestCurrentStreak}/10 days.`
+                      t("timeline.consistentLeaderLocked", { days: bestCurrentStreak })
                     )}
                   </p>
                 </div>
@@ -481,7 +499,7 @@ export default function TimelinePage() {
                     <span className="material-symbols-outlined text-secondary ms-filled" style={{ fontSize: "20px" }}>
                       verified
                     </span>
-                    <p className="font-bold text-xs text-on-surface uppercase tracking-wider">Goal Crusher</p>
+                    <p className="font-bold text-xs text-on-surface uppercase tracking-wider">{t("timeline.goalCrusher")}</p>
                   </div>
                 </div>
                 <div className="p-4 border-t border-white/5">
@@ -489,10 +507,10 @@ export default function TimelinePage() {
                     {totalMonthlyCompletions >= 15 ? (
                       <span className="text-secondary font-bold flex items-center gap-1">
                         <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                        Unlocked! ({totalMonthlyCompletions} monthly logs &ge; 15)
+                        {t("timeline.goalCrusherUnlocked", { count: totalMonthlyCompletions })}
                       </span>
                     ) : (
-                      `Complete 15 daily logs this month. Current: ${totalMonthlyCompletions}/15 logs.`
+                      t("timeline.goalCrusherLocked", { count: totalMonthlyCompletions })
                     )}
                   </p>
                 </div>
@@ -509,9 +527,9 @@ export default function TimelinePage() {
               {/* Feed Header */}
               <div className="p-4 border-b border-white/5 flex items-center justify-between">
                 <div>
-                  <h4 className="font-bold text-sm text-on-surface">Activity Log</h4>
+                  <h4 className="font-bold text-sm text-on-surface">{t("timeline.activityFeed")}</h4>
                   <p className="text-[10px] text-on-surface-variant mt-0.5">
-                    {selectedDay ? `Filtering: Day ${selectedDay}` : "Showing all logs this month"}
+                    {selectedDay ? t("timeline.filteringDay", { day: selectedDay }) : t("timeline.showingAllLogs")}
                   </p>
                 </div>
                 {selectedDay && (
@@ -519,7 +537,7 @@ export default function TimelinePage() {
                     onClick={() => setSelectedDay(null)}
                     className="text-[10px] text-primary font-bold hover:underline"
                   >
-                    Clear Filter
+                    {t("dashboard.clearFilter")}
                   </button>
                 )}
               </div>
@@ -533,10 +551,10 @@ export default function TimelinePage() {
                     const isToday = new Date().toDateString() === logDate.toDateString();
                     
                     const dateDisplay = isToday
-                      ? "Today"
-                      : logDate.toLocaleDateString([], { month: "short", day: "numeric" });
+                      ? t("common.today")
+                      : logDate.toLocaleDateString(language === "vi" ? "vi-VN" : "en-US", { month: "short", day: "numeric" });
                     
-                    const timeDisplay = logDate.toLocaleTimeString([], {
+                    const timeDisplay = logDate.toLocaleTimeString(language === "vi" ? "vi-VN" : "en-US", {
                       hour: "2-digit",
                       minute: "2-digit",
                     });
@@ -563,7 +581,7 @@ export default function TimelinePage() {
                             {dateDisplay}, {timeDisplay}
                           </p>
                           <span className="bg-secondary/15 text-secondary px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border border-secondary/10">
-                            Completed
+                            {t("common.completed")}
                           </span>
                         </div>
 
@@ -574,13 +592,13 @@ export default function TimelinePage() {
                               {log.goalTitle}
                             </p>
                             <p className="text-[10px] text-on-surface-variant mt-0.5 italic truncate">
-                              {log.note ? `"${log.note}"` : "Completed checked-in"}
+                              {log.note ? `"${log.note}"` : t("timeline.defaultCheckinNote")}
                             </p>
                           </div>
                           <button
                             onClick={() => handleDeleteLog(log.logId, log.goalTitle)}
                             className="btn-danger-ghost shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded-lg"
-                            title={isOffline ? "Requires connection" : "Delete log"}
+                            title={isOffline ? t("goals.connectionRequired") : t("timeline.deleteLog")}
                             style={{ display: "inline-flex", alignItems: "center", cursor: isOffline ? "not-allowed" : "pointer", pointerEvents: isOffline ? "none" : "auto", opacity: isOffline ? 0 : undefined }}
                             disabled={isOffline}
                           >
@@ -596,7 +614,7 @@ export default function TimelinePage() {
                     <span className="material-symbols-outlined text-[36px] text-on-surface-variant">
                       history_toggle_off
                     </span>
-                    <p className="text-xs text-on-surface-variant font-medium">No check-ins found</p>
+                    <p className="text-xs text-on-surface-variant font-medium">{t("timeline.noCheckinsFound")}</p>
                   </div>
                 )}
               </div>
@@ -611,12 +629,12 @@ export default function TimelinePage() {
                   <span className="material-symbols-outlined text-[16px]">
                     download
                   </span>
-                  {exporting ? "Generating Report..." : "Export Monthly Report"}
+                  {exporting ? t("timeline.generatingReport") : t("timeline.exportMonthlyReport")}
                 </button>
 
                 {exportSuccess && (
                   <p className="text-[10px] text-secondary text-center mt-2 font-semibold">
-                    Report downloaded successfully!
+                    {t("timeline.exportSuccess")}
                   </p>
                 )}
               </div>

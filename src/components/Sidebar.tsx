@@ -1,9 +1,12 @@
 // src/components/Sidebar.tsx
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { Brain } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
+import { useAICoachStore } from "../store/aiCoachStore";
 import { syncOfflineData } from "../services/syncManager";
+import { useTranslation } from "../i18n";
 
 interface NavItemProps {
   to: string;
@@ -30,11 +33,13 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, end }) => (
 export default function Sidebar() {
   const { user, logout, isAuthenticated } = useAuthStore();
   const { goals, isOffline, isSyncing } = useGoalStore();
+  const { openDrawer } = useAICoachStore();
   const navigate = useNavigate();
-
-  if (!isAuthenticated) return null;
+  const { t } = useTranslation();
 
   const bestStreak = Math.max(0, ...goals.map((g) => g.streak?.current_streak || 0));
+
+  if (!isAuthenticated) return null;
 
   const handleLogout = async () => {
     await logout();
@@ -43,6 +48,13 @@ export default function Sidebar() {
 
   const handleSyncNow = () => {
     if (navigator.onLine) syncOfflineData();
+  };
+
+  const handleOpenAICoach = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    window.dispatchEvent(new CustomEvent("open-ai-coach"));
+    openDrawer();
   };
 
   return (
@@ -97,8 +109,8 @@ export default function Sidebar() {
         >
           <span className="material-symbols-outlined" style={{ fontSize: "16px", color: "#fb923c" }}>cloud_off</span>
           <div className="flex flex-col leading-tight">
-            <span style={{ fontSize: "11px", fontWeight: 700, color: "#fb923c" }}>Offline Mode</span>
-            <span style={{ fontSize: "9px", color: "rgba(251,146,60,0.8)", fontWeight: 500 }}>Check-ins are queued</span>
+            <span style={{ fontSize: "11px", fontWeight: 700, color: "#fb923c" }}>{t("common.offline")}</span>
+            <span style={{ fontSize: "9px", color: "rgba(251,146,60,0.8)", fontWeight: 500 }}>{t("goalCard.offlineQueue")}</span>
           </div>
         </div>
       )}
@@ -111,7 +123,7 @@ export default function Sidebar() {
           }}
         >
           <div className="spinner" style={{ width: "14px", height: "14px", color: "var(--color-primary)" }} />
-          <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-primary)" }}>Syncing data…</span>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-primary)" }}>{t("common.syncing")}</span>
         </div>
       )}
 
@@ -125,19 +137,28 @@ export default function Sidebar() {
             >
               local_fire_department
             </span>
-            <span>{bestStreak} Day Streak</span>
+            <span>{t("goalCard.streakDays", { days: bestStreak })}</span>
           </div>
         </div>
       )}
 
       {/* Nav Links */}
       <nav className="flex-1 px-3 space-y-1">
-        <NavItem to="/" icon="home" label="Dashboard" end />
-        <NavItem to="/stats" icon="query_stats" label="Statistics" />
-        <NavItem to="/goals" icon="checklist" label="Goals" />
-        <NavItem to="/timeline" icon="timeline" label="Timeline" />
-        <NavItem to="/groups" icon="group" label="Habit Groups" />
-        <NavItem to="/settings" icon="settings" label="Settings" />
+        <NavItem to="/" icon="home" label={t("nav.dashboard")} end />
+        <NavItem to="/stats" icon="query_stats" label={t("nav.statistics")} />
+        <NavItem to="/goals" icon="checklist" label={t("nav.goals")} />
+        <NavItem to="/timeline" icon="timeline" label={t("nav.timeline")} />
+        <NavItem to="/groups" icon="group" label={t("nav.habitGroups")} />
+        <button
+          type="button"
+          onClick={handleOpenAICoach}
+          className="nav-item w-full cursor-pointer border-0 bg-transparent text-left pointer-events-auto"
+          style={{ fontFamily: "inherit" }}
+        >
+          <Brain size={22} />
+          <span>AI Coach</span>
+        </button>
+        <NavItem to="/settings" icon="settings" label={t("nav.settings")} />
       </nav>
 
       {/* User section */}
@@ -178,7 +199,7 @@ export default function Sidebar() {
         <button
           onClick={handleLogout}
           className="btn-danger-ghost"
-          title="Sign Out"
+          title={t("auth.logout")}
         >
           <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
             logout
@@ -191,18 +212,18 @@ export default function Sidebar() {
         {isOffline ? (
           <div
             className="btn-primary w-full opacity-50 cursor-not-allowed"
-            title="Network connection required to create goals"
+            title={t("common.offline")}
             style={{ pointerEvents: "none" }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>cloud_off</span>
-            New Goal
+            {t("goals.newGoal")}
           </div>
         ) : (
           <NavLink to="/new-goal" className="btn-primary w-full">
             <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
               add
             </span>
-            New Goal
+            {t("goals.newGoal")}
           </NavLink>
         )}
       </div>

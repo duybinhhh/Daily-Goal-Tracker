@@ -58,6 +58,19 @@ function mapNotification(n) {
     created_at: n.created_at.toISOString()
   };
 }
+function getCurrentMonthYear() {
+  const now = /* @__PURE__ */ new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+function mapFreeze(f) {
+  return {
+    id: f.id,
+    user_id: f.user_id,
+    goal_id: f.goal_id,
+    frozen_date: f.frozen_date,
+    created_at: f.created_at.toISOString()
+  };
+}
 var PrismaDB = class {
   constructor() {
     // Users Operations
@@ -85,7 +98,8 @@ var PrismaDB = class {
             email: data.email,
             password_hash: data.password_hash,
             name: data.name,
-            timezone: data.timezone || "UTC"
+            timezone: data.timezone || "UTC",
+            onboarding_completed: false
           }
         });
         return mapUser(created);
@@ -244,6 +258,43 @@ var PrismaDB = class {
           });
           return mapStreak(updated);
         }
+      }
+    };
+    this.freezeTokens = {
+      findOrCreate: async (userId) => {
+        const currentMonthYear = getCurrentMonthYear();
+        const existing = await prisma.freezeToken.findUnique({ where: { user_id: userId } });
+        if (!existing) {
+          return prisma.freezeToken.create({
+            data: { user_id: userId, tokens_left: 3, month_year: currentMonthYear }
+          });
+        }
+        if (existing.month_year !== currentMonthYear) {
+          return prisma.freezeToken.update({
+            where: { user_id: userId },
+            data: { tokens_left: 3, month_year: currentMonthYear }
+          });
+        }
+        return existing;
+      },
+      update: async (userId, data) => {
+        return prisma.freezeToken.update({ where: { user_id: userId }, data });
+      }
+    };
+    this.streakFreezes = {
+      findMany: async (where) => {
+        const results = await prisma.streakFreeze.findMany({ where });
+        return results.map(mapFreeze);
+      },
+      create: async (data) => {
+        const created = await prisma.streakFreeze.create({ data });
+        return mapFreeze(created);
+      },
+      findByDate: async (goalId, date) => {
+        const found = await prisma.streakFreeze.findUnique({
+          where: { goal_id_frozen_date: { goal_id: goalId, frozen_date: date } }
+        });
+        return found ? mapFreeze(found) : null;
       }
     };
     // Notifications Helpers
@@ -502,7 +553,9 @@ var register = async (req, res, next) => {
         id: newUser.id,
         email: newUser.email,
         name: newUser.name,
-        timezone: newUser.timezone
+        timezone: newUser.timezone,
+        created_at: newUser.created_at,
+        onboarding_completed: newUser.onboarding_completed
       }
     });
   } catch (error) {
@@ -534,7 +587,9 @@ var login = async (req, res, next) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        timezone: user.timezone
+        timezone: user.timezone,
+        created_at: user.created_at,
+        onboarding_completed: user.onboarding_completed
       }
     });
   } catch (error) {
@@ -583,8 +638,28 @@ var updateProfile = async (req, res, next) => {
     if (!authReq.user) {
       throw new AppError("Unauthenticated request", 401);
     }
-    const { name, email, timezone } = req.body;
+    const { name, email, timezone, onboarding_completed } = req.body;
     const userId = authReq.user.id;
+    if (onboarding_completed !== void 0) {
+      const updatedUser2 = await db.users.update(userId, {
+        onboarding_completed: !!onboarding_completed
+      });
+      const accessToken2 = generateAccessToken(updatedUser2);
+      res.status(200).json({
+        success: true,
+        message: "Profile updated successfully.",
+        user: {
+          id: updatedUser2.id,
+          email: updatedUser2.email,
+          name: updatedUser2.name,
+          timezone: updatedUser2.timezone,
+          created_at: updatedUser2.created_at,
+          onboarding_completed: updatedUser2.onboarding_completed
+        },
+        accessToken: accessToken2
+      });
+      return;
+    }
     if (!name || !email) {
       throw new AppError("Name and email are required.", 400);
     }
@@ -607,7 +682,9 @@ var updateProfile = async (req, res, next) => {
         id: updatedUser.id,
         email: updatedUser.email,
         name: updatedUser.name,
-        timezone: updatedUser.timezone
+        timezone: updatedUser.timezone,
+        created_at: updatedUser.created_at,
+        onboarding_completed: updatedUser.onboarding_completed
       },
       accessToken
     });
@@ -973,8 +1050,29 @@ var completeGoal = async (req, res, next) => {
           newLongestStreak = Math.max(newLongestStreak, newCurrentStreak);
           isStreakUpdated = true;
         } else if (daysDiff > 1) {
-          newCurrentStreak = 1;
-          isStreakUpdated = true;
+          const missingDates = [];
+          const baseDate = new Date(streak.last_completed_at);
+          for (let d = 1; d < daysDiff; d++) {
+            const missing = new Date(baseDate);
+            missing.setDate(missing.getDate() + d);
+            missingDates.push(getLocalDateString(missing, timezone));
+          }
+          if (missingDates.length > 0) {
+            const freezes = await db.streakFreezes.findMany({ goal_id: syncedGoal.id });
+            const frozenSet = new Set(freezes.map((f) => f.frozen_date));
+            const allFrozen = missingDates.every((date) => frozenSet.has(date));
+            if (allFrozen) {
+              newCurrentStreak = streak.current_streak + missingDates.length + 1;
+              newLongestStreak = Math.max(newLongestStreak, newCurrentStreak);
+              isStreakUpdated = true;
+            } else {
+              newCurrentStreak = 1;
+              isStreakUpdated = true;
+            }
+          } else {
+            newCurrentStreak = 1;
+            isStreakUpdated = true;
+          }
         } else if (daysDiff <= 0) {
           isStreakUpdated = false;
         }
@@ -1481,6 +1579,286 @@ router4.post("/:id/leave", leaveGroup);
 router4.delete("/:id", deleteGroup);
 var groups_default = router4;
 
+// src/routes/ai.ts
+import { Router as Router5 } from "express";
+
+// src/controllers/aiController.ts
+import { GoogleGenAI } from "@google/genai";
+var MODEL = "gemini-2.0-flash";
+var AI_TIMEOUT_MS = 14e3;
+var systemPrompt = [
+  "B\u1EA1n l\xE0 AI Habit Coach th\xE2n thi\u1EC7n, h\u1ED7 tr\u1EE3 ng\u01B0\u1EDDi d\xF9ng theo d\xF5i th\xF3i quen v\xE0 m\u1EE5c ti\xEAu c\xE1 nh\xE2n.",
+  "Ph\u1EA3n h\u1ED3i b\u1EB1ng ti\u1EBFng Vi\u1EC7t, ng\u1EAFn g\u1ECDn, t\xEDch c\u1EF1c v\xE0 th\u1EF1c t\u1EBF.",
+  "Kh\xF4ng h\u1ECFi th\xF4ng tin c\xE1 nh\xE2n nh\u01B0 email hay m\u1EADt kh\u1EA9u.",
+  "Ch\u1EC9 d\u1EF1a tr\xEAn d\u1EEF li\u1EC7u th\xF3i quen \u0111\u01B0\u1EE3c cung c\u1EA5p trong context."
+].join("\n");
+function getAIClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  return new GoogleGenAI({ apiKey });
+}
+function withTimeout(promise, timeoutMs = AI_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs);
+    })
+  ]);
+}
+function extractJson(text) {
+  const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    return JSON.parse(cleaned.slice(start, end + 1));
+  }
+  return JSON.parse(cleaned);
+}
+function buildStats(goals) {
+  const activeGoals = goals.filter((g) => g.status !== "paused");
+  const totalTargets = activeGoals.reduce((sum, goal) => sum + goal.target_count, 0);
+  const totalProgress = activeGoals.reduce((sum, goal) => sum + Math.min(goal.current_count, goal.target_count), 0);
+  return {
+    totalGoals: goals.length,
+    activeGoals: activeGoals.length,
+    completedGoalsToday: goals.filter((g) => g.current_count >= g.target_count).length,
+    overallCompletionRate: totalTargets > 0 ? Math.round(totalProgress / totalTargets * 100) : 0,
+    bestCurrentStreak: goals.length ? Math.max(...goals.map((g) => g.current_streak)) : 0,
+    bestLongestStreak: goals.length ? Math.max(...goals.map((g) => g.longest_streak)) : 0
+  };
+}
+async function buildCoachContext(userId) {
+  const user = await db.users.findUnique({ id: userId });
+  const timezone = user?.timezone || "UTC";
+  const rawGoals = await db.goals.findMany({ user_id: userId });
+  const goals = await Promise.all(
+    rawGoals.map(async (goal) => {
+      const syncedGoal = await syncAndResetGoalProgress(goal, timezone);
+      const streak = await db.streaks.findUnique({ goal_id: goal.id });
+      return {
+        title: syncedGoal.title,
+        category: syncedGoal.category,
+        frequency: syncedGoal.frequency,
+        status: syncedGoal.status,
+        current_count: syncedGoal.current_count,
+        target_count: syncedGoal.target_count,
+        current_streak: streak?.current_streak || 0,
+        longest_streak: streak?.longest_streak || 0
+      };
+    })
+  );
+  return {
+    timezone,
+    today: (/* @__PURE__ */ new Date()).toLocaleDateString("en-CA", { timeZone: timezone }),
+    goals,
+    stats: buildStats(goals)
+  };
+}
+function buildContextString(context) {
+  return JSON.stringify(
+    {
+      today: context.today,
+      timezone: context.timezone,
+      completionRate: context.stats.overallCompletionRate,
+      bestCurrentStreak: context.stats.bestCurrentStreak,
+      goals: context.goals
+    },
+    null,
+    2
+  );
+}
+function fallbackReport(context) {
+  const ranked = [...context.goals].map((goal) => ({
+    ...goal,
+    completionRate: goal.target_count > 0 ? Math.round(Math.min(goal.current_count, goal.target_count) / goal.target_count * 100) : 0
+  }));
+  const strongHabits = [...ranked].sort((a, b) => b.completionRate - a.completionRate || b.current_streak - a.current_streak).slice(0, 3).map((goal) => ({
+    title: goal.title,
+    completionRate: goal.completionRate,
+    currentStreak: goal.current_streak
+  }));
+  const weakHabits = [...ranked].sort((a, b) => a.completionRate - b.completionRate || b.current_streak - a.current_streak).slice(0, 3).map((goal) => ({
+    title: goal.title,
+    completionRate: goal.completionRate,
+    daysMissed: goal.completionRate >= 100 ? 0 : 1
+  }));
+  const weakest = weakHabits[0];
+  const strongest = strongHabits[0];
+  return {
+    weeklyCompletionRate: context.stats.overallCompletionRate,
+    strongHabits,
+    weakHabits,
+    suggestions: [
+      weakest ? `H\xE3y \u01B0u ti\xEAn ho\xE0n th\xE0nh "${weakest.title}" h\xF4m nay v\xEC ti\u1EBFn \u0111\u1ED9 hi\u1EC7n t\u1EA1i m\u1EDBi \u0111\u1EA1t ${weakest.completionRate}%.` : "H\xE3y t\u1EA1o m\u1ED9t th\xF3i quen nh\u1ECF c\xF3 th\u1EC3 ho\xE0n th\xE0nh trong 5 ph\xFAt \u0111\u1EC3 b\u1EAFt \u0111\u1EA7u \u0111\u1EC1u \u0111\u1EB7n h\u01A1n.",
+      strongest ? `Gi\u1EEF nh\u1ECBp cho "${strongest.title}" v\xEC streak hi\u1EC7n t\u1EA1i \u0111ang l\xE0 ${strongest.currentStreak} ng\xE0y.` : "\u0110\u1EB7t m\u1ED9t khung gi\u1EDD c\u1ED1 \u0111\u1ECBnh m\u1ED7i ng\xE0y \u0111\u1EC3 check-in d\u1EC5 h\u01A1n."
+    ],
+    motivationalMessage: "B\u1EA1n \u0111ang x\xE2y nh\u1ECBp ti\u1EBFn b\u1ED9 t\u1EEBng ng\xE0y. H\xE3y ch\u1ECDn m\u1ED9t h\xE0nh \u0111\u1ED9ng nh\u1ECF v\xE0 l\xE0m ngay h\xF4m nay."
+  };
+}
+async function callGemini(prompt, responseMimeType) {
+  const ai = getAIClient();
+  if (!ai) return null;
+  const response = await withTimeout(
+    ai.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: {
+        temperature: 0.4,
+        responseMimeType
+      }
+    })
+  );
+  return response.text || "";
+}
+var getAIReport = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const context = await buildCoachContext(userId);
+    const fallback = fallbackReport(context);
+    const prompt = [
+      systemPrompt,
+      "D\u01B0\u1EDBi \u0111\xE2y l\xE0 context th\xF3i quen \u0111\xE3 \u0111\u01B0\u1EE3c l\u1ECDc, kh\xF4ng ch\u1EE9a email/id/token:",
+      buildContextString(context),
+      "H\xE3y tr\u1EA3 v\u1EC1 JSON thu\u1EA7n, kh\xF4ng markdown, theo schema:",
+      JSON.stringify(fallback),
+      "Y\xEAu c\u1EA7u suggestions c\xF3 \xEDt nh\u1EA5t 2 h\xE0nh \u0111\u1ED9ng c\u1EE5 th\u1EC3 d\u1EF1a tr\xEAn d\u1EEF li\u1EC7u."
+    ].join("\n\n");
+    try {
+      const text = await callGemini(prompt, "application/json");
+      const report = text ? extractJson(text) : fallback;
+      if (!Array.isArray(report.suggestions) || report.suggestions.length < 2) {
+        report.suggestions = fallback.suggestions;
+      }
+      res.status(200).json({ success: true, report });
+    } catch (error) {
+      console.warn("AI report fallback used:", error);
+      res.status(200).json({ success: true, report: fallback });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+var postAIChat = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const message = String(req.body?.message || "").trim();
+    if (!message) throw new AppError("Message is required.", 400);
+    const context = await buildCoachContext(userId);
+    const prompt = [
+      systemPrompt,
+      "Context th\xF3i quen \u0111\xE3 \u0111\u01B0\u1EE3c l\u1ECDc, kh\xF4ng ch\u1EE9a email/id/token:",
+      buildContextString(context),
+      `C\xE2u h\u1ECFi c\u1EE7a ng\u01B0\u1EDDi d\xF9ng: ${message}`,
+      "Tr\u1EA3 l\u1EDDi t\u1ED1i \u0111a 4 c\xE2u, \u01B0u ti\xEAn l\u1EDDi khuy\xEAn h\xE0nh \u0111\u1ED9ng c\u1EE5 th\u1EC3."
+    ].join("\n\n");
+    try {
+      const reply = await callGemini(prompt);
+      res.status(200).json({
+        success: true,
+        reply: reply || "M\xECnh \u0111\xE3 xem d\u1EEF li\u1EC7u c\u1EE7a b\u1EA1n. H\xE3y ch\u1ECDn m\u1ED9t th\xF3i quen quan tr\u1ECDng nh\u1EA5t v\xE0 ho\xE0n th\xE0nh n\xF3 tr\u01B0\u1EDBc h\xF4m nay nh\xE9."
+      });
+    } catch (error) {
+      console.warn("AI chat fallback used:", error);
+      res.status(200).json({
+        success: true,
+        reply: "M\xECnh \u0111ang g\u1EB7p ch\xFAt kh\xF3 kh\u0103n khi k\u1EBFt n\u1ED1i AI. Tr\u01B0\u1EDBc m\u1EAFt, h\xE3y ch\u1ECDn th\xF3i quen c\xF3 streak cao nh\u1EA5t v\xE0 ho\xE0n th\xE0nh n\xF3 \u0111\u1EC3 gi\u1EEF \u0111\xE0 nh\xE9."
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+// src/routes/ai.ts
+var router5 = Router5();
+router5.use(authMiddleware);
+router5.post("/report", getAIReport);
+router5.post("/chat", postAIChat);
+var ai_default = router5;
+
+// src/routes/freeze.ts
+import { Router as Router6 } from "express";
+
+// src/controllers/freezeController.ts
+function getLocalDateString2(date, timezone) {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    const parts = formatter.formatToParts(date);
+    const y = parts.find((p) => p.type === "year")?.value;
+    const m = parts.find((p) => p.type === "month")?.value;
+    const d = parts.find((p) => p.type === "day")?.value;
+    return `${y}-${m}-${d}`;
+  } catch {
+    return date.toISOString().split("T")[0];
+  }
+}
+var getFreezeTokens = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    const record = await db.freezeTokens.findOrCreate(userId);
+    res.json({ success: true, tokens_left: record.tokens_left, month_year: record.month_year });
+  } catch (err) {
+    next(err);
+  }
+};
+var activateFreeze = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    const { goal_id } = req.body;
+    if (!goal_id) throw new AppError("goal_id is required.", 400);
+    const goals = await db.goals.findMany({ user_id: userId });
+    const goal = goals.find((g) => g.id === goal_id);
+    if (!goal) throw new AppError("Goal not found.", 404);
+    const tokenRecord = await db.freezeTokens.findOrCreate(userId);
+    if (tokenRecord.tokens_left <= 0) {
+      throw new AppError("You have used all 3 Freeze Tokens this month. Tokens reset on the 1st of next month.", 400);
+    }
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const todayStr = getLocalDateString2(/* @__PURE__ */ new Date(), timezone);
+    const existing = await db.streakFreezes.findByDate(goal_id, todayStr);
+    if (existing) throw new AppError("This goal is already frozen for today.", 400);
+    if (goal.current_count >= goal.target_count) {
+      throw new AppError("This goal is already completed today, so a Freeze Token is not needed.", 400);
+    }
+    await db.streakFreezes.create({ user_id: userId, goal_id, frozen_date: todayStr });
+    await db.freezeTokens.update(userId, { tokens_left: tokenRecord.tokens_left - 1 });
+    res.json({ success: true, tokens_left: tokenRecord.tokens_left - 1, frozen_date: todayStr });
+  } catch (err) {
+    next(err);
+  }
+};
+var getFreezeDates = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    const { goal_id, all } = req.query;
+    if (all !== "true" && !goal_id) throw new AppError("goal_id is required unless all=true.", 400);
+    const where = all === "true" ? { user_id: userId } : { goal_id };
+    const freezes = await db.streakFreezes.findMany(where);
+    res.json({ success: true, frozen_dates: freezes.map((f) => f.frozen_date) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// src/routes/freeze.ts
+var router6 = Router6();
+router6.use(authMiddleware);
+router6.get("/tokens", getFreezeTokens);
+router6.post("/activate", activateFreeze);
+router6.get("/dates", getFreezeDates);
+var freeze_default = router6;
+
 // src/express-app.ts
 var app = express();
 app.use(express.json());
@@ -1488,6 +1866,8 @@ app.use("/api/auth", auth_default);
 app.use("/api/goals", goals_default);
 app.use("/api/stats", stats_default);
 app.use("/api/groups", groups_default);
+app.use("/api/ai", ai_default);
+app.use("/api/freeze", freeze_default);
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,

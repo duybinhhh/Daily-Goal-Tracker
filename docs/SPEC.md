@@ -211,3 +211,39 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     1. **Khóa phía giao diện:** Triển khai cơ chế khóa concurrency trạng thái `completing` tại component `GoalCard` để chặn lập tức các click liên tiếp hoặc phím tắt dồn dập.
     2. **Đảm bảo Idempotency:** Sinh UUID định danh duy nhất (`log_id`) cho check-in ngay tại thời điểm click ở client. Server nhận mã này và lưu trực tiếp làm khóa chính (Primary Key) cho bảng GoalLog trong database, tận dụng cơ chế cưỡng chế khóa chính duy nhất của database để bác bỏ hoàn toàn các yêu cầu gửi trùng lắp.
     3. **Hợp nhất hàng đợi (Smart Merging):** Cải tiến store (`fetchGoals`, `fetchHistory`) tự động đọc hàng đợi `syncQueue` IndexedDB và hợp nhất cục bộ các tác vụ check-in đang chờ đồng bộ vào dữ liệu nhận từ server để giữ trạng thái UI thống nhất, không bị giật lag quay lại trạng thái cũ.
+## Bổ sung 2026-06-09: Streak Freeze, AI Coach và ổn định hệ thống
+
+### Streak Freeze / Freeze Token
+* **Mục tiêu:** Cho phép người dùng dùng token để bảo vệ streak của một goal trong ngày chưa hoàn thành.
+* **Điều kiện UI:** Nút `Protect Streak` chỉ hiển thị khi goal chưa hoàn thành, `current_streak > 0`, còn token, và đã tới giờ mở tính năng.
+* **Giới hạn token:** Mỗi user có tối đa 3 Freeze Token mỗi tháng. Token reset theo `month_year`.
+* **Ràng buộc dữ liệu:** Mỗi goal chỉ được đóng băng một lần cho một ngày, qua unique key `[goal_id, frozen_date]`.
+* **API:**
+  - `GET /api/freeze/tokens`
+  - `POST /api/freeze/activate`
+  - `GET /api/freeze/dates?goal_id=...`
+  - `GET /api/freeze/dates?all=true`
+* **Schema liên quan:**
+  - `User.last_freeze_reminder_date`
+  - `StreakFreeze`
+  - `FreezeToken`
+
+### AI Coach
+* **Mục tiêu:** Cung cấp báo cáo tuần và chat tư vấn thói quen cá nhân.
+* **Luồng sử dụng:** Người dùng bấm AI Coach trong Sidebar hoặc BottomNav, drawer mở phủ lên giao diện hiện tại.
+* **API:**
+  - `POST /api/ai/report`
+  - `POST /api/ai/chat`
+* **Bảo mật:** Gemini API key chỉ dùng ở backend, không gửi xuống client.
+* **Fallback:** Khi Gemini lỗi quota, timeout, hoặc thiếu key, backend trả response fallback để UI không bị vỡ.
+
+### Ổn định hệ thống
+* `authStore` phải parse `localStorage.user` an toàn. Nếu JSON hỏng, xóa session cục bộ và đưa người dùng về login.
+* Service worker không được cache/intercept app shell ở `localhost`, tránh lỗi trắng trang khi dev.
+* Database schema phải đồng bộ với Prisma schema trước khi test login/freeze.
+
+### Thông tin còn thiếu / cần hoàn thiện
+* Chưa có migration file chính thức cho Streak Freeze trong `prisma/migrations`.
+* Backend `/api/freeze/activate` chưa enforce giờ mở tính năng; hiện điều kiện giờ chủ yếu nằm ở UI.
+* Copy của Freeze Token cần đưa vào i18n đầy đủ.
+* AI Coach cần test lại khi Gemini key có quota thật.

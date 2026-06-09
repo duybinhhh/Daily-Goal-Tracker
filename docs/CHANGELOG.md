@@ -4,7 +4,119 @@
 
 # Changelog
 
+## [Đã hoàn thành] - Sprint 7 - Ổn định hệ thống, AI Coach và Streak Freeze - 2026-06-09 (GMT+7)
+
+### Đã thêm & cải tiến
+* **AI Coach Drawer:**
+  - Thêm drawer AI Coach mở trực tiếp từ Sidebar và BottomNav, không cần route riêng.
+  - Thêm store `aiCoachStore` để điều khiển trạng thái mở/đóng drawer.
+  - Thêm backend route `/api/ai/report` và `/api/ai/chat`, gọi Gemini ở phía server để không lộ API key ra client.
+  - Bổ sung fallback message khi Gemini lỗi quota, timeout, thiếu key hoặc không kết nối được.
+  - Ghi nhận tình trạng thực tế: API key Gemini có thể hợp lệ nhưng vẫn trả `429 RESOURCE_EXHAUSTED` nếu project/key chưa có quota.
+
+* **Streak Freeze / Freeze Token:**
+  - Thêm model Prisma `StreakFreeze` và `FreezeToken`.
+  - Thêm cột `User.last_freeze_reminder_date` để hỗ trợ nhắc nhở đóng băng streak.
+  - Thêm API `/api/freeze/tokens`, `/api/freeze/activate`, `/api/freeze/dates`.
+  - Thêm logic bảo vệ streak khi người dùng bỏ lỡ 1 ngày nhưng đã dùng Freeze Token.
+  - Thêm UI nút `Protect Streak` trên `GoalCard` khi đủ điều kiện: goal chưa hoàn thành, streak > 0, và đã tới giờ mở tính năng.
+  - Thêm dấu ngày đóng băng vào các màn thống kê/timeline để phân biệt với ngày check-in thật.
+
+* **Ổn định đăng nhập và màn trắng:**
+  - Sửa `authStore` để không crash nếu `localStorage.user` bị hỏng JSON; app tự xóa session lỗi và quay về login.
+  - Tắt đăng ký service worker trên `localhost` để tránh dev server bị cache app shell hoặc JS cũ.
+  - Cập nhật `sw.js` để khi chạy local, service worker tự xóa cache, tự unregister và không intercept request.
+  - Gỡ request Freeze Token tự động khỏi Sidebar để tránh gọi API phụ khi database chưa migrate đầy đủ.
+
+* **Đồng bộ database Supabase:**
+  - Xác minh DB thật thiếu `User.last_freeze_reminder_date`, bảng `StreakFreeze`, bảng `FreezeToken`.
+  - Bổ sung các cột/bảng thiếu bằng SQL an toàn, không xóa dữ liệu hiện có.
+  - Kiểm tra lại Prisma đọc được user thật và API login không còn trả lỗi schema/database.
+
+### Thông tin còn thiếu / cần hoàn thiện
+* Chưa có migration file chính thức trong `prisma/migrations` cho phần Streak Freeze; hiện database Supabase đã được bổ sung thủ công bằng SQL.
+* Cần tạo migration chuẩn để team khác hoặc môi trường deploy mới không bị thiếu bảng/cột.
+* Giờ mở nút Freeze Token hiện đang nằm ở UI `GoalCard.tsx`; API `/api/freeze/activate` chưa enforce giờ ở backend.
+* Copy/UI của Freeze Token còn cần i18n đầy đủ cho tiếng Việt/tiếng Anh.
+* Cần kiểm thử lại AI Coach sau khi Gemini API key có quota thật.
+* Cần rotate các secret đã từng bị paste vào chat: `DATABASE_URL`, `VAPID_PRIVATE_KEY`, `GEMINI_API_KEY` nếu key thật đã dùng.
+
 Tất cả các thay đổi lớn của dự án sẽ được ghi nhận và cập nhật theo từng Sprint tại đây.
+
+
+## [Đã hoàn thành] - Sprint 7 - AI Habit Coach (US-16) - 2026-06-09 (GMT+7)
+
+### Đã thêm & Cải tiến (Added & Improved)
+* **AI Coach Drawer:**
+  - Tạo mới component [AICoachDrawer.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/components/AICoachDrawer.tsx) dạng slide-in drawer từ bên phải, có backdrop overlay, header với icon Brain, nút đóng, skeleton loading và giao diện responsive trên mobile/desktop.
+  - Bổ sung banner cảnh báo nguy cơ mất streak trong khung giờ 18:00-21:00, ưu tiên hiển thị thói quen chưa hoàn thành có streak cao nhất.
+  - Hiển thị báo cáo tuần gồm tỷ lệ hoàn thành, top thói quen mạnh, top thói quen cần cải thiện, thông điệp động viên và danh sách gợi ý hành động cụ thể từ AI.
+* **Chatbot AI Coach:**
+  - Thêm giao diện chat tự do trong drawer với bubble user/AI, typing indicator, input cố định cuối drawer và nút gửi icon Send.
+  - Không lưu lịch sử chat vào `localStorage` hay server; tin nhắn chỉ tồn tại trong state của component.
+  - Bổ sung timeout 15 giây cho request chat/report, kèm thông báo lỗi thân thiện khi AI bận hoặc mất kết nối mạng.
+  - Thêm giới hạn 10 lượt chat/ngày bằng `localStorage` với key `ai_coach_usage` và counter hiển thị số lượt còn lại.
+* **Điều hướng mở AI Coach:**
+  - Tạo mới Zustand store [aiCoachStore.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/store/aiCoachStore.ts) quản lý trạng thái mở/đóng drawer.
+  - Cập nhật [Sidebar.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/components/Sidebar.tsx) thêm nút "AI Coach" với icon Brain, dùng cùng style navigation hiện có và không tạo route mới.
+  - Cập nhật [BottomNav.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/components/BottomNav.tsx) thêm tab "AI Coach" cho mobile, mở drawer trực tiếp thay vì điều hướng route.
+  - Render `<AICoachDrawer />` trong `AppLayout` tại [App.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/App.tsx) để overlay phủ đúng toàn bộ giao diện.
+* **Backend Gemini an toàn:**
+  - Tạo mới controller [aiController.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/controllers/aiController.ts) gọi `@google/genai` với model `gemini-2.0-flash` ở phía server.
+  - Tạo route bảo vệ bằng xác thực tại [ai.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/routes/ai.ts), gồm `POST /api/ai/report` và `POST /api/ai/chat`.
+  - Đăng ký route `/api/ai` trong [express-app.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/express-app.ts).
+  - Xây dựng context AI ở server-side từ goals, streak và thống kê tổng hợp; không gửi email, id người dùng, password, token hoặc API key lên client.
+  - Bổ sung fallback report/reply khi Gemini timeout, lỗi kết nối hoặc thiếu `GEMINI_API_KEY`, giúp UI vẫn nhận response đúng schema và không bị vỡ trải nghiệm.
+
+## [Đã hoàn thành] - Sprint 7 - Tính Năng Chọn Ngôn Ngữ i18n (US-16) - 2026-06-09 10:45 (GMT+7)
+
+### Đã thêm & Cải tiến (Added & Improved)
+* **Hệ thống đa ngôn ngữ thuần React (i18n Context & Custom Hook):**
+  - Xây dựng hệ thống dịch i18n không dùng thư viện ngoài tại [index.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/i18n/index.tsx), hỗ trợ dịch dựa trên React Context và custom hook `useTranslation()`.
+  - Triển khai file từ điển tiếng Việt [vi.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/i18n/vi.ts) và tiếng Anh [en.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/i18n/en.ts) với cấu trúc key-value khớp nhau 100% để đảm bảo an toàn kiểu dữ liệu (`TranslationKeys = typeof vi`).
+  - Hỗ trợ nội suy tham số động (dynamic string interpolation) như `{name}`, `{sec}`, `{days}`, `{count}`, `{cat}`.
+  - Tự động lưu lựa chọn ngôn ngữ của người dùng vào `localStorage` dưới khóa `setting_language` và tự động áp dụng khi tải lại trang.
+* **Tích hợp và địa phương hóa toàn bộ Giao diện (Full Page Localization):**
+  - Refactor toàn bộ các trang và component lớn để chuyển các chuỗi text cứng sang hàm dịch `t()` động:
+    - **Trang Cài đặt (SettingsPage.tsx):** Thêm phần "Ngôn ngữ / Language" cho phép người dùng chuyển đổi tức thì giữa 🇻🇳 Tiếng Việt và 🇬🇧 English.
+    - **Trang Dashboard & Danh mục (DashboardPage.tsx, GoalsPage.tsx):** Địa phương hóa lịch tuần, chỉ số, nhãn danh mục, và bộ lọc.
+    - **Trang Onboarding (OnboardingPage.tsx):** Refactor toàn bộ 4 bước hướng dẫn, các thẻ danh mục, form tạo mục tiêu đầu tiên và thông điệp chào mừng theo ngôn ngữ hoạt động.
+    - **Trang Thống kê & Chia sẻ (Stats.tsx, ShareModal.tsx):** Chuyển đổi định dạng ngày tháng sang Locale tương ứng, hỗ trợ dịch milestone động và badge chia sẻ.
+    - **Trang Nhật ký & Nhóm thói quen (TimelinePage.tsx, GroupsPage.tsx, QuickCheckInPage.tsx, LoginPage.tsx):** Dịch toàn bộ thông báo lỗi, nhãn form, xác nhận cảnh báo, các trạng thái offline, và nút CTA.
+* **Cập nhật chức năng lựa chọn ngôn ngữ:**
+  - Tạo component dùng chung [LanguageSwitcher.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/components/LanguageSwitcher.tsx) để tái sử dụng UI chuyển đổi ngôn ngữ giữa màn đăng nhập và trang cài đặt.
+  - Bổ sung bộ chọn ngôn ngữ dạng rút gọn trên [LoginPage.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/pages/LoginPage.tsx), cho phép người dùng đổi Tiếng Việt/Tiếng Anh trước khi đăng nhập hoặc đăng ký.
+  - Thay thế cụm nút chọn ngôn ngữ cũ trong [SettingsPage.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/pages/SettingsPage.tsx) bằng `LanguageSwitcher` để đồng bộ giao diện và hành vi.
+  - Cải tiến [i18n/index.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/i18n/index.tsx): kiểm tra giá trị `setting_language` hợp lệ trước khi áp dụng, fallback về `vi`, cập nhật thuộc tính `html lang`, fallback chuỗi dịch thiếu về tiếng Việt, và đồng bộ thay đổi ngôn ngữ giữa các tab qua sự kiện `storage`.
+
+## [Đã hoàn thành] - Sprint 7 - Luồng Onboarding Người Dùng Mới (US-15) - 2026-06-09 10:00 (GMT+7)
+
+### Đã thêm & Cải tiến (Added & Improved)
+* **Trang hướng dẫn người dùng mới (User Onboarding Flow):**
+  - Tạo mới trang [OnboardingPage.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/pages/OnboardingPage.tsx) quản lý luồng 4 bước giúp người dùng làm quen với ứng dụng mà không bị choáng ngợp:
+    - **Step 1 (Welcome):** Chào mừng người dùng mới bằng hiển thị tên động, liệt kê 3 lợi ích cốt lõi của ứng dụng (theo dõi thói quen, xem thống kê chi tiết, và nhận nhắc nhở).
+    - **Step 2 (Danh mục):** Hiển thị danh sách 6 categories thói quen cố định (`health`, `learning`, `mindfulness`, `productivity`, `social`, `finance`) dưới dạng thẻ lưới (Grid) 2 cột trên Mobile / 3 cột trên Desktop, hỗ trợ tương tác chọn, highlight viền/nền và kiểm soát trạng thái nút.
+    - **Step 3 (Tạo mục tiêu):** Tích hợp form rút gọn tạo mục tiêu đầu tiên (tiêu đề giới hạn tối đa 100 ký tự, tự động điền danh mục từ Step 2, và mặc định tần suất `"daily"`).
+    - **Step 4 (Hoàn thành):** Kích hoạt hiệu ứng Confetti chúc mừng rực rỡ, hiển thị thông báo thành công và nút CTA điều hướng trực tiếp về Dashboard.
+  - **Thanh tiến độ 4 bước (AC-7):** Thiết kế thanh progress bar sticky/fixed ở đầu trang onboarding, hiển thị rõ ràng 4 giai đoạn, sử dụng màu `var(--color-primary)` cho bước hiện tại, icon check của Material Symbols cho bước đã qua, và đường nối line ngang mượt mà.
+  - **Nút Bỏ qua linh hoạt (AC-6):** Thêm nút "Bỏ qua" ở góc trên cùng bên phải từ Step 1 đến Step 3, khi nhấn sẽ lưu cờ `onboarding_completed = true` vào `localStorage` và gửi cập nhật lên server, sau đó chuyển hướng thẳng về Dashboard.
+  - **Hiệu ứng Confetti thuần CSS (Confetti.tsx):** Tạo mới component [Confetti.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/components/Confetti.tsx) mô phỏng ~45 hạt giấy rơi tự do với các màu sắc ngẫu nhiên trong bảng màu ứng dụng, hoạt động bằng keyframe animation thuần CSS và tự động unmount giải phóng bộ nhớ sau 5 giây.
+  - **Logic điều hướng thông minh (AC-1):** Thêm component điều phối định tuyến `RedirectHandler` trong [App.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/App.tsx) để tự động chuyển hướng người dùng mới đăng ký dưới 5 phút và chưa có thói quen nào sang `/onboarding`.
+
+### Đã sửa đổi & Cập nhật (Changed & Updated)
+* **Cơ sở dữ liệu & Server API:**
+  - Cập nhật [schema.prisma](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/prisma/schema.prisma) bổ sung trường `onboarding_completed Boolean @default(false)` cho bảng `User`.
+  - Cập nhật [db.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/server/db.ts) để khởi tạo và lưu trường trạng thái `onboarding_completed` cho người dùng.
+  - Cập nhật file cơ sở dữ liệu mẫu [db.json](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/data/db.json) thiết lập cờ `onboarding_completed": false` mặc định cho các tài khoản test.
+  - Sửa đổi hàm `updateProfile` trong [authController.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/controllers/authController.ts) cho phép cập nhật riêng lẻ cờ `onboarding_completed` mà không bắt buộc điền lại `name` và `email`.
+* **Quản lý trạng thái client (Zustand Auth Store):**
+  - Thêm action `completeOnboarding()` trong [authStore.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/store/authStore.ts) giúp cập nhật trạng thái client-side trong `localStorage` đồng thời đồng bộ lưu trữ về server thông qua API profile PUT.
+  - Sửa đổi hàm `checkAuth()` để tự động bổ sung cờ `onboarding_completed` từ bộ nhớ cục bộ khi tải lại trang.
+  - Điều chỉnh logic seeding ban đầu trong `login`/`register` chỉ tự động chèn 3 habits mẫu khi cờ `onboarding_completed` đã được bật, tránh gây xung đột với luồng onboarding của người dùng mới.
+* **Cấu hình & Tích hợp:**
+  - Cập nhật [types.ts](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/types.ts) khai báo đầy đủ trường `onboarding_completed` và `created_at` trong interface `User`.
+  - Đăng ký route `/onboarding` bảo vệ bởi `ProtectedRoute` trong [App.tsx](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/src/App.tsx) để cô lập giao diện onboarding khỏi bố cục thanh Sidebar và BottomNav mặc định.
+  - Tăng số hiệu phiên bản cache trong Service Worker [sw.js](file:///d:/Th%E1%BB%B1c%20t%E1%BA%ADp/Bai_Binh/Daily-Goal-Tracker/public/sw.js) lên `daily-goal-tracker-v2` để kích hoạt dọn dẹp các cache cũ và đảm bảo trình duyệt người dùng tải mã Javascript mới nhất.
 
 ## [Đã hoàn thành] - Mobile Quick Widget (PWA Shortcuts & Quick Check-in) - 2026-06-05 14:35 (GMT+7)
 ### Đã thêm & Cải tiến (Added & Improved)

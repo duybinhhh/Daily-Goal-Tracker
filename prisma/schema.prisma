@@ -14,6 +14,7 @@ model User {
   password_hash String
   name          String
   timezone      String         @default("UTC")
+  onboarding_completed Boolean @default(false)
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt
   goals         Goal[]
@@ -21,6 +22,7 @@ model User {
   notifications Notification[]
   push_subscription     String?
   last_reminder_sent_date String?
+  last_freeze_reminder_date String?
   created_groups HabitGroup[] @relation("GroupCreator")
   group_memberships HabitGroupMember[]
 }
@@ -41,6 +43,7 @@ model Goal {
   updated_at    DateTime   @updatedAt
   logs          GoalLog[]
   streaks       Streak[]
+  freezes       StreakFreeze[]
   group_id      String?
   group         HabitGroup? @relation(fields: [group_id], references: [id], onDelete: SetNull)
 
@@ -84,6 +87,27 @@ model Notification {
   created_at DateTime @default(now())
 
   @@index([user_id])
+}
+
+model StreakFreeze {
+  id          String   @id @default(uuid())
+  user_id     String
+  goal_id     String
+  goal        Goal     @relation(fields: [goal_id], references: [id], onDelete: Cascade)
+  frozen_date String
+  created_at  DateTime @default(now())
+
+  @@unique([goal_id, frozen_date])
+  @@index([user_id])
+  @@index([goal_id])
+}
+
+model FreezeToken {
+  id          String   @id @default(uuid())
+  user_id     String   @unique
+  tokens_left Int      @default(3)
+  month_year  String
+  updated_at  DateTime @updatedAt
 }
 
 model HabitGroup {

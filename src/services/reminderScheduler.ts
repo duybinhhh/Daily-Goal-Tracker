@@ -51,6 +51,53 @@ export async function checkAndSendReminders() {
 
       const timezone = user.timezone || "UTC";
       const localHour = getLocalHour(now, timezone);
+      const goals = await db.goals.findMany({ user_id: user.id });
+
+      if (localHour === 20) {
+        const localDateStr = getLocalDateString(now, timezone);
+
+        if (user.last_freeze_reminder_date !== localDateStr) {
+          const atRiskGoals = [];
+          for (const goal of goals) {
+            const synced = await syncAndResetGoalProgress(goal, timezone);
+            const streak = await db.streaks.findUnique({ goal_id: synced.id });
+            const currentStreak = streak?.current_streak ?? 0;
+            if (currentStreak > 0 && currentStreak < 5 && synced.current_count < synced.target_count) {
+              atRiskGoals.push({ ...synced, currentStreak });
+            }
+          }
+
+          if (atRiskGoals.length > 0) {
+            const tokenRecord = await db.freezeTokens.findOrCreate(user.id);
+            if (tokenRecord.tokens_left > 0) {
+              const goalNames = atRiskGoals
+                .sort((a, b) => b.currentStreak - a.currentStreak)
+                .slice(0, 2)
+                .map((goal) => `"${goal.title}"`)
+                .join(", ");
+
+              const payload = JSON.stringify({
+                title: "Protect your streak!",
+                body: `${goalNames} may lose a streak. You still have ${tokenRecord.tokens_left} Freeze Tokens.`,
+                icon: "/icon.png",
+                badge: "/icon.png",
+                data: { url: "/#/goals" },
+              });
+
+              try {
+                const subscription = JSON.parse(user.push_subscription);
+                await webpush.sendNotification(subscription, payload);
+                await db.users.update(user.id, { last_freeze_reminder_date: localDateStr });
+              } catch (pushErr: any) {
+                console.error(`[Freeze Reminder] Push failed for user ${user.id}:`, pushErr.message);
+                if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
+                  await db.users.update(user.id, { push_subscription: null });
+                }
+              }
+            }
+          }
+        }
+      }
 
       // Check if it's 21:00 (9:00 PM) or later in the user's local timezone
       if (localHour >= 21) {
@@ -61,8 +108,6 @@ export async function checkAndSendReminders() {
           continue;
         }
 
-        // 2. Fetch the user's goals
-        const goals = await db.goals.findMany({ user_id: user.id });
         let hasIncompleteDailyGoals = false;
 
         for (const goal of goals) {

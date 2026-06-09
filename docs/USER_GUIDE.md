@@ -234,3 +234,66 @@ Momentum cung cấp tính năng **Social Sharing** cao cấp cho phép bạn kho
 
 ---
 *Chúc bạn có những trải nghiệm tuyệt vời và duy trì được kỷ luật bản thân xuất sắc cùng **Momentum**!*
+## Bổ sung 2026-06-09: Cách dùng và test Streak Freeze / AI Coach
+
+### Streak Freeze / Freeze Token
+Tính năng **Streak Freeze** giúp bảo vệ streak của một goal khi người dùng chưa kịp hoàn thành trong ngày.
+
+Điều kiện để nút `Protect Streak` hiển thị:
+- Người dùng đã đăng nhập.
+- Goal chưa hoàn thành trong ngày hiện tại.
+- Goal đang có `current_streak > 0`.
+- Đã tới giờ mở tính năng đóng băng. Mặc định ban đầu là từ 18:00 trở đi.
+- Tài khoản còn Freeze Token trong tháng.
+
+Cách test nhanh trên giao diện:
+1. Chọn một goal có streak lớn hơn 0.
+2. Không check-in goal đó trong ngày test.
+3. Đợi tới giờ mở Freeze Token, hoặc tạm đổi ngưỡng giờ test trong `src/components/GoalCard.tsx`.
+4. Mở Dashboard hoặc Goals.
+5. Bấm `Protect Streak`.
+6. Kết quả đúng: nút chuyển sang trạng thái protected, token giảm 1, và ngày hiện tại được lưu vào danh sách ngày đóng băng.
+
+Đổi giờ test sang 13:30 trong `GoalCard.tsx`:
+
+```ts
+const now = new Date();
+const currentMinutes = now.getHours() * 60 + now.getMinutes();
+const freezeStartMinutes = 13 * 60 + 30;
+
+const showFreezeButton =
+  currentMinutes >= freezeStartMinutes && !isCompleted && currentStreak > 0;
+```
+
+API liên quan:
+- `GET /api/freeze/tokens`: xem số token còn lại trong tháng.
+- `POST /api/freeze/activate`: dùng 1 token để bảo vệ streak cho goal.
+- `GET /api/freeze/dates?goal_id=...`: xem danh sách ngày đã đóng băng của goal.
+
+Lỗi thường gặp khi test:
+- Không thấy nút: chưa tới giờ mở tính năng, goal chưa có streak, hoặc goal đã hoàn thành hôm nay.
+- Báo hết token: tài khoản đã dùng đủ 3 token trong tháng.
+- Bấm lại cùng ngày không được: mỗi goal chỉ được đóng băng một lần cho một ngày.
+- Lỗi database operation: kiểm tra DB đã có cột `User.last_freeze_reminder_date`, bảng `StreakFreeze`, bảng `FreezeToken`.
+
+### AI Coach
+AI Coach dùng Gemini API ở phía backend. Nếu giao diện trả fallback như "Mình đang gặp chút khó khăn khi kết nối AI", cần kiểm tra:
+- `.env` có `GEMINI_API_KEY`.
+- Key Gemini còn quota.
+- Backend đã restart sau khi đổi `.env`.
+- Route `/api/ai/chat` và `/api/ai/report` đã được đăng ký trong Express.
+
+Trường hợp key hợp lệ nhưng Gemini trả `429 RESOURCE_EXHAUSTED`, đây là lỗi quota của Google/Gemini, không phải lỗi giao diện chat.
+
+### Khi web bị trắng trang hoặc treo ở localhost
+Các nguyên nhân đã gặp:
+- `localStorage.user` bị hỏng JSON làm app crash ngay khi khởi động.
+- Service worker cache bản JS/app shell cũ ở `localhost`.
+- Database schema chưa đồng bộ với Prisma schema.
+
+Cách xử lý nhanh:
+1. Bấm `Ctrl + F5` để hard refresh.
+2. Nếu vẫn trắng, clear site data cho `localhost:3000`.
+3. Restart dev server bằng `npm run dev`.
+4. Kiểm tra backend trả HTML ở `http://localhost:3000/login#/login`.
+5. Nếu login báo lỗi database, kiểm tra migration/schema DB.

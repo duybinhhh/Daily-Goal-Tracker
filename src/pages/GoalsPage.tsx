@@ -5,6 +5,7 @@ import { useGoals } from "../hooks/useGoals";
 import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
 import { AlertCircle, RefreshCw, WifiOff } from "lucide-react";
+import { useTranslation } from "../i18n";
 
 const CATEGORY_ICONS: Record<string, string> = {
   health: "water_drop",
@@ -41,6 +42,7 @@ const getCategoryStyles = (category: string) => {
 };
 
 export default function GoalsPage() {
+  const { t, language } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { isOffline } = useGoalStore();
@@ -78,7 +80,7 @@ export default function GoalsPage() {
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     if (isOffline) {
-      setOfflineActionMsg("Pausing or resuming goals requires a connection. Please try again when you are online.");
+      setOfflineActionMsg(t("goals.offlinePauseError"));
       setActiveMenuId(null);
       return;
     }
@@ -93,11 +95,11 @@ export default function GoalsPage() {
 
   const handleDelete = async (id: string, title: string) => {
     if (isOffline) {
-      setOfflineActionMsg("Deleting goals requires a connection. Please try again when you are online.");
+      setOfflineActionMsg(t("goals.offlineDeleteError"));
       setActiveMenuId(null);
       return;
     }
-    if (window.confirm(`Delete goal "${title}"?`)) {
+    if (window.confirm(t("goals.confirmDelete"))) {
       try {
         await deleteGoal(id);
         setActiveMenuId(null);
@@ -182,7 +184,7 @@ export default function GoalsPage() {
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full md:w-auto">
           <h2 style={{ fontSize: "20px", fontWeight: 800, color: "var(--color-primary)", letterSpacing: "-0.03em" }}>
-            My Goals
+            {t("goals.title")}
           </h2>
           <div className="relative w-full sm:w-[240px]">
             <span className="material-symbols-outlined" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--color-outline)", fontSize: "18px" }}>
@@ -192,7 +194,7 @@ export default function GoalsPage() {
               type="text"
               className="m-input"
               style={{ paddingLeft: "36px", paddingRight: "16px", paddingTop: "8px", paddingBottom: "8px", width: "100%", borderRadius: "9999px", fontSize: "13px" }}
-              placeholder="Search goals..."
+              placeholder={t("common.search")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -205,28 +207,28 @@ export default function GoalsPage() {
               <span className="material-symbols-outlined ms-filled" style={{ fontSize: "15px" }}>
                 local_fire_department
               </span>
-              <span>{bestCurrentStreak} Day Streak</span>
+              <span>{t("dashboard.streakBadge")}: {bestCurrentStreak} {t("common.days")}</span>
             </div>
           )}
           {isOffline && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ background: "rgba(255,140,0,0.12)", color: "#fb923c", border: "1px solid rgba(255,140,0,0.25)" }}>
               <WifiOff size={12} />
-              Offline
+              {t("common.offline")}
             </div>
           )}
-          <button onClick={refreshAll} className="btn-ghost" title="Refresh">
+          <button onClick={refreshAll} className="btn-ghost" title={t("common.refresh")}>
             <RefreshCw size={14} />
-            <span className="hidden sm:inline">Refresh</span>
+            <span className="hidden sm:inline">{t("common.refresh")}</span>
           </button>
           {isOffline ? (
             <div className="btn-primary opacity-50 cursor-not-allowed" style={{ pointerEvents: "none" }} title="Network required">
               <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>cloud_off</span>
-              <span className="hidden sm:inline">New Goal</span>
+              <span className="hidden sm:inline">{t("goals.newGoal")}</span>
             </div>
           ) : (
             <Link to="/new-goal" className="btn-primary">
               <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>add</span>
-              <span className="hidden sm:inline">New Goal</span>
+              <span className="hidden sm:inline">{t("goals.newGoal")}</span>
             </Link>
           )}
         </div>
@@ -311,7 +313,7 @@ export default function GoalsPage() {
                   : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
               }`}
             >
-              All Goals ({totalCount})
+              {t("goals.filterAll")} ({totalCount})
             </button>
             <button
               onClick={() => setStatusFilter("active")}
@@ -321,7 +323,7 @@ export default function GoalsPage() {
                   : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
               }`}
             >
-              Active ({activeCount})
+              {t("goals.filterActive")} ({activeCount})
             </button>
             <button
               onClick={() => setStatusFilter("paused")}
@@ -331,7 +333,7 @@ export default function GoalsPage() {
                   : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
               }`}
             >
-              Paused ({pausedCount})
+              {t("goals.filterPaused")} ({pausedCount})
             </button>
           </div>
 
@@ -341,9 +343,9 @@ export default function GoalsPage() {
               onChange={(e) => setSortBy(e.target.value as any)}
               className="bg-surface-container-low border-none rounded-full text-xs font-semibold text-on-surface-variant focus:ring-1 focus:ring-primary py-2 px-4 cursor-pointer"
             >
-              <option value="priority">Sort: Priority</option>
-              <option value="recent">Sort: Recently Active</option>
-              <option value="streak">Sort: Streak</option>
+              <option value="priority">{t("goals.sortBy")}: {t("goals.sortPriority")}</option>
+              <option value="recent">{t("goals.sortBy")}: {t("goals.sortRecent")}</option>
+              <option value="streak">{t("goals.sortBy")}: {t("goals.sortStreak")}</option>
             </select>
 
             <select
@@ -351,7 +353,7 @@ export default function GoalsPage() {
               onChange={(e) => setActiveCategory(e.target.value)}
               className="bg-surface-container-low border-none rounded-full text-xs font-semibold text-on-surface-variant focus:ring-1 focus:ring-primary py-2 px-4 cursor-pointer"
             >
-              <option value="All">Category: All</option>
+              <option value="All">{t("goals.category")}: {t("common.all")}</option>
               {categories.filter(c => c !== "All").map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -361,9 +363,9 @@ export default function GoalsPage() {
 
         {/* Goals Bento Grid */}
         {loading ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "14px", padding: "64px 0" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyItems: "center", gap: "14px", padding: "64px 0" }}>
             <div className="spinner" style={{ width: "32px", height: "32px", color: "var(--color-primary)" }} />
-            <p style={{ fontSize: "13px", color: "var(--color-on-surface-variant)" }}>Loading goals grid...</p>
+            <p style={{ fontSize: "13px", color: "var(--color-on-surface-variant)" }}>{t("common.loading")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -392,16 +394,16 @@ export default function GoalsPage() {
                     <div className="flex justify-between items-start mb-4">
                       {isPaused ? (
                         <span className="px-3 py-1 bg-surface-variant text-on-surface-variant text-[10px] font-black uppercase tracking-widest rounded-full">
-                          Paused
+                          {t("common.paused")}
                         </span>
                       ) : isCompleted ? (
                         <span className="px-3 py-1 bg-secondary/10 text-secondary text-[10px] font-black uppercase tracking-widest rounded-full border border-secondary/20 flex items-center gap-1">
                           <span className="material-symbols-outlined text-[12px] ms-filled">check_circle</span>
-                          Completed Today
+                          {t("goals.completedToday")}
                         </span>
                       ) : (
                         <span className="px-3 py-1 bg-secondary/10 text-secondary text-[10px] font-black uppercase tracking-widest rounded-full border border-secondary/20">
-                          Active
+                          {t("common.active")}
                         </span>
                       )}
 
@@ -431,7 +433,7 @@ export default function GoalsPage() {
                               <span className="material-symbols-outlined text-[16px]">
                                 {isPaused ? "play_arrow" : "pause"}
                               </span>
-                              {isPaused ? "Resume" : "Pause"}
+                              {isPaused ? t("goals.resumeGoal") : t("goals.pauseGoal")}
                             </button>
                             {isOffline ? (
                               <div
@@ -440,7 +442,7 @@ export default function GoalsPage() {
                                 title="Requires connection"
                               >
                                 <span className="material-symbols-outlined text-[16px]">edit</span>
-                                Edit
+                                {t("common.edit")}
                               </div>
                             ) : (
                               <Link
@@ -448,7 +450,7 @@ export default function GoalsPage() {
                                 className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
                               >
                                 <span className="material-symbols-outlined text-[16px]">edit</span>
-                                Edit
+                                {t("common.edit")}
                               </Link>
                             )}
                             <button
@@ -459,7 +461,7 @@ export default function GoalsPage() {
                               title={isOffline ? "Requires connection" : undefined}
                             >
                               <span className="material-symbols-outlined text-[16px]">delete</span>
-                              Delete
+                              {t("common.delete")}
                             </button>
                           </div>
                         )}
@@ -480,7 +482,7 @@ export default function GoalsPage() {
                     <div className="flex items-center gap-4">
                       <div className="flex-1">
                         <div className="flex justify-between mb-1.5">
-                          <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Progress</span>
+                          <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">{t("goals.progress")}</span>
                           <span className="text-xs font-extrabold text-primary">{percentage}%</span>
                         </div>
                         <div className="h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
@@ -512,13 +514,13 @@ export default function GoalsPage() {
                         <>
                           <span className="material-symbols-outlined text-[16px]">calendar_month</span>
                           <span className="text-[10px] font-bold uppercase tracking-wider">
-                            Due: {new Date(goal.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            {t("goals.dueDate")}: {new Date(goal.due_date).toLocaleDateString(language === "vi" ? "vi-VN" : "en-US", { month: "short", day: "numeric" })}
                           </span>
                         </>
                       ) : (
                         <>
                           <span className="material-symbols-outlined text-[16px]">repeat</span>
-                          <span className="text-[10px] font-bold uppercase tracking-wider">{goal.frequency}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider">{t("common." + goal.frequency.toLowerCase())}</span>
                         </>
                       )}
                     </div>
@@ -533,7 +535,7 @@ export default function GoalsPage() {
                         style={{ padding: "4px 10px", fontSize: "11px", borderRadius: "8px" }}
                       >
                         <span className="material-symbols-outlined text-[14px]">add</span>
-                        Log
+                        {t("goalCard.checkIn")}
                       </button>
                     )}
                   </div>
@@ -551,8 +553,8 @@ export default function GoalsPage() {
                 <div className="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
                   <span className="material-symbols-outlined text-[28px] group-hover:text-primary">add_circle</span>
                 </div>
-                <p className="text-md font-bold mb-1">Create New Goal</p>
-                <p className="text-xs opacity-60">Set a target and start tracking</p>
+                <p className="text-md font-bold mb-1">{t("goals.newGoal")}</p>
+                <p className="text-xs opacity-60">{t("goals.noGoalsDesc")}</p>
               </button>
             )}
 
@@ -587,18 +589,18 @@ export default function GoalsPage() {
           </div>
 
           <div className="flex-1 text-center md:text-left">
-            <h2 className="text-lg font-bold text-on-surface mb-2">Momentum Peak Reached!</h2>
+            <h2 className="text-lg font-bold text-on-surface mb-2">{t("dashboard.momentumPeak")}</h2>
             <p className="text-sm text-on-surface-variant mb-4 max-w-lg">
-              You've maintained a {bestCurrentStreak > 0 ? `${bestCurrentStreak}-day` : "steady"} streak across active goals. You are currently within the top 3% of Achiever Pro members this month.
+              {t("dashboard.momentumPeakDesc")}
             </p>
             <div className="flex flex-wrap gap-2 justify-center md:justify-start">
               <div className="flex items-center gap-1.5 bg-surface-container-highest px-3 py-1.5 rounded-full border border-white/10">
                 <span className="material-symbols-outlined text-secondary text-[16px]">military_tech</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface">Elite Strategist</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface">{t("dashboard.eliteStrategist")}</span>
               </div>
               <div className="flex items-center gap-1.5 bg-surface-container-highest px-3 py-1.5 rounded-full border border-white/10">
                 <span className="material-symbols-outlined text-tertiary text-[16px]">trending_up</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface">+12% Velocity</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface">+12% {t("dashboard.velocity")}</span>
               </div>
             </div>
           </div>
@@ -607,7 +609,7 @@ export default function GoalsPage() {
             onClick={() => navigate("/stats")}
             className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-on-surface rounded-xl font-bold border border-white/10 transition-all backdrop-blur-md text-xs"
           >
-            View Insights
+            {t("dashboard.viewInsights")}
           </button>
         </div>
 

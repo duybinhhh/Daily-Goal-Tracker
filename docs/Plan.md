@@ -36,3 +36,22 @@
 - **Goals**: `GET /api/goals` (lọc theo status/category), `POST /api/goals`, `GET /api/goals/:id`, `PUT /api/goals/:id`, `DELETE /api/goals/:id`, `POST /api/goals/:id/complete` (Tăng tiến độ/Ghi log/Tính streak, hỗ trợ truyền tham số `completed_at` tùy chọn từ body để ghi nhận đúng ngày giờ check-in offline), `DELETE /api/goals/logs/:logId` (Xóa log và tự động tính lại Streak).
 - **Stats**: `GET /api/stats/dashboard` (bento data), `GET /api/stats/history?from=&to=` (heatmap data).
 - **Groups**: `GET /api/groups` (danh sách tất cả nhóm), `POST /api/groups` (tạo nhóm thói quen), `GET /api/groups/:id` (lấy chi tiết nhóm và bảng tiến độ thành viên), `POST /api/groups/:id/join` (gia nhập nhóm), `POST /api/groups/:id/leave` (rời nhóm), `DELETE /api/groups/:id` (xóa nhóm).
+## Bổ sung 2026-06-09: Việc đã làm và việc còn thiếu
+
+### Đã làm
+- Cập nhật chức năng lựa chọn ngôn ngữ bằng i18n Context, `LanguageSwitcher`, lưu `setting_language` vào localStorage.
+- Thêm AI Coach drawer, store, Sidebar/BottomNav trigger và backend route `/api/ai`.
+- Thêm Streak Freeze / Freeze Token với API `/api/freeze`, schema Prisma và UI `Protect Streak`.
+- Sửa lỗi AI Coach bấm không mở bằng cách render drawer ở layout và mở bằng state/event.
+- Sửa lỗi trắng trang bằng cách parse `localStorage.user` an toàn.
+- Tắt service worker cache trên localhost để tránh dùng JS/app shell cũ.
+- Đồng bộ thủ công DB Supabase cho các phần còn thiếu của Freeze Token.
+
+### Còn thiếu / cần làm tiếp
+- Tạo migration chính thức cho Streak Freeze trong `prisma/migrations`.
+- Enforce giờ mở Freeze Token ở backend nếu muốn tránh bypass bằng API.
+- Đưa toàn bộ copy Freeze Token và fallback AI Coach vào i18n.
+- Test AI Coach bằng Gemini key có quota thật.
+- Test Streak Freeze đầy đủ các case: hết token, reset token tháng mới, đóng băng trùng ngày, goal đã hoàn thành, goal streak = 0.
+- Rotate secret nếu `DATABASE_URL`, `GEMINI_API_KEY`, `VAPID_PRIVATE_KEY` đã từng lộ ra ngoài.
+- Kiểm tra deploy mới từ DB rỗng để chắc schema không thiếu bảng/cột.

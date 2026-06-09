@@ -6,6 +6,7 @@ import { useGoals } from "../hooks/useGoals";
 import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
 import { GoalCard } from "../components/GoalCard";
+import { useTranslation } from "../i18n";
 
 /* ── Shared section label style ── */
 const SECTION_LABEL: React.CSSProperties = {
@@ -18,6 +19,7 @@ const SECTION_LABEL: React.CSSProperties = {
 
 /* ─── Mini Calendar ─── */
 const MiniCalendar: React.FC = () => {
+  const { t, language } = useTranslation();
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const year = currentDate.getFullYear();
@@ -26,7 +28,7 @@ const MiniCalendar: React.FC = () => {
   const isCurrentMonth =
     today.getFullYear() === year && today.getMonth() === month;
 
-  const monthName = currentDate.toLocaleString("en-US", {
+  const monthName = currentDate.toLocaleString(language === "vi" ? "vi-VN" : "en-US", {
     month: "long",
     year: "numeric",
   });
@@ -96,7 +98,10 @@ const MiniCalendar: React.FC = () => {
           textAlign: "center",
         }}
       >
-        {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((d) => (
+        {(language === "vi"
+          ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+          : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+        ).map((d) => (
           <div
             key={d}
             style={{
@@ -185,6 +190,7 @@ const UpcomingMilestones: React.FC<MilestoneProps> = ({
   totalActCount,
   goals,
 }) => {
+  const { t } = useTranslation();
   const milestones: Array<{
     label: string;
     sub: string;
@@ -197,11 +203,11 @@ const UpcomingMilestones: React.FC<MilestoneProps> = ({
   const daysLeft = nextStreakTarget - bestStreak;
   if (bestStreak > 0) {
     milestones.push({
-      label: `${nextStreakTarget}-Day Fire Streak`,
+      label: t("dashboard.fireStreakTarget", { days: nextStreakTarget }),
       sub:
         daysLeft === 0
-          ? "Milestone reached! 🎉"
-          : `${daysLeft} day${daysLeft > 1 ? "s" : ""} remaining`,
+          ? t("dashboard.milestoneReached")
+          : t("dashboard.daysRemaining", { days: daysLeft }),
       color: "var(--color-tertiary)",
     });
   }
@@ -210,14 +216,14 @@ const UpcomingMilestones: React.FC<MilestoneProps> = ({
   const remaining = totalActCount - doneTodayCount;
   if (totalActCount > 0 && remaining > 0) {
     milestones.push({
-      label: "Complete Today's Goals",
-      sub: `${remaining} goal${remaining > 1 ? "s" : ""} left to finish today`,
+      label: t("dashboard.completeTodayGoals"),
+      sub: t("dashboard.goalsLeftMsg", { count: remaining }),
       color: "var(--color-secondary)",
     });
   } else if (totalActCount > 0 && remaining === 0) {
     milestones.push({
-      label: "All Goals Met! 🎯",
-      sub: "You crushed it today",
+      label: t("dashboard.allGoalsMet"),
+      sub: t("dashboard.crushedItToday"),
       color: "var(--color-secondary)",
     });
   }
@@ -234,15 +240,15 @@ const UpcomingMilestones: React.FC<MilestoneProps> = ({
   if (topGoal && topGoal.streak && topGoal.streak.current_streak > 0) {
     milestones.push({
       label: topGoal.title,
-      sub: `${topGoal.streak.current_streak}d streak — keep it going!`,
+      sub: `${topGoal.streak.current_streak}d ${t("common.streak")} — ${t("dashboard.keepItGoing")}`,
       color: "var(--color-primary)",
     });
   }
 
   if (milestones.length === 0) {
     milestones.push({
-      label: "Create your first goal",
-      sub: "Set a target to start tracking",
+      label: t("dashboard.createFirst"),
+      sub: t("goals.noGoalsDesc"),
       color: "var(--color-outline)",
     });
   }
@@ -259,7 +265,7 @@ const UpcomingMilestones: React.FC<MilestoneProps> = ({
           marginBottom: "16px",
         }}
       >
-        Upcoming Milestones
+        {t("dashboard.nextMilestone")}
       </h3>
       <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
         {milestones.map((m, i) => (
@@ -298,6 +304,7 @@ const UpcomingMilestones: React.FC<MilestoneProps> = ({
 
 /* ─── Main Dashboard Page ─── */
 export const DashboardPage: React.FC = () => {
+  const { t, language } = useTranslation();
   const { user } = useAuthStore();
   const { isOffline, isSyncing } = useGoalStore();
   const {
@@ -408,14 +415,12 @@ export const DashboardPage: React.FC = () => {
     (g) => g.current_count < g.target_count || disappearingGoals[g.id]
   );
 
-  const [greeting, setGreeting] = useState("Hello");
-
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good morning");
-    else if (hour < 18) setGreeting("Good afternoon");
-    else setGreeting("Good evening");
-  }, []);
+  const hour = new Date().getHours();
+  const greeting = hour < 12
+    ? t("dashboard.goodMorning")
+    : hour < 18
+    ? t("dashboard.goodAfternoon")
+    : t("dashboard.goodEvening");
 
   const totalActCount = goals.filter((g) => g.status !== "paused").length;
   const doneTodayCount = goals.filter(
@@ -472,7 +477,7 @@ export const DashboardPage: React.FC = () => {
               >
                 cloud_off
               </span>
-              <span>Offline Mode</span>
+              <span>{t("common.offline")}</span>
             </div>
           )}
 
@@ -491,7 +496,7 @@ export const DashboardPage: React.FC = () => {
               >
                 sync
               </span>
-              <span>Syncing...</span>
+              <span>{t("common.syncing")}</span>
             </div>
           )}
 
@@ -504,12 +509,12 @@ export const DashboardPage: React.FC = () => {
               >
                 local_fire_department
               </span>
-              <span>{bestCurrentStreak} Day Streak</span>
+              <span>{t("dashboard.streakBadge")}: {bestCurrentStreak} {t("common.days")}</span>
             </div>
           )}
-          <button onClick={refreshAll} className="btn-ghost" title="Refresh">
+          <button onClick={refreshAll} className="btn-ghost" title={t("common.refresh")}>
             <RefreshCw size={14} />
-            <span className="hidden sm:inline">Refresh</span>
+            <span className="hidden sm:inline">{t("common.refresh")}</span>
           </button>
           {isOffline ? (
             <div
@@ -518,7 +523,7 @@ export const DashboardPage: React.FC = () => {
               title="Network connection required to create goals"
             >
               <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>cloud_off</span>
-              <span className="hidden sm:inline">Add Goal</span>
+              <span className="hidden sm:inline">{t("dashboard.addGoal")}</span>
             </div>
           ) : (
             <Link to="/new-goal" className="btn-primary">
@@ -528,7 +533,7 @@ export const DashboardPage: React.FC = () => {
               >
                 add
               </span>
-              <span className="hidden sm:inline">Add Goal</span>
+              <span className="hidden sm:inline">{t("dashboard.addGoal")}</span>
             </Link>
           )}
         </div>
@@ -580,7 +585,7 @@ export const DashboardPage: React.FC = () => {
                   color: "var(--color-on-surface-variant)",
                 }}
               >
-                Today's Progress
+                {t("dashboard.todayProgress")}
               </span>
               <span
                 className="material-symbols-outlined"
@@ -615,7 +620,7 @@ export const DashboardPage: React.FC = () => {
                     color: "var(--color-secondary)",
                   }}
                 >
-                  {doneTodayCount}/{totalActCount} goals
+                  {doneTodayCount}/{totalActCount} {t("nav.goals")}
                 </span>
               </div>
               <div className="progress-track">
@@ -666,7 +671,7 @@ export const DashboardPage: React.FC = () => {
                   color: "var(--color-on-surface-variant)",
                 }}
               >
-                Current Streak
+                {t("dashboard.streakBadge")}
               </span>
               <span
                 className="material-symbols-outlined ms-filled"
@@ -684,7 +689,7 @@ export const DashboardPage: React.FC = () => {
                   color: "var(--color-on-surface)",
                 }}
               >
-                {bestCurrentStreak} Days
+                {bestCurrentStreak} {t("common.days")}
               </span>
               <p
                 style={{
@@ -694,8 +699,8 @@ export const DashboardPage: React.FC = () => {
                 }}
               >
                 {bestCurrentStreak >= 7
-                  ? "Top 5% of all users 🏆"
-                  : "Keep it up!"}
+                  ? t("dashboard.topUsers")
+                  : t("dashboard.keepGoing")}
               </p>
             </div>
           </div>
@@ -718,7 +723,7 @@ export const DashboardPage: React.FC = () => {
                   color: "var(--color-on-surface-variant)",
                 }}
               >
-                Total Logged
+                {t("stats.totalCompleted")}
               </span>
               <span
                 className="material-symbols-outlined ms-filled"
@@ -746,8 +751,8 @@ export const DashboardPage: React.FC = () => {
                 }}
               >
                 {doneTodayCount >= totalActCount && totalActCount > 0
-                  ? "Milestone reached: Elite 🎯"
-                  : "Progress logged across all goals"}
+                  ? t("dashboard.eliteMilestone")
+                  : t("dashboard.totalLoggedDesc")}
               </p>
             </div>
           </div>
@@ -779,10 +784,10 @@ export const DashboardPage: React.FC = () => {
             </div>
             <div>
               <h4 className="font-bold text-sm" style={{ color: "var(--color-on-surface)" }}>
-                1-Tap Quick Check-in on Mobile!
+                {t("dashboard.pwaPromoTitle")}
               </h4>
               <p className="text-xs mt-0.5 animate-pulse" style={{ color: "var(--color-on-surface-variant)" }}>
-                💡 Pin the PWA shortcut to your Home Screen for instant habit logging.
+                {t("dashboard.pwaPromoDesc")}
               </p>
             </div>
           </div>
@@ -794,7 +799,7 @@ export const DashboardPage: React.FC = () => {
               whiteSpace: "nowrap"
             }}
           >
-            <span>Open Check-in</span>
+            <span>{t("dashboard.pwaPromoBtn")}</span>
             <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>
               arrow_forward
             </span>
@@ -825,13 +830,13 @@ export const DashboardPage: React.FC = () => {
                     color: "var(--color-on-surface)",
                   }}
                 >
-                  Today's Priority Goals
+                  {t("dashboard.todayPriority")}
                 </h2>
                 <div style={{ display: "flex", gap: "4px" }}>
                   <button
                     className="btn-ghost"
                     style={{ padding: "6px 8px" }}
-                    title="Filter"
+                    title={t("goals.sortBy")}
                   >
                     <span
                       className="material-symbols-outlined"
@@ -843,7 +848,7 @@ export const DashboardPage: React.FC = () => {
                   <button
                     className="btn-ghost"
                     style={{ padding: "6px 8px" }}
-                    title="Grid View"
+                    title={t("dashboard.gridView")}
                   >
                     <span
                       className="material-symbols-outlined"
@@ -908,7 +913,7 @@ export const DashboardPage: React.FC = () => {
                     color: "var(--color-on-surface-variant)",
                   }}
                 >
-                  Loading daily layout...
+                  {t("common.loading")}
                 </p>
               </div>
             ) : activeFilteredGoals.length > 0 ? (
@@ -973,7 +978,7 @@ export const DashboardPage: React.FC = () => {
                             marginBottom: "6px",
                           }}
                         >
-                          No goals yet
+                          {t("goals.noGoals")}
                         </h3>
                         <p
                           style={{
@@ -982,8 +987,7 @@ export const DashboardPage: React.FC = () => {
                             lineHeight: 1.6,
                           }}
                         >
-                          Start by creating your first daily goal to build
-                          lasting habits.
+                          {t("goals.noGoalsDesc")}
                         </p>
                       </div>
                       <Link to="/new-goal" className="btn-primary">
@@ -993,7 +997,7 @@ export const DashboardPage: React.FC = () => {
                         >
                           add
                         </span>
-                        Create First Goal
+                        {t("dashboard.createFirst")}
                       </Link>
                     </>
                   ) : (
@@ -1017,7 +1021,7 @@ export const DashboardPage: React.FC = () => {
                             marginBottom: "6px",
                           }}
                         >
-                          No goals in "{activeCategory}"
+                          {t("dashboard.noGoalsInCat", { cat: activeCategory })}
                         </h3>
                         <p
                           style={{
@@ -1026,7 +1030,7 @@ export const DashboardPage: React.FC = () => {
                             lineHeight: 1.6,
                           }}
                         >
-                          No active goals match this category filter.
+                          {t("dashboard.noGoalsInCatDesc")}
                         </p>
                       </div>
                       <button
@@ -1039,7 +1043,7 @@ export const DashboardPage: React.FC = () => {
                           borderRadius: "9999px",
                         }}
                       >
-                        Clear Filter
+                        {t("dashboard.clearFilter")}
                       </button>
                     </>
                   )}

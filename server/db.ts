@@ -58,6 +58,23 @@ function mapNotification(n: any) {
   };
 }
 
+function getCurrentMonthYear(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function mapFreeze(f: any) {
+  return {
+    id: f.id,
+    user_id: f.user_id,
+    goal_id: f.goal_id,
+    frozen_date: f.frozen_date,
+    created_at: f.created_at.toISOString(),
+  };
+}
+
+type StreakFreezeRecord = ReturnType<typeof mapFreeze>;
+
 class PrismaDB {
   // Users Operations
   public users = {
@@ -85,6 +102,7 @@ class PrismaDB {
           password_hash: data.password_hash,
           name: data.name,
           timezone: data.timezone || "UTC",
+          onboarding_completed: false,
         },
       });
       return mapUser(created);
@@ -98,6 +116,8 @@ class PrismaDB {
         timezone?: string;
         push_subscription?: string | null;
         last_reminder_sent_date?: string | null;
+        last_freeze_reminder_date?: string | null;
+        onboarding_completed?: boolean;
       }
     ) => {
       const updated = await prisma.user.update({
@@ -274,6 +294,48 @@ class PrismaDB {
         });
         return mapStreak(updated);
       }
+    },
+  };
+
+  public freezeTokens = {
+    findOrCreate: async (userId: string): Promise<{ id: string; user_id: string; tokens_left: number; month_year: string }> => {
+      const currentMonthYear = getCurrentMonthYear();
+      const existing = await prisma.freezeToken.findUnique({ where: { user_id: userId } });
+
+      if (!existing) {
+        return prisma.freezeToken.create({
+          data: { user_id: userId, tokens_left: 3, month_year: currentMonthYear },
+        });
+      }
+
+      if (existing.month_year !== currentMonthYear) {
+        return prisma.freezeToken.update({
+          where: { user_id: userId },
+          data: { tokens_left: 3, month_year: currentMonthYear },
+        });
+      }
+
+      return existing;
+    },
+    update: async (userId: string, data: { tokens_left?: number; month_year?: string }) => {
+      return prisma.freezeToken.update({ where: { user_id: userId }, data });
+    },
+  };
+
+  public streakFreezes = {
+    findMany: async (where: { user_id?: string; goal_id?: string }): Promise<StreakFreezeRecord[]> => {
+      const results = await prisma.streakFreeze.findMany({ where });
+      return results.map(mapFreeze);
+    },
+    create: async (data: { user_id: string; goal_id: string; frozen_date: string }) => {
+      const created = await prisma.streakFreeze.create({ data });
+      return mapFreeze(created);
+    },
+    findByDate: async (goalId: string, date: string) => {
+      const found = await prisma.streakFreeze.findUnique({
+        where: { goal_id_frozen_date: { goal_id: goalId, frozen_date: date } },
+      });
+      return found ? mapFreeze(found) : null;
     },
   };
 

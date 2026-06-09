@@ -1,6 +1,7 @@
 // src/components/ShareModal.tsx
 import React, { useRef, useEffect, useState } from "react";
 import { useAuthStore } from "../store/authStore";
+import { useTranslation } from "../i18n";
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface ShareModalProps {
 }
 
 export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, data }) => {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [imageUrl, setImageUrl] = useState<string>("");
@@ -192,17 +194,17 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
 
         ctx.fillStyle = "#fb923c";
         ctx.font = "bold 14px system-ui, sans-serif";
-        ctx.fillText(`🔥 ${data.streakCount}-Day Streak Active`, 458, lineY + 49);
+        ctx.fillText(t("share.streakActive", { days: data.streakCount }), 458, lineY + 49);
       }
     } else {
       // Render Heatmap Mode Card Content
       ctx.fillStyle = "#e2e8f0";
       ctx.font = "bold 28px system-ui, sans-serif";
-      ctx.fillText("Consistency Heatmap", 150, 240);
+      ctx.fillText(t("share.heatmapCard"), 150, 240);
 
       ctx.fillStyle = "#94a3b8";
       ctx.font = "16px system-ui, sans-serif";
-      ctx.fillText("Discipline is choosing between what you want now and what you want most.", 150, 275);
+      ctx.fillText(t("share.heatmapSubtitle"), 150, 275);
 
       // Render a mini 24-week heatmap grid (168 days)
       const gridX = 150;
@@ -254,7 +256,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
       // Draw Legend
       ctx.fillStyle = "#94a3b8";
       ctx.font = "semibold 12px system-ui, sans-serif";
-      ctx.fillText("Less", gridX, gridY + rows * (cellSize + gap) + 25);
+      ctx.fillText(t("share.less"), gridX, gridY + rows * (cellSize + gap) + 25);
 
       const legX = gridX + 45;
       const legY = gridY + rows * (cellSize + gap) + 14;
@@ -266,7 +268,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
         ctx.fill();
       }
       ctx.fillStyle = "#94a3b8";
-      ctx.fillText("More", legX + 85, gridY + rows * (cellSize + gap) + 25);
+      ctx.fillText(t("share.more"), legX + 85, gridY + rows * (cellSize + gap) + 25);
     }
 
     // Convert to Image URL
@@ -291,7 +293,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
   };
 
   const copyShareText = () => {
-    const text = `🔥 Check out my achievement on Daily Goal Tracker! I completed "${data.title}": ${data.description}. Join me in building healthy daily habits!`;
+    const text = t("share.message", { title: data.title, description: data.description });
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -304,8 +306,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
         if (!blob) return;
         const file = new File([blob], "achievement.png", { type: "image/png" });
         const shareData = {
-          title: "My Daily Goal Achievement",
-          text: `🔥 I completed my habit target "${data.title}" on DailyGoal Tracker!`,
+          title: t("share.title"),
+          text: t("share.nativeText", { title: data.title }),
           files: [file]
         };
         if (navigator.canShare && navigator.canShare(shareData)) {
@@ -313,8 +315,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
         } else {
           // Fallback text share
           await navigator.share({
-            title: "My Daily Goal Achievement",
-            text: `🔥 I completed my habit target "${data.title}" on DailyGoal Tracker: ${data.description}!`,
+            title: t("share.title"),
+            text: t("share.message", { title: data.title, description: data.description }),
             url: window.location.origin
           });
         }
@@ -325,7 +327,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
   };
 
   // Redirection URLs
-  const shareText = `🔥 Check out my consistency achievement on DailyGoal Tracker: "${data.title}"! ${data.description} #discipline #goals`;
+  const shareText = t("share.message", { title: data.title, description: data.description }) + " #discipline #goals";
   const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
   const facebookUrl = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(shareText)}&u=${encodeURIComponent(window.location.origin)}`;
 
@@ -349,7 +351,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
 
         {/* Card Image Preview Column */}
         <div className="flex-1 flex flex-col items-center justify-center bg-black/20 rounded-2xl p-4 border border-white/5">
-          <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">Shareable Card Preview</p>
+          <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">{t("share.previewTitle")}</p>
           {imageUrl ? (
             <img 
               src={imageUrl} 
@@ -361,14 +363,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
               <div className="animate-spin h-6 w-6 border-t-2 border-primary border-transparent rounded-full" />
             </div>
           )}
-          <p className="text-[10px] text-slate-500 mt-3 text-center">Perfect size for Twitter Cards & Facebook feed posts (1200x630px)</p>
+          <p className="text-[10px] text-slate-500 mt-3 text-center">{t("share.previewDesc")}</p>
         </div>
 
         {/* Action Controls Column */}
         <div className="w-full md:w-80 flex flex-col justify-between py-2">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-on-surface">Share Achievement</h3>
+              <h3 className="text-lg font-bold text-on-surface">{t("share.title")}</h3>
               <button 
                 onClick={onClose}
                 className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-on-surface border-none cursor-pointer"
@@ -378,7 +380,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
             </div>
             
             <p className="text-sm text-on-surface-variant mb-5">
-              Congratulations! Show off your consistency badge and inspire friends to build daily discipline.
+              {t("share.introDesc")}
             </p>
 
             <div className="space-y-2.5">
@@ -388,7 +390,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>download</span>
-                Download High-Res PNG
+                {t("share.downloadPng")}
               </button>
 
               {canShare && (
@@ -398,7 +400,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
                   style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>share</span>
-                  Share via Devices
+                  {t("share.shareNative")}
                 </button>
               )}
 
@@ -410,13 +412,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
                 <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
                   {copied ? "check" : "content_copy"}
                 </span>
-                {copied ? "Copied text!" : "Copy Share Message"}
+                {copied ? t("share.copied") : t("share.copyMessage")}
               </button>
             </div>
 
             <div className="my-6 border-t border-white/10" />
 
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Quick Social Links</p>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">{t("share.quickLinks")}</p>
             <div className="flex gap-2">
               <a 
                 href={twitterUrl} 
@@ -443,7 +445,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, type, d
           
           <div className="mt-6 md:mt-0">
             <p className="text-[10px] text-slate-500 text-center font-semibold">
-              Discipline is the bridge between goals and accomplishment.
+              {t("share.footerQuote")}
             </p>
           </div>
         </div>

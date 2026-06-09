@@ -4,9 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, RotateCcw, Award, Sparkles, Smile } from "lucide-react";
 import { useGoalStore } from "../store/goalStore";
 import { Goal } from "../types";
+import { useTranslation } from "../i18n";
 
 export const QuickCheckInPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t, language } = useTranslation();
   const { goals, fetchGoals, completeGoalProgress, deleteLogProgress, isOffline } = useGoalStore();
   
   // Track recently logged progress for undoing
@@ -160,7 +162,7 @@ export const QuickCheckInPage: React.FC = () => {
           className="text-lg font-bold tracking-tight text-center flex-1"
           style={{ color: "var(--color-on-background)" }}
         >
-          Check-in Nhanh ⚡
+          {t("quickCheckin.title")} ⚡
         </h1>
         <div style={{ width: "40px" }} /> {/* Balance space */}
       </header>
@@ -171,7 +173,7 @@ export const QuickCheckInPage: React.FC = () => {
           className="mb-6 py-2 px-4 text-xs flex items-center justify-center gap-2 rounded-xl border border-orange-500/20 bg-orange-500/10 text-orange-400 font-semibold animate-pulse"
         >
           <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>cloud_off</span>
-          <span>Đang check-in ngoại tuyến (Offline)</span>
+          <span>{t("quickCheckin.offlineCheckin")}</span>
         </div>
       )}
 
@@ -191,7 +193,7 @@ export const QuickCheckInPage: React.FC = () => {
               paddingLeft: "4px"
             }}
           >
-            Thói quen chưa hoàn thành ({activeGoals.length})
+            {t("quickCheckin.incompleteHabits", { count: activeGoals.length })}
           </h2>
 
           {activeGoals.length === 0 ? (
@@ -206,16 +208,16 @@ export const QuickCheckInPage: React.FC = () => {
                 <Sparkles size={28} />
               </div>
               <h3 className="font-bold text-base mb-1" style={{ color: "var(--color-on-surface)" }}>
-                Hoàn thành xuất sắc!
+                {t("quickCheckin.allDone")}
               </h3>
               <p className="text-xs max-w-[280px]" style={{ color: "var(--color-on-surface-variant)" }}>
-                Tất cả các thói quen của bạn trong ngày hôm nay đã được ghi nhận đầy đủ. Hẹn gặp lại bạn ngày mai!
+                {t("quickCheckin.allDoneDesc")}
               </p>
               <button 
                 onClick={() => navigate("/")} 
                 className="btn-primary mt-6 text-xs py-2.5 px-6"
               >
-                Quay lại Trang chủ
+                {t("goals.backToDashboard")}
               </button>
             </div>
           ) : (
@@ -247,7 +249,7 @@ export const QuickCheckInPage: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1.5">
                             <span className={`cat-pill ${getCategoryClass(goal.category)}`}>
-                              {getCategoryEmoji(goal.category)} {goal.category}
+                              {getCategoryEmoji(goal.category)} {t("category." + goal.category.toLowerCase())}
                             </span>
                             {goal.streak && goal.streak.current_streak > 0 && (
                               <span 
@@ -276,7 +278,7 @@ export const QuickCheckInPage: React.FC = () => {
                             className="text-xs mt-1" 
                             style={{ color: "var(--color-on-surface-variant)" }}
                           >
-                            Tiến trình: {goal.current_count}/{goal.target_count} ({goal.frequency})
+                            {t("quickCheckin.progressLabel", { current: goal.current_count, target: goal.target_count, freq: t("common." + goal.frequency) })}
                           </p>
                         </div>
 
@@ -316,10 +318,10 @@ export const QuickCheckInPage: React.FC = () => {
                           </div>
                           <div>
                             <h4 className="font-semibold text-sm" style={{ color: "var(--color-on-surface)" }}>
-                              Đã ghi nhận thói quen!
+                              {t("quickCheckin.habitLogged")}
                             </h4>
                             <p className="text-xs" style={{ color: "var(--color-on-surface-variant)" }}>
-                              Mất dấu sau {secondsLeft} giây...
+                              {t("goalCard.hideIn", { sec: secondsLeft })}
                             </p>
                           </div>
                         </div>
@@ -333,7 +335,7 @@ export const QuickCheckInPage: React.FC = () => {
                           }}
                         >
                           <RotateCcw size={14} />
-                          <span>Hoàn tác</span>
+                          <span>{t("common.undo")}</span>
                         </button>
                       </div>
                     )}
@@ -371,7 +373,7 @@ export const QuickCheckInPage: React.FC = () => {
                 paddingLeft: "4px"
               }}
             >
-              Đã hoàn thành ({completedGoals.length})
+              {t("quickCheckin.completedHabits", { count: completedGoals.length })}
             </h2>
 
             <div className="flex flex-col gap-2.5 opacity-60">
@@ -392,7 +394,7 @@ export const QuickCheckInPage: React.FC = () => {
                       {goal.title}
                     </h3>
                     <p style={{ fontSize: "11px", color: "var(--color-outline)" }}>
-                      Mục tiêu: {goal.current_count}/{goal.target_count} • Chuỗi: {goal.streak?.current_streak || 0} ngày
+                      {t("quickCheckin.completedProgressLabel", { current: goal.current_count, target: goal.target_count, streak: goal.streak?.current_streak || 0 })}
                     </p>
                   </div>
                   
@@ -401,13 +403,13 @@ export const QuickCheckInPage: React.FC = () => {
                       <span className="material-symbols-outlined" style={{ fontSize: "12px" }}>
                         check
                       </span>
-                      <span>Xong</span>
+                      <span>{t("common.done")}</span>
                     </span>
                     {/* Allow extra completion check-in if clicked */}
                     <button
                       onClick={() => handleCheckIn(goal)}
                       className="btn-ghost p-1.5 rounded-lg"
-                      title="Check-in thêm"
+                      title={t("quickCheckin.checkinMore")}
                       style={{ display: "flex", alignItems: "center" }}
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>

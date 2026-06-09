@@ -19,11 +19,29 @@ interface AuthState {
   clearError: () => void;
   updateProfile: (name: string, email: string, timezone: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
 }
 
+const getStoredUser = (): User | null => {
+  const rawUser = localStorage.getItem("user");
+  if (!rawUser) return null;
+
+  try {
+    return JSON.parse(rawUser) as User;
+  } catch (error) {
+    console.warn("Invalid stored user cleared:", error);
+    clearStoredTokens();
+    localStorage.removeItem("user");
+    localStorage.removeItem("onboarding_completed");
+    return null;
+  }
+};
+
+const initialUser = getStoredUser();
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: JSON.parse(localStorage.getItem("user") || "null"),
-  isAuthenticated: !!getStoredAccessToken(),
+  user: initialUser,
+  isAuthenticated: !!getStoredAccessToken() && !!initialUser,
   loading: false,
   error: null,
 
@@ -31,10 +49,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   checkAuth: () => {
     const token = getStoredAccessToken();
-    const userJson = localStorage.getItem("user");
-    if (token && userJson) {
+    const user = getStoredUser();
+    if (token && user) {
+      if (localStorage.getItem("onboarding_completed") === "true") {
+        user.onboarding_completed = true;
+      }
       set({
-        user: JSON.parse(userJson),
+        user,
         isAuthenticated: true,
         loading: false,
       });
@@ -53,6 +74,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       setStoredTokens(accessToken, refreshToken);
       localStorage.setItem("user", JSON.stringify(user));
+      if (user.onboarding_completed) {
+        localStorage.setItem("onboarding_completed", "true");
+      } else {
+        localStorage.removeItem("onboarding_completed");
+      }
 
       set({
         user,
@@ -60,11 +86,13 @@ export const useAuthStore = create<AuthState>((set) => ({
         loading: false,
       });
 
-      // Silently try to seed some sample goals for this user if they are empty
-      try {
-        await api.post("/api/seed", { userId: user.id });
-      } catch (seedErr) {
-        console.warn("Goals seed bypassed:", seedErr);
+      // Silently try to seed some sample goals for this user only if onboarding is completed
+      if (user.onboarding_completed) {
+        try {
+          await api.post("/api/seed", { userId: user.id });
+        } catch (seedErr) {
+          console.warn("Goals seed bypassed:", seedErr);
+        }
       }
     } catch (error: any) {
       const msg = error.response?.data?.message || "Login failed. Please verify credentials.";
@@ -87,6 +115,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       setStoredTokens(accessToken, refreshToken);
       localStorage.setItem("user", JSON.stringify(user));
+      if (user.onboarding_completed) {
+        localStorage.setItem("onboarding_completed", "true");
+      } else {
+        localStorage.removeItem("onboarding_completed");
+      }
 
       set({
         user,
@@ -94,11 +127,13 @@ export const useAuthStore = create<AuthState>((set) => ({
         loading: false,
       });
 
-      // Immediately seed welcoming sample goals
-      try {
-        await api.post("/api/seed", { userId: user.id });
-      } catch (seedErr) {
-        console.warn("Goals seed bypassed:", seedErr);
+      // Immediately seed welcoming sample goals only if onboarding is completed
+      if (user.onboarding_completed) {
+        try {
+          await api.post("/api/seed", { userId: user.id });
+        } catch (seedErr) {
+          console.warn("Goals seed bypassed:", seedErr);
+        }
       }
     } catch (error: any) {
       const msg = error.response?.data?.message || "Registration failed. Try again.";
@@ -148,11 +183,28 @@ export const useAuthStore = create<AuthState>((set) => ({
       await api.delete("/api/auth/profile");
       clearStoredTokens();
       localStorage.removeItem("user");
+      localStorage.removeItem("onboarding_completed");
       set({ user: null, isAuthenticated: false, loading: false });
     } catch (error: any) {
       const msg = error.response?.data?.message || "Failed to delete account.";
       set({ error: msg, loading: false });
       throw new Error(msg);
     }
+  },
+
+  completeOnboarding: async () => {
+    localStorage.setItem("onboarding_completed", "true");
+    try {
+      await api.put("/api/auth/profile", { onboarding_completed: true });
+    } catch (err) {
+      console.warn("Server-side onboarding update bypassed:", err);
+    }
+    set((state) => {
+      const updatedUser = state.user ? { ...state.user, onboarding_completed: true } : null;
+      if (updatedUser) {
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+      }
+      return { user: updatedUser };
+    });
   },
 }));

@@ -5,14 +5,17 @@ import { useGoalStore } from "../store/goalStore";
 import { useAuthStore } from "../store/authStore";
 import api from "../services/api";
 import { ShareModal } from "../components/ShareModal";
+import { useTranslation } from "../i18n";
 
 export const Stats: React.FC = () => {
+  const { t, language } = useTranslation();
   const { user, isAuthenticated } = useAuthStore();
   const { stats, history, loading, fetchStats, fetchHistory, goals, fetchGoals, isOffline } = useGoalStore();
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [seeding, setSeeding] = useState(false);
+  const [frozenDates, setFrozenDates] = useState<Set<string>>(new Set());
 
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false);
@@ -29,8 +32,8 @@ export const Stats: React.FC = () => {
     }));
     setShareType("heatmap");
     setShareData({
-      title: "Consistency Heatmap",
-      description: `I've logged ${history.reduce((sum, d) => sum + d.count, 0)} goal completions over the last 182 days!`,
+      title: t("stats.consistencyHeatmap"),
+      description: t("share.heatmapDescription", { count: history.reduce((sum, d) => sum + d.count, 0) }),
       heatmapData
     });
     setShowShareModal(true);
@@ -38,8 +41,9 @@ export const Stats: React.FC = () => {
 
   const handleShareMilestone = (milestone: any) => {
     let streakCount = 0;
-    if (milestone.title.toLowerCase().includes("streak")) {
-      const match = milestone.title.match(/(\d+)-Day/);
+    const isStreak = milestone.title.toLowerCase().includes("streak") || milestone.title.toLowerCase().includes("chuỗi");
+    if (isStreak) {
+      const match = milestone.title.match(/(\d+)/);
       if (match) streakCount = parseInt(match[1], 10);
     }
     setShareType("badge");
@@ -68,6 +72,10 @@ export const Stats: React.FC = () => {
       const fromDate = fromDateObj.toISOString().split("T")[0];
       const toDate = now.toISOString().split("T")[0];
       fetchHistory(fromDate, toDate);
+
+      api.get("/api/freeze/dates?all=true")
+        .then((res) => setFrozenDates(new Set<string>(res.data.frozen_dates)))
+        .catch(() => {});
     }
   }, [isAuthenticated, fetchGoals, fetchStats, fetchHistory]);
 
@@ -83,6 +91,9 @@ export const Stats: React.FC = () => {
     const fromDate = fromDateObj.toISOString().split("T")[0];
     const toDate = now.toISOString().split("T")[0];
     fetchHistory(fromDate, toDate);
+    api.get("/api/freeze/dates?all=true")
+      .then((res) => setFrozenDates(new Set<string>(res.data.frozen_dates)))
+      .catch(() => {});
   };
 
   const handleSeedGoals = async () => {
@@ -245,13 +256,13 @@ export const Stats: React.FC = () => {
   const monthsList = useMemo(() => {
     const list: string[] = [];
     history.forEach(day => {
-      const mName = new Date(day.date).toLocaleDateString(undefined, { month: "short" });
+      const mName = new Date(day.date).toLocaleDateString(language === "vi" ? "vi-VN" : "en-US", { month: "short" });
       if (!list.includes(mName)) {
         list.push(mName);
       }
     });
     return list.slice(-6);
-  }, [history]);
+  }, [history, language]);
 
   // 5. Performance Trend grouped by past 10 weeks
   const performanceTrend = useMemo(() => {
@@ -278,13 +289,13 @@ export const Stats: React.FC = () => {
       const percentage = maxTarget > 0 ? Math.min(100, Math.round((completionsSum / maxTarget) * 100)) : 0;
       
       trendData.push({
-        weekLabel: `WEEK ${weeksCount - w}`,
+        weekLabel: t("stats.weekLabel", { num: weeksCount - w }),
         percentage: percentage || 15 + (9 - w) * 8, // fallback curve if empty
         count: completionsSum
       });
     }
     return trendData;
-  }, [history, stats, goals]);
+  }, [history, stats, goals, t]);
 
   // 6. Conic gradient calculation for Goal Distribution Donut Chart
   const distributionData = useMemo(() => {
@@ -335,10 +346,10 @@ export const Stats: React.FC = () => {
     const globalRate = stats?.overallCompletionRate || 87.4;
     if (globalRate > 75) {
       list.push({
-        title: "Achiever Elite Tier Unlocked",
-        desc: `You've maintained a global accomplishment rate of ${globalRate}% across all categories.`,
+        title: t("stats.milestonesList.eliteTitle"),
+        desc: t("stats.milestonesList.eliteDesc", { rate: globalRate }),
         icon: "emoji_events",
-        date: "Last Week",
+        date: t("stats.milestoneDate.lastWeek"),
         colorClass: "border-l-4 border-primary",
         iconColorClass: "bg-primary/10 text-primary"
       });
@@ -348,10 +359,10 @@ export const Stats: React.FC = () => {
     const longestStreak = stats?.bestLongestStreak || 14;
     if (longestStreak > 0) {
       list.push({
-        title: `${longestStreak}-Day Health Streak Reached`,
-        desc: `Consistency is paying off. Your longest logged streak is currently ${longestStreak} days.`,
+        title: t("stats.milestonesList.streakTitle", { days: longestStreak }),
+        desc: t("stats.milestonesList.streakDesc", { days: longestStreak }),
         icon: "stars",
-        date: "2 days ago",
+        date: t("stats.milestoneDate.twoDaysAgo"),
         colorClass: "border-l-4 border-secondary",
         iconColorClass: "bg-secondary/10 text-secondary"
       });
@@ -361,10 +372,10 @@ export const Stats: React.FC = () => {
     const totalCompleted = goals.reduce((sum, g) => sum + g.current_count, 0);
     if (totalCompleted > 5) {
       list.push({
-        title: `Logged ${totalCompleted} Goal completions`,
-        desc: "You are actively building great daily routines and habit tracking loops.",
+        title: t("stats.milestonesList.totalCompletedTitle", { count: totalCompleted }),
+        desc: t("stats.milestonesList.totalCompletedDesc"),
         icon: "timeline",
-        date: "Active",
+        date: t("stats.milestoneDate.active"),
         colorClass: "border-l-4 border-tertiary",
         iconColorClass: "bg-tertiary/10 text-tertiary"
       });
@@ -373,17 +384,17 @@ export const Stats: React.FC = () => {
     // Default if empty
     if (list.length === 0) {
       list.push({
-        title: "Start Logging Goals",
-        desc: "Complete your first daily goal to unlock consistency badges and historic milestones.",
+        title: t("stats.milestonesList.startTitle"),
+        desc: t("stats.milestonesList.startDesc"),
         icon: "emoji_events",
-        date: "Today",
+        date: t("stats.milestoneDate.today"),
         colorClass: "border-l-4 border-primary",
         iconColorClass: "bg-primary/10 text-primary"
       });
     }
 
     return list;
-  }, [stats, goals]);
+  }, [stats, goals, t]);
 
   // Filtered Milestones based on Search
   const filteredMilestones = useMemo(() => {
@@ -401,7 +412,7 @@ export const Stats: React.FC = () => {
     return (
       <div style={{ minHeight: "100vh" }} className="flex flex-col items-center justify-center p-4">
         <div className="animate-spin h-8 w-8 text-secondary mb-3 border-t-2 border-secondary border-l border-r border-transparent rounded-full" />
-        <p className="text-sm text-on-surface-variant">Loading performance statistics analytics...</p>
+        <p className="text-sm text-on-surface-variant">{t("stats.loadingDesc")}</p>
       </div>
     );
   }
@@ -427,7 +438,7 @@ export const Stats: React.FC = () => {
               color: "var(--color-on-surface)",
             }}
           >
-            Statistics
+            {t("nav.statistics")}
           </h2>
           <div className="relative w-full sm:max-w-[240px]">
             <span
@@ -439,7 +450,7 @@ export const Stats: React.FC = () => {
             <input
               className="bg-surface-container-high border-none rounded-full py-1.5 pl-9 pr-4 text-xs focus:ring-2 focus:ring-primary w-full text-on-surface outline-none transition-all duration-300"
               style={{ border: "1px solid var(--border-subtle)" }}
-              placeholder="Search milestones..."
+              placeholder={t("stats.searchMilestone")}
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -453,44 +464,44 @@ export const Stats: React.FC = () => {
               <span className="material-symbols-outlined ms-filled" style={{ fontSize: "14px" }}>
                 local_fire_department
               </span>
-              <span>{bestStreak} Day Streak</span>
+              <span>{t("goalCard.streakDays", { days: bestStreak })}</span>
             </div>
           )}
           <button
             onClick={handleExportCSV}
             className="btn-ghost text-xs shrink-0 py-2 px-2.5 sm:px-3"
             style={{ display: "flex", alignItems: "center", gap: "6px" }}
-            title="Export CSV Report"
+            title={t("common.exportCsv")}
           >
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
               download
             </span>
-            <span className="hidden sm:inline">Export CSV</span>
+            <span className="hidden sm:inline">{t("common.exportCsv")}</span>
           </button>
           <button
             onClick={handleRefresh}
             className="btn-ghost text-xs shrink-0 py-2 px-2.5 sm:px-3"
             style={{ display: "flex", alignItems: "center", gap: "6px" }}
-            title="Update Stats"
+            title={t("common.refresh")}
           >
             <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>
               refresh
             </span>
-            <span className="hidden sm:inline">Update Data</span>
+            <span className="hidden sm:inline">{t("common.refresh")}</span>
           </button>
           {isOffline ? (
             <div
               className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4 opacity-50 cursor-not-allowed"
               style={{ pointerEvents: "none" }}
-              title="Network connection required"
+              title={t("goals.connectionRequired")}
             >
               <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>cloud_off</span>
-              <span className="hidden sm:inline">New Goal</span>
+              <span className="hidden sm:inline">{t("goals.newGoal")}</span>
             </div>
           ) : (
             <Link to="/new-goal" className="btn-primary text-xs shrink-0 py-2 px-2.5 sm:px-4">
               <span className="material-symbols-outlined" style={{ fontSize: "15px" }}>add</span>
-              <span className="hidden sm:inline">New Goal</span>
+              <span className="hidden sm:inline">{t("goals.newGoal")}</span>
             </Link>
           )}
         </div>
@@ -501,8 +512,8 @@ export const Stats: React.FC = () => {
         {/* Header Section */}
         <section className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">Statistics Dashboard</h1>
-            <p className="text-base text-on-surface-variant mt-2">Your performance breakdown for the last 180 days.</p>
+            <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">{t("stats.title")}</h1>
+            <p className="text-base text-on-surface-variant mt-2">{t("stats.subtitle")}</p>
           </div>
         </section>
 
@@ -512,8 +523,8 @@ export const Stats: React.FC = () => {
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-tertiary text-3xl">auto_awesome</span>
               <div>
-                <h4 className="font-bold text-on-surface">No habits seeded yet</h4>
-                <p className="text-sm text-on-surface-variant mt-0.5">Let's populate some example goals to check out premium visualizations!</p>
+                <h4 className="font-bold text-on-surface">{t("stats.noHabitsSeeded")}</h4>
+                <p className="text-sm text-on-surface-variant mt-0.5">{t("stats.populateHint")}</p>
               </div>
             </div>
             <button
@@ -521,7 +532,7 @@ export const Stats: React.FC = () => {
               disabled={seeding}
               className="px-5 py-2.5 bg-primary text-on-primary font-bold text-xs uppercase tracking-wider rounded-full hover:scale-105 active:scale-95 transition-all cursor-pointer border-none disabled:opacity-50"
             >
-              {seeding ? "Seeding..." : "Seed Demo Goals"}
+              {seeding ? t("stats.seedingBtn") : t("stats.seedDemoBtn")}
             </button>
           </div>
         )}
@@ -531,14 +542,14 @@ export const Stats: React.FC = () => {
           {/* Key Highlight Card */}
           <div className="lg:col-span-4 glass-card p-6 rounded-2xl relative overflow-hidden group hover:border-white/20 transition-all">
             <div className="relative z-10">
-              <p className="text-xs font-bold text-secondary mb-2 uppercase tracking-widest">Global Completion</p>
+              <p className="text-xs font-bold text-secondary mb-2 uppercase tracking-widest">{t("stats.globalCompletion")}</p>
               <h3 className="text-4xl font-extrabold text-on-surface">{stats?.overallCompletionRate || 87.4}%</h3>
               <div className="mt-4 flex items-center gap-2">
                 <span className={`material-symbols-outlined ${completionTrend.isUp ? 'text-secondary' : 'text-error'}`}>
                   {completionTrend.isUp ? 'trending_up' : 'trending_down'}
                 </span>
                 <span className={`text-sm font-bold ${completionTrend.isUp ? 'text-secondary' : 'text-error'}`}>
-                  {completionTrend.isUp ? '+' : '-'}{completionTrend.percent}% vs last month
+                  {completionTrend.isUp ? '+' : '-'}{completionTrend.percent}% {t("stats.vsLastMonth")}
                 </span>
               </div>
             </div>
@@ -555,17 +566,17 @@ export const Stats: React.FC = () => {
                 <div key={cat.name} className={`glass-card p-6 rounded-2xl ${theme.border} hover:border-white/20 transition-all`}>
                   <div className="flex justify-between items-start mb-4">
                     <span className={`material-symbols-outlined ${theme.bgClass.split(" ")[1]}`}>{theme.icon}</span>
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${theme.bgClass}`}>{cat.name}</span>
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${theme.bgClass}`}>{t("category." + cat.name.toLowerCase())}</span>
                   </div>
-                  <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Completed</p>
+                  <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">{t("common.completed")}</p>
                   <h4 className="text-2xl font-black text-on-surface mt-1">
-                    {cat.count > 0 ? `${cat.totalProgress} Goals` : "0 Goals"}
+                    {cat.count > 0 ? `${cat.totalProgress} ${t("nav.goals")}` : `0 ${t("nav.goals")}`}
                   </h4>
                   <div className="mt-4 h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                     <div className={`h-full ${theme.progressBg}`} style={{ width: `${cat.progressRate || 0}%` }}></div>
                   </div>
                   <div className="mt-2 flex justify-between items-center text-[10px] text-on-surface-variant font-bold">
-                    <span>PROGRESS</span>
+                    <span>{t("goals.progress").toUpperCase()}</span>
                     <span>{cat.progressRate || 0}%</span>
                   </div>
                 </div>
@@ -579,45 +590,51 @@ export const Stats: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-primary text-2xl">calendar_month</span>
-              <h2 className="text-xl font-bold text-on-surface">Consistency Heatmap</h2>
+              <h2 className="text-xl font-bold text-on-surface">{t("stats.consistencyHeatmap")}</h2>
               <button
                 onClick={handleShareHeatmap}
                 className="btn-ghost p-1 rounded-full flex items-center justify-center border-none cursor-pointer"
-                title="Share Heatmap"
+                title={t("share.title")}
                 style={{ display: "inline-flex" }}
               >
                 <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: "18px" }}>share</span>
               </button>
             </div>
             <div className="flex items-center gap-2 self-end">
-              <span className="text-xs font-semibold text-on-surface-variant">Less</span>
+              <span className="text-xs font-semibold text-on-surface-variant">{t("share.less")}</span>
               <div className="flex gap-[3px]">
                 <div className="heatmap-cell heatmap-cell-0"></div>
                 <div className="heatmap-cell heatmap-cell-1"></div>
                 <div className="heatmap-cell heatmap-cell-2"></div>
                 <div className="heatmap-cell heatmap-cell-3" style={{ boxShadow: '0 0 8px rgba(78, 222, 163, 0.4)' }}></div>
               </div>
-              <span className="text-xs font-semibold text-on-surface-variant">More</span>
+              <span className="text-xs font-semibold text-on-surface-variant">{t("share.more")}</span>
             </div>
           </div>
           <div className="overflow-x-auto pb-4 custom-scrollbar">
             <div className="grid grid-flow-col grid-rows-7 gap-1 min-w-[800px]" id="heatmap-grid">
               {history.map((day) => {
                 const d = new Date(day.date);
-                const dayNum = d.getDate();
-                const dayName = d.toLocaleDateString(undefined, { day: "numeric", month: "short", weekday: "long" });
+                const dayName = d.toLocaleDateString(language === "vi" ? "vi-VN" : "en-US", { day: "numeric", month: "short", weekday: "long" });
+                const isFrozen = frozenDates.has(day.date);
 
                 return (
                   <div
                     key={day.date}
                     style={day.count >= 3 ? { boxShadow: '0 0 8px rgba(78, 222, 163, 0.4)' } : undefined}
-                    className={`heatmap-cell relative group cursor-pointer transition-all hover:scale-110 ${getHeatmapColorClass(
-                      day.count
-                    )}`}
+                    className={`heatmap-cell relative group cursor-pointer transition-all hover:scale-110 ${
+                      isFrozen ? "heatmap-cell-frozen" : getHeatmapColorClass(day.count)
+                    }`}
+                    title={isFrozen ? `Frozen day - ${day.date}` : `${day.date}: ${day.count} completions`}
                   >
+                    {isFrozen && (
+                      <span className="absolute inset-0 flex items-center justify-center" style={{ fontSize: "8px" }}>
+                        ❄
+                      </span>
+                    )}
                     {/* Interactive tooltip bubble indicator */}
                     <div className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 bg-surface-container-high border border-white/10 text-on-surface font-semibold text-[10px] rounded-lg px-2.5 py-1.5 whitespace-nowrap z-30 transition-all shadow-xl font-sans">
-                      {dayName}: {day.count} completion log{day.count !== 1 ? "s" : ""}
+                      {isFrozen ? `Frozen day - ${day.date}` : t("stats.heatmapTooltip", { date: dayName, count: day.count })}
                     </div>
                   </div>
                 );
@@ -635,7 +652,7 @@ export const Stats: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Performance Trend */}
           <div className="glass-card p-8 rounded-2xl">
-            <h3 className="text-xl font-bold text-on-surface mb-6">Performance Trend</h3>
+            <h3 className="text-xl font-bold text-on-surface mb-6">{t("stats.weeklyTrend")}</h3>
             <div className="h-64 relative flex items-end gap-2 px-4 border-b border-white/10 border-l border-white/10">
               {performanceTrend.map((data, idx) => (
                 <div
@@ -651,7 +668,7 @@ export const Stats: React.FC = () => {
                   )}
                   {/* Tooltip on hover */}
                   <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-surface-container-high border border-white/10 px-2 py-1 rounded text-[10px] text-primary font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none shadow-lg">
-                    {data.percentage}% ({data.count} logs)
+                    {data.percentage}% ({t("stats.logCount", { count: data.count })})
                   </div>
                 </div>
               ))}
@@ -665,7 +682,7 @@ export const Stats: React.FC = () => {
 
           {/* Goal Distribution Donut Chart */}
           <div className="glass-card p-8 rounded-2xl flex flex-col">
-            <h3 className="text-xl font-bold text-on-surface mb-6">Goal Distribution</h3>
+            <h3 className="text-xl font-bold text-on-surface mb-6">{t("stats.goalDistribution")}</h3>
             <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-8">
               {/* Dynamic Conic Donut Chart */}
               <div
@@ -677,7 +694,7 @@ export const Stats: React.FC = () => {
               >
                 <div className="absolute inset-4 bg-background rounded-full shadow-inner flex flex-col items-center justify-center">
                   <span className="text-3xl font-black text-on-surface">{distributionData.total}</span>
-                  <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Total Goals</span>
+                  <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">{t("stats.totalGoals")}</span>
                 </div>
               </div>
 
@@ -687,7 +704,7 @@ export const Stats: React.FC = () => {
                   <div key={sector.name} className="flex items-center gap-3">
                     <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: sector.color }} />
                     <span className="font-bold text-sm text-on-surface">
-                      {sector.name} ({sector.percentage}%)
+                      {t("category." + sector.name.toLowerCase())} ({sector.percentage}%)
                     </span>
                   </div>
                 ))}
@@ -698,7 +715,7 @@ export const Stats: React.FC = () => {
 
         {/* Key Milestones Feed */}
         <section className="mb-8">
-          <h3 className="text-xl font-bold text-on-surface mb-6">Key Milestones</h3>
+          <h3 className="text-xl font-bold text-on-surface mb-6">{t("stats.milestones")}</h3>
           <div className="space-y-4">
             {filteredMilestones.map((milestone, idx) => (
               <div
@@ -719,7 +736,7 @@ export const Stats: React.FC = () => {
                   <button
                     onClick={() => handleShareMilestone(milestone)}
                     className="btn-ghost p-2 rounded-xl flex items-center justify-center border-none cursor-pointer"
-                    title="Share Badge"
+                    title={t("share.title")}
                   >
                     <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: "16px" }}>share</span>
                   </button>
@@ -728,7 +745,7 @@ export const Stats: React.FC = () => {
             ))}
             {filteredMilestones.length === 0 && (
               <div className="glass-card p-8 rounded-2xl text-center text-on-surface-variant text-sm">
-                No milestones match your search query.
+                {t("stats.noMilestonesFound")}
               </div>
             )}
           </div>
@@ -740,7 +757,7 @@ export const Stats: React.FC = () => {
         <button
           onClick={() => navigate("/new-goal")}
           className="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-[0_8px_24px_rgba(192,193,255,0.3)] hover:scale-110 active:scale-95 hover:shadow-[0_12px_28px_rgba(192,193,255,0.45)] transition-all z-50 border-none cursor-pointer"
-          title="Add New Goal"
+          title={t("goals.newGoal")}
         >
           <span className="material-symbols-outlined text-[32px]">add</span>
         </button>

@@ -80,6 +80,8 @@ export const register = async (req: Request, res: Response, next: NextFunction):
         email: newUser.email,
         name: newUser.name,
         timezone: newUser.timezone,
+        created_at: newUser.created_at,
+        onboarding_completed: newUser.onboarding_completed,
       },
     });
   } catch (error) {
@@ -118,6 +120,8 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
         email: user.email,
         name: user.name,
         timezone: user.timezone,
+        created_at: user.created_at,
+        onboarding_completed: user.onboarding_completed,
       },
     });
   } catch (error) {
@@ -177,8 +181,30 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
     if (!authReq.user) {
       throw new AppError("Unauthenticated request", 401);
     }
-    const { name, email, timezone } = req.body;
+    const { name, email, timezone, onboarding_completed } = req.body;
     const userId = authReq.user.id;
+
+    // Support updating onboarding_completed independently
+    if (onboarding_completed !== undefined) {
+      const updatedUser = await db.users.update(userId, {
+        onboarding_completed: !!onboarding_completed,
+      });
+      const accessToken = generateAccessToken(updatedUser);
+      res.status(200).json({
+        success: true,
+        message: "Profile updated successfully.",
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          timezone: updatedUser.timezone,
+          created_at: updatedUser.created_at,
+          onboarding_completed: updatedUser.onboarding_completed,
+        },
+        accessToken,
+      });
+      return;
+    }
 
     if (!name || !email) {
       throw new AppError("Name and email are required.", 400);
@@ -209,6 +235,8 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
         email: updatedUser.email,
         name: updatedUser.name,
         timezone: updatedUser.timezone,
+        created_at: updatedUser.created_at,
+        onboarding_completed: updatedUser.onboarding_completed,
       },
       accessToken,
     });

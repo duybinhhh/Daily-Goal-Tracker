@@ -1,9 +1,10 @@
 // src/App.tsx
 import React, { useEffect } from "react";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
+import { AICoachDrawer } from "./components/AICoachDrawer";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { GoalFormPage } from "./pages/GoalFormPage";
@@ -13,9 +14,11 @@ import TimelinePage from "./pages/TimelinePage";
 import GoalsPage from "./pages/GoalsPage";
 import GroupsPage from "./pages/GroupsPage";
 import { QuickCheckInPage } from "./pages/QuickCheckInPage";
+import { OnboardingPage } from "./pages/OnboardingPage";
 
 import { useGoalStore } from "./store/goalStore";
 import { syncOfflineData } from "./services/syncManager";
+import { LanguageProvider } from "./i18n";
 
 
 // Auth Guard for protected workspace screens
@@ -28,6 +31,40 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+  return <>{children}</>;
+};
+
+// Redirect Handler for US-15 AC-1
+interface RedirectHandlerProps {
+  children: React.ReactNode;
+}
+
+const RedirectHandler: React.FC<RedirectHandlerProps> = ({ children }) => {
+  const { user, isAuthenticated } = useAuthStore();
+  const { goals, fetchGoals } = useGoalStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (location.pathname !== "/onboarding") {
+        fetchGoals().catch((err) => console.error("Error fetching goals in RedirectHandler:", err));
+      }
+    }
+  }, [isAuthenticated, user, location.pathname, fetchGoals]);
+
+  useEffect(() => {
+    if (isAuthenticated && user && location.pathname !== "/onboarding") {
+      const notCompletedOnboarding = user.onboarding_completed === false;
+      const hasNoGoals = goals.length === 0;
+      const isNewUser = user.created_at && (Date.now() - new Date(user.created_at).getTime()) < 5 * 60 * 1000;
+
+      if (notCompletedOnboarding && hasNoGoals && isNewUser) {
+        navigate("/onboarding");
+      }
+    }
+  }, [isAuthenticated, user, goals, location.pathname, navigate]);
+
   return <>{children}</>;
 };
 
@@ -83,26 +120,48 @@ export default function App() {
 
 
   return (
-    <HashRouter>
-      <Routes>
-        {/* Public authentication page — no sidebar */}
-        <Route path="/login" element={<LoginPage />} />
+    <LanguageProvider>
+      <HashRouter>
+        <RedirectHandler>
+          <Routes>
+            {/* Public authentication page — no sidebar */}
+            <Route path="/login" element={<LoginPage />} />
 
-        {/* Protected pages — with persistent sidebar */}
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <AppLayout />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </HashRouter>
+            {/* Onboarding page — no sidebar, but protected */}
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <OnboardingPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected pages — with persistent sidebar */}
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </RedirectHandler>
+      </HashRouter>
+    </LanguageProvider>
   );
 }
 
 function AppLayout() {
+  const [isAICoachOpen, setIsAICoachOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleOpenAICoach = () => setIsAICoachOpen(true);
+    window.addEventListener("open-ai-coach", handleOpenAICoach);
+    return () => window.removeEventListener("open-ai-coach", handleOpenAICoach);
+  }, []);
+
   return (
     <div
       id="app-wrapper"
@@ -142,6 +201,8 @@ function AppLayout() {
 
       {/* Bottom Nav for Mobile */}
       <BottomNav />
+
+      <AICoachDrawer isOpen={isAICoachOpen} onClose={() => setIsAICoachOpen(false)} />
     </div>
   );
 }
