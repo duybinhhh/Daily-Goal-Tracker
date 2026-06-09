@@ -7,6 +7,8 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
 import { useTranslation } from "../i18n";
+import { GoalTemplateModal } from "../components/GoalTemplateModal";
+import type { GoalTemplate } from "../data/goalTemplates";
 
 export const GoalFormPage: React.FC = () => {
   const { t } = useTranslation();
@@ -39,6 +41,7 @@ export const GoalFormPage: React.FC = () => {
   });
 
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   useEffect(() => {
     // Clear any previous store errors when mounting GoalFormPage
@@ -63,6 +66,19 @@ export const GoalFormPage: React.FC = () => {
       }
     }
   }, [isEdit, id, goals, navigate]);
+
+  const handleApplyTemplate = (template: GoalTemplate) => {
+    setFormData({
+      title: template.title,
+      description: template.description,
+      category: template.category,
+      target_count: template.target_count,
+      frequency: template.frequency,
+      due_date: "", // không pre-fill due_date – user tự điền
+    });
+    setFormErrors({}); // xoá validation errors cũ nếu có
+    setShowTemplateModal(false);
+  };
 
   const validate = () => {
     const errors: { [key: string]: string } = {};
@@ -164,6 +180,24 @@ export const GoalFormPage: React.FC = () => {
               </p>
             </div>
           </div>
+
+          {/* Template Button – chỉ hiện ở Create mode, không hiện khi Edit */}
+          {!isEdit && (
+            <div className="mb-5 pb-5" style={{ borderBottom: "1px solid var(--color-outline-variant)" }}>
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all border border-dashed hover:border-primary hover:bg-primary/5"
+                style={{
+                  borderColor: "var(--color-outline-variant)",
+                  color: "var(--color-on-surface-variant)",
+                }}
+              >
+                <Sparkles className="w-4 h-4" style={{ color: "var(--color-primary)" }} />
+                Chọn từ Template có sẵn
+              </button>
+            </div>
+          )}
  
           {error && !isConnectionError && (
             <div className="mb-6 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold rounded-lg text-center">
@@ -286,6 +320,12 @@ export const GoalFormPage: React.FC = () => {
           </form>
         </Card>
       </div>
+
+      <GoalTemplateModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        onApply={handleApplyTemplate}
+      />
     </div>
   );
 };
