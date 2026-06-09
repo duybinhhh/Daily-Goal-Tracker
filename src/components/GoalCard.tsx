@@ -259,6 +259,21 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
             >
               {goal.title}
             </h3>
+
+            {/* Reminder time badge — chỉ hiện nếu có reminder_time riêng */}
+            {goal.reminder_time && (
+              <div
+                className="flex items-center gap-1 text-[10px] mb-2"
+                style={{ color: 'var(--color-on-surface-variant)', opacity: 0.8 }}
+                title="Giờ nhắc nhở riêng"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>
+                  alarm
+                </span>
+                <span>{goal.reminder_time}</span>
+              </div>
+            )}
+
             {goal.description && (
               <p
                 style={{

@@ -1,21 +1,45 @@
+import "dotenv/config";
 import { db } from "./server/db";
 
-async function run() {
+async function main() {
+  console.log("=== USERS ===");
+  const users = await db.users.findMany();
+  for (const u of users) {
+    console.log({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      timezone: u.timezone,
+      onboarding_completed: u.onboarding_completed,
+      push_subscription: u.push_subscription ? "HAS_SUBSCRIPTION (length: " + u.push_subscription.length + ")" : "NULL"
+    });
+  }
+
+  console.log("\n=== GOALS ===");
   const goals = await db.goals.findMany();
-  console.log("Goals:", goals.length);
-  const logs = await db.logs.findMany();
-  console.log("Logs:", logs.length);
-  
-  if (logs.length > 0) {
-    const logIds = logs.map(l => l.id);
-    const uniqueIds = new Set(logIds);
-    console.log("Total Logs:", logs.length);
-    console.log("Unique IDs:", uniqueIds.size);
-    
-    // Check for identical notes or goal_ids
-    const logDetails = logs.map(l => ({ id: l.id, goal_id: l.goal_id, note: l.note }));
-    console.log(logDetails);
+  for (const g of goals) {
+    console.log({
+      id: g.id,
+      user_id: g.user_id,
+      title: g.title,
+      status: g.status,
+      reminder_time: g.reminder_time
+    });
+  }
+
+  console.log("\n=== NOTIFICATIONS ===");
+  const notifs = await db.notifications.findMany();
+  console.log("Total notifications count:", notifs.length);
+  for (const n of notifs.slice(-5)) {
+    console.log({
+      id: n.id,
+      user_id: n.user_id,
+      type: n.type,
+      message: n.message,
+      created_at: n.created_at
+    });
   }
 }
 
-run();
+main()
+  .catch(console.error);

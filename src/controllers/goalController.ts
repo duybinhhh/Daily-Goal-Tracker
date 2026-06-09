@@ -151,7 +151,7 @@ export const createGoal = async (req: AuthenticatedRequest, res: Response, next:
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
 
-    const { title, description, category, target_count, frequency, due_date } = req.body;
+    const { title, description, category, target_count, frequency, due_date, reminder_time } = req.body;
 
     if (!title || !category) {
       throw new AppError("Goal title and category fields are required properties.", 400);
@@ -162,6 +162,10 @@ export const createGoal = async (req: AuthenticatedRequest, res: Response, next:
       throw new AppError("Target count must be a positive integer greater than zero.", 400);
     }
 
+    if (reminder_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(reminder_time)) {
+      throw new AppError("Reminder time must use HH:mm format.", 400);
+    }
+
     const newGoal = await db.goals.create({
       user_id: userId,
       title,
@@ -170,6 +174,7 @@ export const createGoal = async (req: AuthenticatedRequest, res: Response, next:
       target_count: goalTarget,
       frequency: frequency || "daily",
       due_date: due_date || null,
+      reminder_time: reminder_time || null,
     });
 
     // Seed default streak record for this goal
@@ -234,7 +239,7 @@ export const updateGoal = async (req: AuthenticatedRequest, res: Response, next:
       throw new AppError("Goal not found or access denied.", 404);
     }
 
-    const { title, description, category, target_count, current_count, frequency, status, due_date } = req.body;
+    const { title, description, category, target_count, current_count, frequency, status, due_date, reminder_time } = req.body;
 
     const updates: any = {};
     if (title !== undefined) updates.title = title;
@@ -243,6 +248,12 @@ export const updateGoal = async (req: AuthenticatedRequest, res: Response, next:
     if (frequency !== undefined) updates.frequency = frequency;
     if (status !== undefined) updates.status = status;
     if (due_date !== undefined) updates.due_date = due_date;
+    if (reminder_time !== undefined) {
+      if (reminder_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(reminder_time)) {
+        throw new AppError("Reminder time must use HH:mm format.", 400);
+      }
+      updates.reminder_time = reminder_time || null;
+    }
 
     if (target_count !== undefined) {
       const parsed = parseInt(target_count, 10);

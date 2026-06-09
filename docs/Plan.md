@@ -36,12 +36,14 @@
 - **Goals**: `GET /api/goals` (lọc theo status/category), `POST /api/goals`, `GET /api/goals/:id`, `PUT /api/goals/:id`, `DELETE /api/goals/:id`, `POST /api/goals/:id/complete` (Tăng tiến độ/Ghi log/Tính streak, hỗ trợ truyền tham số `completed_at` tùy chọn từ body để ghi nhận đúng ngày giờ check-in offline), `DELETE /api/goals/logs/:logId` (Xóa log và tự động tính lại Streak).
 - **Stats**: `GET /api/stats/dashboard` (bento data), `GET /api/stats/history?from=&to=` (heatmap data).
 - **Groups**: `GET /api/groups` (danh sách tất cả nhóm), `POST /api/groups` (tạo nhóm thói quen), `GET /api/groups/:id` (lấy chi tiết nhóm và bảng tiến độ thành viên), `POST /api/groups/:id/join` (gia nhập nhóm), `POST /api/groups/:id/leave` (rời nhóm), `DELETE /api/groups/:id` (xóa nhóm).
-## Bổ sung 2026-06-09: Việc đã làm và việc còn thiếu
+### Bổ sung 2026-06-09: Việc đã làm và việc còn thiếu
 
 ### Đã làm
 - Cập nhật chức năng lựa chọn ngôn ngữ bằng i18n Context, `LanguageSwitcher`, lưu `setting_language` vào localStorage.
 - Thêm AI Coach drawer, store, Sidebar/BottomNav trigger và backend route `/api/ai`.
 - Thêm Streak Freeze / Freeze Token với API `/api/freeze`, schema Prisma và UI `Protect Streak`.
+- **Nhắc nhở riêng từng mục tiêu (US-19)**: Thêm `reminder_time` vào Goal, tích hợp Time picker vào form, hiển thị badge trên GoalCard và nâng cấp Scheduler.
+- **Hệ thống Mẫu mục tiêu (Goal Templates)**: Thư viện mẫu mục tiêu giúp tạo thói quen nhanh chóng.
 - Sửa lỗi AI Coach bấm không mở bằng cách render drawer ở layout và mở bằng state/event.
 - Sửa lỗi trắng trang bằng cách parse `localStorage.user` an toàn.
 - Tắt service worker cache trên localhost để tránh dùng JS/app shell cũ.

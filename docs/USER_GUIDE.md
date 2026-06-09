@@ -77,8 +77,10 @@ Trang Quản lý mục tiêu (`/goals`) được thiết kế dưới dạng lư
 
 ### 3.1. Tạo Thói Quen Mới (`/new-goal`)
 Click vào nút **Add Goal** trên header để mở giao diện tạo thói quen. Bạn có thể thiết lập:
+- **Chọn từ Template (Mẫu có sẵn)**: Nếu bạn chưa biết bắt đầu từ đâu, hãy nhấn nút "Chọn từ Template có sẵn". Hệ thống cung cấp thư viện mẫu đa dạng (Sức khỏe, Học tập, Thể lực...) để bạn điền nhanh các thông tin.
 - **Title (Tiêu đề)**: Ví dụ "Đọc sách", "Chạy bộ", "Uống nước".
 - **Category (Danh mục)**: Chọn các danh mục có sẵn như Health, Work, Fitness, Learning hoặc tự tạo danh mục riêng.
+- **Nhắc nhở lúc (Individual Reminder)** [NEW]: Bạn có thể cài đặt một giờ nhắc nhở cụ thể (ví dụ: 08:30) cho thói quen này. Nếu cài đặt, hệ thống sẽ ưu tiên nhắc bạn vào đúng giờ đó thay vì nhắc chung lúc 21h.
 - **Type (Loại mục tiêu)**:
   - `Binary` (Nhị phân): Chỉ có trạng thái Đã hoàn thành hoặc Chưa hoàn thành (Có/Không).
   - `Quantity` (Định lượng): Thiết lập mục tiêu theo số lượng cụ thể trong ngày (ví dụ: 8 cốc, 10 km). Bạn cần điền thêm đơn vị (**Unit**) và chỉ tiêu cần đạt (**Target Count**).
@@ -93,11 +95,12 @@ Tại trang `/goals`, bạn có các công cụ mạnh mẽ:
   - `Recent`: Sắp xếp theo thói quen được tạo hoặc cập nhật gần nhất.
   - `Streak`: Sắp xếp theo thứ tự chuỗi ngày hoàn thành liên tục từ cao xuống thấp.
 
-### 3.3. Menu Hành Động Nhanh trên Goal Card
-Mỗi thẻ mục tiêu có một nút menu hành động nhanh (biểu tượng 3 chấm hoặc tùy chọn góc phải):
-- **Tạm dừng/Kích hoạt lại (Pause/Resume)**: Giúp bạn đóng băng thói quen khi đi du lịch hoặc nghỉ ngơi mà không làm mất lịch sử cũ hay ảnh hưởng đến thống kê ngày hiện tại.
-- **Chỉnh sửa (Edit)**: Thay đổi tiêu đề, chỉ tiêu, danh mục thói quen bất kỳ lúc nào.
-- **Xóa (Delete)**: Gỡ bỏ thói quen khỏi hệ thống vĩnh viễn (sẽ xóa toàn bộ lịch sử check-in liên quan).
+### 3.3. Hiển thị thông tin trên Goal Card
+- **Badge Nhắc nhở**: Nếu thói quen có cài đặt giờ nhắc riêng, một biểu tượng chuông 🔔 kèm giờ sẽ hiển thị ngay dưới tên thói quen để bạn dễ dàng theo dõi lịch trình.
+- **Menu Hành Động Nhanh**: Mỗi thẻ mục tiêu có một nút menu hành động nhanh (biểu tượng 3 chấm hoặc tùy chọn góc phải):
+  - **Tạm dừng/Kích hoạt lại (Pause/Resume)**: Giúp bạn đóng băng thói quen khi đi du lịch hoặc nghỉ ngơi mà không làm mất lịch sử cũ hay ảnh hưởng đến thống kê ngày hiện tại.
+  - **Chỉnh sửa (Edit)**: Thay đổi tiêu đề, chỉ tiêu, danh mục thói quen bất kỳ lúc nào.
+  - **Xóa (Delete)**: Gỡ bỏ thói quen khỏi hệ thống vĩnh viễn (sẽ xóa toàn bộ lịch sử check-in liên quan).
 
 ---
 
@@ -206,9 +209,13 @@ Momentum cung cấp tính năng **Social Sharing** cao cấp cho phép bạn kho
 
 ---
 
-## 9. Các Câu Hỏi Thường Gặp (FAQs)
+### 9. Các Câu Hỏi Thường Gặp (FAQs)
+
+**Q: Tại sao tôi vào trang tạo thói quen lại báo "Yêu cầu kết nối mạng" dù tôi vẫn đang online?**
+> **A:** Một số trình duyệt có thể báo nhầm trạng thái kết nối mạng (false offline). Trong trường hợp này, Momentum cung cấp một nút **"Tôi vẫn đang online, cho tôi tiếp tục"** ở ngay màn hình thông báo lỗi đó. Hãy bấm vào nút này để bỏ qua cảnh báo và tiếp tục thiết lập thói quen. Lưu ý: Khi lưu mục tiêu, bạn vẫn cần có kết nối mạng thực tế để dữ liệu được gửi lên máy chủ thành công.
 
 **Q: Làm sao để duy trì ngọn lửa Streak của thói quen?**
+
 > Bạn chỉ cần thực hiện check-in thói quen đạt chỉ tiêu tối thiểu trong ngày trước khi ngày đó kết thúc theo múi giờ bạn đã cài đặt. Chuỗi Streak sẽ tăng lên 1 sau mỗi ngày hoàn thành liên tục.
 
 **Q: Tại sao tôi vừa check-in thói quen thành công nhưng nó lại biến mất trên Dashboard?**

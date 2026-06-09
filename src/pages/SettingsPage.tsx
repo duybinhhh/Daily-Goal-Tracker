@@ -6,7 +6,6 @@ import { useGoalStore } from "../store/goalStore";
 import { useTranslation } from "../i18n";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import {
-  checkNotificationPermission,
   getActiveSubscription,
   subscribeToPush,
   unsubscribeFromPush

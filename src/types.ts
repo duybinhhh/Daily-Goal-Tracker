@@ -7,6 +7,8 @@ export interface User {
   timezone: string;
   onboarding_completed?: boolean;
   created_at?: string;
+  total_xp?: number;
+  level?: number;
 }
 
 export interface Streak {
@@ -57,6 +59,7 @@ export interface Goal {
   updated_at: string;
   streak?: Streak;
   group_id?: string | null;
+  reminder_time?: string | null;  // "HH:mm" hoặc null
 }
 
 export interface DashboardStats {

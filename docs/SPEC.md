@@ -157,6 +157,17 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * **Cơ chế Hoàn tác nhanh:** Hiển thị lớp phủ đếm ngược 5 giây trên thẻ thói quen vừa hoàn thành với nút Undo để thu hồi check-in nếu chạm nhầm.
     * **Trạng thái All-Done:** Hiển thị thông điệp vinh danh đầy cảm hứng khi người dùng hoàn thành toàn bộ mục tiêu trong ngày.
 
+#### US-19: Nhắc nhở riêng từng mục tiêu
+* **Độ ưu tiên:** Medium
+* **Story Point:** 3.0
+* **Tiêu chí chấp nhận (AC):**
+    * **AC-1:** Thêm trường tùy chọn "Nhắc nhở lúc" (Time picker HH:mm) vào GoalFormPage — cả tạo mới lẫn chỉnh sửa.
+    * **AC-2:** Giờ nhắc nhở (nếu có) hiển thị nhỏ dưới tên mục tiêu trên GoalCard.
+    * **AC-3:** Scheduler scan DB mỗi phút, bắn push notification đúng giờ đã cài và đúng timezone của user.
+    * **AC-4:** Nội dung push notification: `"⏰ [{Goal Title}] — Đừng quên mục tiêu của bạn hôm nay!"`.
+    * **AC-5:** Nếu mục tiêu đã được hoàn thành trước giờ nhắc → không gửi thông báo cho goal đó.
+    * **AC-6:** Nhắc chung 21h loại trừ các goal đã cài đặt `reminder_time` riêng (dù goal đó đã xong hay chưa).
+
 ---
 
 ### 📦 Module 6: Accountability Partners & Social Sharing (Sprint 6 — 8.0 SP)

@@ -23,6 +23,8 @@ model User {
   push_subscription     String?
   last_reminder_sent_date String?
   last_freeze_reminder_date String?
+  total_xp      Int            @default(0)
+  level         Int            @default(1)
   created_groups HabitGroup[] @relation("GroupCreator")
   group_memberships HabitGroupMember[]
 }
@@ -46,6 +48,7 @@ model Goal {
   freezes       StreakFreeze[]
   group_id      String?
   group         HabitGroup? @relation(fields: [group_id], references: [id], onDelete: SetNull)
+  reminder_time String?   // Format "HH:mm" (e.g. "08:30"), null = dùng nhắc chung 21h
 
   @@index([user_id])
 }

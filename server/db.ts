@@ -30,6 +30,7 @@ function mapGoal(g: any) {
     created_at: g.created_at.toISOString(),
     updated_at: g.updated_at.toISOString(),
     due_date: g.due_date ? g.due_date.toISOString() : null,
+    reminder_time: g.reminder_time ?? null,
   };
 }
 
@@ -118,11 +119,14 @@ class PrismaDB {
         last_reminder_sent_date?: string | null;
         last_freeze_reminder_date?: string | null;
         onboarding_completed?: boolean;
+        total_xp?: number;
+        level?: number;
       }
     ) => {
+      const prismaUpdate: any = { ...updateData };
       const updated = await prisma.user.update({
         where: { id },
-        data: updateData,
+        data: prismaUpdate,
       });
       return mapUser(updated);
     },
@@ -157,6 +161,7 @@ class PrismaDB {
       target_count: number;
       frequency: string;
       due_date?: string | null;
+      reminder_time?: string | null;
     }) => {
       const created = await prisma.goal.create({
         data: {
@@ -167,6 +172,7 @@ class PrismaDB {
           target_count: data.target_count,
           frequency: data.frequency,
           due_date: data.due_date ? new Date(data.due_date) : null,
+          reminder_time: data.reminder_time || null,
           current_count: 0,
           status: "active",
         },
@@ -182,10 +188,14 @@ class PrismaDB {
       frequency?: string;
       status?: string;
       due_date?: string | null;
+      reminder_time?: string | null;
     }) => {
       const prismaUpdate: any = { ...updateData };
       if (updateData.due_date !== undefined) {
         prismaUpdate.due_date = updateData.due_date ? new Date(updateData.due_date) : null;
+      }
+      if (updateData.reminder_time !== undefined) {
+        prismaUpdate.reminder_time = updateData.reminder_time || null;
       }
       const updated = await prisma.goal.update({
         where: { id },
@@ -341,12 +351,19 @@ class PrismaDB {
 
   // Notifications Helpers
   public notifications = {
-    findMany: async (where: { user_id: string; is_read?: boolean }) => {
-      const prismaWhere: any = { user_id: where.user_id };
-      if (where.is_read !== undefined) {
-        prismaWhere.is_read = where.is_read;
+    findMany: async (where?: { user_id?: string; is_read?: boolean }) => {
+      const prismaWhere: any = {};
+      if (where) {
+        if (where.user_id) prismaWhere.user_id = where.user_id;
+        if (where.is_read !== undefined) {
+          prismaWhere.is_read = where.is_read;
+        }
       }
-      const notifications = await prisma.notification.findMany({ where: prismaWhere });
+      const notifications = await prisma.notification.findMany({ 
+        where: prismaWhere,
+        orderBy: { created_at: "desc" },
+        take: 100
+      });
       return notifications.map(mapNotification);
     },
     create: async (data: { user_id: string; type: string; message: string }) => {
