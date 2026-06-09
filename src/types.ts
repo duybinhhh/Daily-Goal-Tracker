@@ -5,6 +5,8 @@ export interface User {
   email: string;
   name: string;
   timezone: string;
+  onboarding_completed?: boolean;
+  created_at?: string;
 }
 
 export interface Streak {
@@ -14,6 +16,21 @@ export interface Streak {
   current_streak: number;
   longest_streak: number;
   last_completed_at: string | null;
+}
+
+export interface StreakFreeze {
+  id: string;
+  user_id: string;
+  goal_id: string;
+  frozen_date: string;
+  created_at: string;
+}
+
+export interface FreezeToken {
+  id: string;
+  user_id: string;
+  tokens_left: number;
+  month_year: string;
 }
 
 export interface GoalLog {

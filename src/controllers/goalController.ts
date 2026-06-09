@@ -386,9 +386,31 @@ export const completeGoal = async (req: AuthenticatedRequest, res: Response, nex
           newLongestStreak = Math.max(newLongestStreak, newCurrentStreak);
           isStreakUpdated = true;
         } else if (daysDiff > 1) {
-          // Broken streak
-          newCurrentStreak = 1;
-          isStreakUpdated = true;
+          const missingDates: string[] = [];
+          const baseDate = new Date(streak.last_completed_at);
+          for (let d = 1; d < daysDiff; d++) {
+            const missing = new Date(baseDate);
+            missing.setDate(missing.getDate() + d);
+            missingDates.push(getLocalDateString(missing, timezone));
+          }
+
+          if (missingDates.length > 0) {
+            const freezes = await db.streakFreezes.findMany({ goal_id: syncedGoal.id });
+            const frozenSet = new Set(freezes.map((f) => f.frozen_date));
+            const allFrozen = missingDates.every((date) => frozenSet.has(date));
+
+            if (allFrozen) {
+              newCurrentStreak = streak.current_streak + missingDates.length + 1;
+              newLongestStreak = Math.max(newLongestStreak, newCurrentStreak);
+              isStreakUpdated = true;
+            } else {
+              newCurrentStreak = 1;
+              isStreakUpdated = true;
+            }
+          } else {
+            newCurrentStreak = 1;
+            isStreakUpdated = true;
+          }
         } else if (daysDiff <= 0) {
           // Already completed full target earlier today, do not increment streak again
           isStreakUpdated = false;

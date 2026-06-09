@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
+import { useTranslation } from "../i18n";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import {
   checkNotificationPermission,
   getActiveSubscription,
@@ -11,6 +13,7 @@ import {
 } from "../services/pushNotification";
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const { user, updateProfile, deleteAccount, logout, loading, error, clearError } = useAuthStore();
   const { goals, fetchGoals, isOffline } = useGoalStore();
   const navigate = useNavigate();
@@ -218,10 +221,10 @@ export function SettingsPage() {
         {/* Header */}
         <div>
           <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-on-surface">
-            Settings
+            {t("settings.title")}
           </h2>
           <p className="text-on-surface-variant text-sm md:text-base mt-1">
-            Customize your performance environment and account preferences.
+            {t("settings.profileDesc")}
           </p>
         </div>
 
@@ -235,7 +238,7 @@ export function SettingsPage() {
         {saveSuccess && (
           <div className="p-4 rounded-xl bg-secondary/10 border border-secondary/20 text-secondary text-sm flex items-center gap-3 animate-fade-in">
             <span className="material-symbols-outlined ms-filled">check_circle</span>
-            <span>Preferences saved successfully!</span>
+            <span>{t("settings.profileSaved")}</span>
           </div>
         )}
 
@@ -261,7 +264,7 @@ export function SettingsPage() {
                     <p className="text-sm text-on-surface-variant">{user?.email || "No Email"}</p>
                     <span className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-secondary/15 text-secondary text-[10px] font-bold rounded-full uppercase tracking-wider">
                       <span className="material-symbols-outlined ms-filled text-[12px]">local_fire_department</span>
-                      Active Streak: {bestStreak} Days
+                      {t("dashboard.streakBadge")}: {bestStreak} {t("common.days")}
                     </span>
                   </div>
                 </div>
@@ -269,7 +272,7 @@ export function SettingsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant block ml-1">
-                      Display Name
+                      {t("settings.name")}
                     </label>
                     <div className="flex items-center bg-surface-container-low/60 border border-white/5 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary/50 transition-all">
                       <span className="material-symbols-outlined text-primary mr-3 text-[20px]">person</span>
@@ -285,7 +288,7 @@ export function SettingsPage() {
 
                   <div className="space-y-1">
                     <label className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant block ml-1">
-                      Email Address
+                      {t("settings.email")}
                     </label>
                     <div className="flex items-center bg-surface-container-low/60 border border-white/5 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary/50 transition-all">
                       <span className="material-symbols-outlined text-primary mr-3 text-[20px]">mail</span>
@@ -301,7 +304,7 @@ export function SettingsPage() {
 
                   <div className="space-y-1 sm:col-span-2">
                     <label className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant block ml-1">
-                      Timezone
+                      {t("settings.timezone")}
                     </label>
                     <div className="flex items-center bg-surface-container-low/60 border border-white/5 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary/50 transition-all">
                       <span className="material-symbols-outlined text-primary mr-3 text-[20px]">public</span>
@@ -332,9 +335,9 @@ export function SettingsPage() {
                   local_fire_department
                 </span>
               </div>
-              <h3 className="text-lg font-bold text-on-surface mb-1">Stay Lit</h3>
+              <h3 className="text-lg font-bold text-on-surface mb-1">{t("settings.streakAlerts")}</h3>
               <p className="text-xs text-on-surface-variant max-w-[200px]">
-                Notify me before a streak expires.
+                {t("settings.notificationsDesc")}
               </p>
               <div className="mt-6">
                 <input
@@ -359,33 +362,33 @@ export function SettingsPage() {
                 <div className="p-2 bg-secondary/10 rounded-xl text-secondary">
                   <span className="material-symbols-outlined text-[22px] ms-filled">bolt</span>
                 </div>
-                <h3 className="font-bold text-lg text-on-surface">Mobile PWA Widget & Shortcuts</h3>
+                <h3 className="font-bold text-lg text-on-surface">{t("settings.pwaTitle")}</h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-sm text-on-surface">How to add Quick Check-in shortcut to Home Screen</h4>
+                  <h4 className="font-semibold text-sm text-on-surface">{t("settings.pwaDesc")}</h4>
                   <p className="text-xs text-on-surface-variant leading-relaxed">
-                    To log habits with a convenient 1-tap from your phone screen without opening the browser:
+                    {t("settings.pwaSteps")}
                   </p>
                   <ol className="list-decimal list-inside text-xs text-on-surface-variant space-y-1.5 ml-1">
-                    <li>Open this app in your mobile browser (Chrome/Safari).</li>
-                    <li>Select <strong>"Add to Home Screen"</strong> in the share menu or browser options.</li>
-                    <li>After installation, you can long-press the app icon on your home screen and select <strong>"Quick Check-in"</strong>.</li>
-                    <li>Or you can pin this link directly to your home screen: <a href="/#/quick-checkin" className="text-primary hover:underline font-semibold">/#/quick-checkin</a></li>
+                    <li>{t("settings.pwaStep1")}</li>
+                    <li>{t("settings.pwaStep2")}</li>
+                    <li>{t("settings.pwaStep3")}</li>
+                    <li>{t("settings.pwaStep4")} <a href="/#/quick-checkin" className="text-primary hover:underline font-semibold">/#/quick-checkin</a></li>
                   </ol>
                 </div>
                 <div className="flex flex-col justify-center items-center p-4 bg-surface-container-low/40 rounded-xl border border-white/5 text-center">
                   <span className="material-symbols-outlined text-4xl text-primary animate-pulse mb-3">install_mobile</span>
-                  <h5 className="font-bold text-sm text-on-surface mb-1">Try Quick Check-in</h5>
+                  <h5 className="font-bold text-sm text-on-surface mb-1">{t("settings.pwaTryTitle")}</h5>
                   <p className="text-xs text-on-surface-variant max-w-[240px] mb-4">
-                    Try the minimal check-in interface designed specifically for mobile screens.
+                    {t("settings.pwaTryDesc")}
                   </p>
                   <button
                     type="button"
                     onClick={() => navigate("/quick-checkin")}
                     className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
                   >
-                    <span>Open Now</span>
+                    <span>{t("settings.pwaTryBtn")}</span>
                     <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                   </button>
                 </div>
@@ -398,13 +401,13 @@ export function SettingsPage() {
                 <div className="p-2 bg-primary/10 rounded-xl text-primary">
                   <span className="material-symbols-outlined text-[22px]">notifications</span>
                 </div>
-                <h3 className="font-bold text-lg text-on-surface">Notifications</h3>
+                <h3 className="font-bold text-lg text-on-surface">{t("settings.notifications")}</h3>
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-on-surface">Daily Reminders</p>
-                    <p className="text-[11px] text-on-surface-variant">Morning planning nudge at 8:00 AM</p>
+                    <p className="text-sm font-semibold text-on-surface">{t("settings.dailyReminder")}</p>
+                    <p className="text-[11px] text-on-surface-variant">{t("settings.dailyReminderDesc")}</p>
                   </div>
                   <div>
                     <input
@@ -425,8 +428,8 @@ export function SettingsPage() {
                 <div className="h-[1px] bg-white/5"></div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-on-surface">Goal Milestones</p>
-                    <p className="text-[11px] text-on-surface-variant">Celebration when hitting 50% / 100%</p>
+                    <p className="text-sm font-semibold text-on-surface">{t("settings.goalReminder")}</p>
+                    <p className="text-[11px] text-on-surface-variant">{t("settings.goalReminderDesc")}</p>
                   </div>
                   <div>
                     <input
@@ -447,8 +450,8 @@ export function SettingsPage() {
                 <div className="h-[1px] bg-white/5"></div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-on-surface">Active Reminders</p>
-                    <p className="text-[11px] text-on-surface-variant">Prevent streak loss: alert at 21:00 if goals are incomplete</p>
+                    <p className="text-sm font-semibold text-on-surface">{t("settings.activeReminders")}</p>
+                    <p className="text-[11px] text-on-surface-variant">{t("settings.activeRemindersDesc")}</p>
                   </div>
                   <div>
                     <input
@@ -471,19 +474,49 @@ export function SettingsPage() {
               </div>
             </section>
 
+            <section className="glass-card p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-sky-500/10 rounded-xl text-sky-400">
+                  <span className="text-[22px]">❄</span>
+                </div>
+                <h3 className="font-bold text-lg text-on-surface">Streak Freeze Tokens</h3>
+              </div>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Use tokens to protect your streak when you are busy. Tokens reset to 3 on the first day of each month.
+              </p>
+              <div className="flex items-center gap-3">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl text-sm transition-all"
+                    style={{
+                      background: i < 3 ? "rgba(56,189,248,0.15)" : "var(--color-surface-variant)",
+                      border: i < 3 ? "1px solid rgba(56,189,248,0.4)" : "1px solid transparent",
+                      opacity: i < 3 ? 1 : 0.3,
+                    }}
+                  >
+                    ❄
+                  </div>
+                ))}
+                <span className="text-xs text-on-surface-variant">
+                  3/3 tokens left this month
+                </span>
+              </div>
+            </section>
+
             {/* Appearance Section */}
             <section className="glass-card p-6 space-y-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-tertiary/10 rounded-xl text-tertiary">
                   <span className="material-symbols-outlined text-[22px]">palette</span>
                 </div>
-                <h3 className="font-bold text-lg text-on-surface">Appearance</h3>
+                <h3 className="font-bold text-lg text-on-surface">{t("settings.appearance")}</h3>
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-on-surface">Theme</p>
-                    <p className="text-[11px] text-on-surface-variant">Switch between light and dark modes</p>
+                    <p className="text-sm font-semibold text-on-surface">{t("settings.theme")}</p>
+                    <p className="text-[11px] text-on-surface-variant">{t("settings.themeDesc")}</p>
                   </div>
                   <div>
                     <select
@@ -491,16 +524,16 @@ export function SettingsPage() {
                       value={theme}
                       onChange={(e) => handleThemeChange(e.target.value)}
                     >
-                      <option value="dark" className="bg-surface-container-high text-on-surface">Dark Mode</option>
-                      <option value="light" className="bg-surface-container-high text-on-surface">Light Mode</option>
+                      <option value="dark" className="bg-surface-container-high text-on-surface">{t("settings.themeDark")}</option>
+                      <option value="light" className="bg-surface-container-high text-on-surface">{t("settings.themeLight")}</option>
                     </select>
                   </div>
                 </div>
                 <div className="h-[1px] bg-white/5"></div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-on-surface">Motion Effects</p>
-                    <p className="text-[11px] text-on-surface-variant">Confetti and streak micro-animations</p>
+                    <p className="text-sm font-semibold text-on-surface">{t("settings.motionEffects")}</p>
+                    <p className="text-[11px] text-on-surface-variant">{t("settings.motionEffectsDesc")}</p>
                   </div>
                   <div>
                     <input
@@ -520,7 +553,7 @@ export function SettingsPage() {
                 </div>
                 <div className="h-[1px] bg-white/5"></div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-sm font-semibold text-on-surface">Glass Opacity</span>
+                  <span className="text-sm font-semibold text-on-surface">{t("settings.glassOpacity")}</span>
                   <div className="flex items-center gap-2 flex-1 justify-end">
                     <input
                       type="range"
@@ -539,13 +572,30 @@ export function SettingsPage() {
               </div>
             </section>
 
+            {/* Language Section */}
+            <section className="glass-card p-6 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                  <span className="material-symbols-outlined text-[22px]">language</span>
+                </div>
+                <h3 className="font-bold text-lg text-on-surface">{t("settings.language")}</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-on-surface">{t("settings.language")}</p>
+                  <p className="text-[11px] text-on-surface-variant">{t("settings.languageDesc")}</p>
+                </div>
+                <LanguageSwitcher />
+              </div>
+            </section>
+
             {/* Account & Data */}
             <section className="glass-card p-6 space-y-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-error/10 rounded-xl text-error">
                   <span className="material-symbols-outlined text-[22px]">shield</span>
                 </div>
-                <h3 className="font-bold text-lg text-on-surface">Account</h3>
+                <h3 className="font-bold text-lg text-on-surface">{t("settings.dangerZone")}</h3>
               </div>
               <div className="space-y-3">
                 <button
@@ -553,7 +603,7 @@ export function SettingsPage() {
                   onClick={handleExportData}
                   className="w-full flex items-center justify-between py-2 text-sm text-on-surface hover:text-primary transition-colors group text-left"
                 >
-                  <span>Export My Data</span>
+                  <span>{t("settings.exportData")}</span>
                   <span className="material-symbols-outlined text-[18px] opacity-50 group-hover:opacity-100 transition-opacity">
                     download
                   </span>
@@ -564,7 +614,7 @@ export function SettingsPage() {
                   onClick={() => setShowDeleteConfirm(true)}
                   className="w-full flex items-center justify-between py-2 text-sm text-on-surface-variant hover:text-error transition-colors group text-left"
                 >
-                  <span>Delete Account</span>
+                  <span>{t("settings.deleteAccount")}</span>
                   <span className="material-symbols-outlined text-[18px] opacity-50 group-hover:opacity-100 transition-opacity">
                     delete_forever
                   </span>
@@ -578,7 +628,7 @@ export function SettingsPage() {
                   }}
                   className="w-full py-2 mt-2 bg-white/5 hover:bg-white/10 text-on-surface rounded-xl text-xs font-semibold text-center transition-colors"
                 >
-                  Logout
+                  {t("auth.logout")}
                 </button>
               </div>
             </section>
@@ -591,14 +641,14 @@ export function SettingsPage() {
               onClick={handleDiscard}
               className="px-5 py-2.5 text-sm text-on-surface-variant hover:text-on-surface font-semibold transition-colors cursor-pointer"
             >
-              Discard Changes
+              {t("common.cancel")}
             </button>
             <button
               type="submit"
               disabled={saving}
               className="px-6 py-2.5 bg-primary text-on-primary rounded-xl font-bold shadow-[0_8px_24px_rgba(192,193,255,0.2)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 text-sm cursor-pointer"
             >
-              {saving ? "Saving..." : "Save Preferences"}
+              {saving ? t("common.saving") : t("settings.saveProfile")}
             </button>
           </div>
         </form>
@@ -610,10 +660,10 @@ export function SettingsPage() {
           <div className="glass-card max-w-md w-full p-6 space-y-6 border border-error/20">
             <div className="flex items-center gap-3 text-error">
               <span className="material-symbols-outlined text-3xl">warning</span>
-              <h3 className="text-xl font-bold text-on-surface">Delete Account</h3>
+              <h3 className="text-xl font-bold text-on-surface">{t("settings.deleteAccount")}</h3>
             </div>
             <p className="text-sm text-on-surface-variant">
-              Are you absolutely sure you want to delete your Achiever Pro account? This action is permanent and will cascade delete all your goals, completed history logs, and streaks. This cannot be undone.
+              {t("settings.deleteAccountDesc")}
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -621,14 +671,14 @@ export function SettingsPage() {
                 onClick={() => setShowDeleteConfirm(false)}
                 className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-sm font-semibold transition-colors text-on-surface"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
                 onClick={handleDeleteAccount}
                 className="px-4 py-2 bg-error text-on-error hover:bg-error-container rounded-xl text-sm font-bold shadow-[0_8px_24px_rgba(255,180,171,0.2)] transition-all"
               >
-                Yes, Delete Permanent
+                {t("settings.confirmDeleteAccount")}
               </button>
             </div>
           </div>

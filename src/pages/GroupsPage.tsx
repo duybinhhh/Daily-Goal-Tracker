@@ -4,8 +4,10 @@ import { useGroupStore } from "../store/groupStore";
 import { useGoalStore } from "../store/goalStore";
 import { useAuthStore } from "../store/authStore";
 import { ShareModal } from "../components/ShareModal";
+import { useTranslation } from "../i18n";
 
 export const GroupsPage: React.FC = () => {
+  const { t, language } = useTranslation();
   const { user } = useAuthStore();
   const { groups, activeGroup, loading, error, fetchGroups, fetchGroupById, createGroup, joinGroup, leaveGroup, deleteGroup, clearError } = useGroupStore();
   const { completeGoalProgress, goals, fetchGoals } = useGoalStore();
@@ -73,7 +75,7 @@ export const GroupsPage: React.FC = () => {
   };
 
   const handleLeaveGroup = async (groupId: string) => {
-    if (confirm("Are you sure you want to leave this habit group? Your progress goal for this group will be deleted.")) {
+    if (confirm(t("groups.confirmLeave"))) {
       try {
         await leaveGroup(groupId);
         fetchGoals();
@@ -84,7 +86,7 @@ export const GroupsPage: React.FC = () => {
   };
 
   const handleDeleteGroup = async (groupId: string) => {
-    if (confirm("WARNING: Are you sure you want to delete this habit group? This will remove all members and delete their group goals.")) {
+    if (confirm(t("groups.confirmDelete"))) {
       try {
         await deleteGroup(groupId);
         fetchGoals();
@@ -102,7 +104,7 @@ export const GroupsPage: React.FC = () => {
     if (!groupGoal) return;
 
     try {
-      const note = prompt("Add check-in note (optional):") || "";
+      const note = prompt(t("groups.checkinNotePrompt")) || "";
       await completeGoalProgress(groupGoal.id, note);
       // Refresh active group data to update leaderboard
       fetchGroupById(activeGroup.id);
@@ -118,8 +120,8 @@ export const GroupsPage: React.FC = () => {
     const streak = memberProgress?.streak.current_streak || 0;
     
     setShareData({
-      title: `${activeGroup.name} Team Progress`,
-      description: `I'm tracking "${activeGroup.goal_title}" with my accountability partner group! Current progress: ${memberProgress?.current_count}/${memberProgress?.target_count}.`,
+      title: t("groups.teamProgress", { name: activeGroup.name }),
+      description: t("groups.shareDesc", { title: activeGroup.goal_title, current: memberProgress?.current_count || 0, target: memberProgress?.target_count || 0 }),
       streakCount: streak,
     });
     setShowShareModal(true);
@@ -149,7 +151,7 @@ export const GroupsPage: React.FC = () => {
         }}
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
-          <h2 className="text-xl font-bold tracking-tight text-on-surface">Habit Groups</h2>
+          <h2 className="text-xl font-bold tracking-tight text-on-surface">{t("groups.title")}</h2>
           <div className="relative w-full sm:w-60">
             <span className="material-symbols-outlined text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2" style={{ fontSize: "18px" }}>
               search
@@ -157,7 +159,7 @@ export const GroupsPage: React.FC = () => {
             <input
               className="bg-surface-container-high border-none rounded-full py-1.5 pl-9 pr-4 text-xs focus:ring-2 focus:ring-primary w-full text-on-surface outline-none transition-all duration-300"
               style={{ border: "1px solid var(--border-subtle)" }}
-              placeholder="Search groups..."
+              placeholder={t("common.search")}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -171,7 +173,7 @@ export const GroupsPage: React.FC = () => {
           style={{ display: "flex", alignItems: "center", gap: "6px" }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>group_add</span>
-          Create Group
+          {t("groups.createGroup")}
         </button>
       </header>
 
@@ -189,7 +191,7 @@ export const GroupsPage: React.FC = () => {
                   : "bg-transparent text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              My Groups ({groups.filter(g => g.isJoined).length})
+              {t("groups.myGroups")} ({groups.filter(g => g.isJoined).length})
             </button>
             <button
               onClick={() => { setActiveTab("discover"); }}
@@ -199,7 +201,7 @@ export const GroupsPage: React.FC = () => {
                   : "bg-transparent text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              Discover ({groups.filter(g => !g.isJoined).length})
+              {t("groups.discover")} ({groups.filter(g => !g.isJoined).length})
             </button>
           </div>
 
@@ -212,8 +214,8 @@ export const GroupsPage: React.FC = () => {
             ) : filteredGroups.length === 0 ? (
               <div className="glass-card p-8 text-center text-on-surface-variant text-sm rounded-2xl">
                 {activeTab === "my-groups" 
-                  ? "You haven't joined any habit groups yet. Browse the Discover tab!"
-                  : "No new groups found. Create one yourself!"}
+                  ? t("groups.noJoinedGroups")
+                  : t("groups.noDiscoverGroups")}
               </div>
             ) : (
               filteredGroups.map((g) => (
@@ -229,15 +231,15 @@ export const GroupsPage: React.FC = () => {
                   <div className="flex justify-between items-start gap-2 mb-2">
                     <h4 className="font-bold text-on-surface text-sm truncate">{g.name}</h4>
                     <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded-full text-on-surface-variant font-semibold shrink-0">
-                      👤 {g.memberCount} member{g.memberCount !== 1 ? "s" : ""}
+                      👤 {t("groups.memberCount", { count: g.memberCount })}
                     </span>
                   </div>
                   <p className="text-xs text-on-surface-variant line-clamp-2 mb-3 leading-relaxed">
-                    {g.description || "No description provided."}
+                    {g.description || t("groups.noDescription")}
                   </p>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
                     <span className="text-[10px] text-primary font-bold uppercase tracking-wider">
-                      🎯 {g.goal_title} ({g.goal_target_count}/{g.goal_frequency})
+                      🎯 {g.goal_title} ({g.goal_target_count}/{t("common." + g.goal_frequency)})
                     </span>
                     {!g.isJoined && (
                       <button
@@ -247,7 +249,7 @@ export const GroupsPage: React.FC = () => {
                         }}
                         className="px-3 py-1 bg-secondary text-on-secondary text-[10px] font-bold uppercase tracking-wider rounded-md border-none cursor-pointer hover:scale-105 active:scale-95 transition-all"
                       >
-                        Join Group
+                        {t("groups.joinGroup")}
                       </button>
                     )}
                   </div>
@@ -266,18 +268,18 @@ export const GroupsPage: React.FC = () => {
                 <div>
                   <h3 className="text-xl font-extrabold text-on-surface tracking-tight">{activeGroup.name}</h3>
                   <p className="text-xs text-on-surface-variant mt-1">
-                    Created by <span className="font-semibold">{activeGroup.creator_name}</span>
+                    {t("groups.createdBy", { name: activeGroup.creator_name })}
                   </p>
                   <p className="text-sm text-on-surface-variant mt-3 leading-relaxed">
-                    {activeGroup.description || "No description provided."}
+                    {activeGroup.description || t("groups.noDescription")}
                   </p>
                 </div>
                 <div className="flex flex-row sm:flex-col gap-2 shrink-0 sm:items-end">
                   <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full font-bold">
-                    {activeGroup.goal_category}
+                    {t("category." + activeGroup.goal_category.toLowerCase())}
                   </span>
                   <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest mt-1">
-                    {activeGroup.goal_frequency} target: {activeGroup.goal_target_count} logs
+                    {t("common." + activeGroup.goal_frequency)} target: {activeGroup.goal_target_count} logs
                   </span>
                 </div>
               </div>
@@ -285,7 +287,7 @@ export const GroupsPage: React.FC = () => {
               {/* Members leaderboard title */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-sm font-bold text-on-surface uppercase tracking-wider">👥 Members & Leaderboard</h4>
+                  <h4 className="text-sm font-bold text-on-surface uppercase tracking-wider">👥 {t("groups.members")} & {t("groups.leaderboard")}</h4>
                   {activeGroup.isJoined && (
                     <div className="flex gap-2">
                       <button
@@ -294,7 +296,7 @@ export const GroupsPage: React.FC = () => {
                         style={{ display: "flex", alignItems: "center", gap: "4px" }}
                       >
                         <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>share</span>
-                        Share Team
+                        {t("groups.shareTeam")}
                       </button>
                       <button
                         onClick={handleQuickCheckin}
@@ -302,7 +304,7 @@ export const GroupsPage: React.FC = () => {
                         style={{ display: "flex", alignItems: "center", gap: "4px" }}
                       >
                         <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>check_circle</span>
-                        Check-in Habit
+                        {t("groups.checkinHabit")}
                       </button>
                     </div>
                   )}
@@ -339,7 +341,7 @@ export const GroupsPage: React.FC = () => {
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-xs text-on-surface truncate">
-                              {member.name} {isCurrentUser && <span className="text-[10px] text-secondary font-bold">(You)</span>}
+                              {member.name} {isCurrentUser && <span className="text-[10px] text-secondary font-bold">{t("groups.youTag")}</span>}
                             </p>
                             <p className="text-[10px] text-on-surface-variant truncate">{member.email}</p>
                           </div>
@@ -364,11 +366,11 @@ export const GroupsPage: React.FC = () => {
                           <div>
                             {member.status === "completed" ? (
                               <span className="px-2.5 py-0.5 bg-secondary/15 text-secondary border border-secondary/25 rounded-full text-[9px] font-bold uppercase tracking-wider">
-                                Done
+                                {t("common.done")}
                               </span>
                             ) : (
                               <span className="px-2.5 py-0.5 bg-white/5 text-on-surface-variant border border-white/10 rounded-full text-[9px] font-bold uppercase tracking-wider">
-                                Active
+                                {t("common.active")}
                               </span>
                             )}
                           </div>
@@ -379,7 +381,7 @@ export const GroupsPage: React.FC = () => {
                               <span className="material-symbols-outlined ms-filled" style={{ fontSize: "11px" }}>
                                 local_fire_department
                               </span>
-                              <span>{member.streak.current_streak}d</span>
+                              <span>{t("groups.streakBadgeValue", { days: member.streak.current_streak })}</span>
                             </div>
                           )}
                         </div>
@@ -396,7 +398,7 @@ export const GroupsPage: React.FC = () => {
                     onClick={() => handleDeleteGroup(activeGroup.id)}
                     className="btn-danger-ghost py-2 px-3 text-xs"
                   >
-                    Delete Group
+                    {t("groups.deleteGroup")}
                   </button>
                 ) : (
                   activeGroup.isJoined && (
@@ -404,7 +406,7 @@ export const GroupsPage: React.FC = () => {
                       onClick={() => handleLeaveGroup(activeGroup.id)}
                       className="btn-danger-ghost py-2 px-3 text-xs"
                     >
-                      Leave Group
+                      {t("groups.leaveGroup")}
                     </button>
                   )
                 )}
@@ -413,16 +415,16 @@ export const GroupsPage: React.FC = () => {
                   onClick={() => useGroupStore.setState({ activeGroup: null })}
                   className="btn-ghost py-2 px-3 text-xs"
                 >
-                  Close Details
+                  {t("common.close")}
                 </button>
               </div>
             </div>
           ) : (
             <div className="glass-card p-12 rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center h-full min-h-[450px]">
               <span className="material-symbols-outlined text-on-surface-variant text-5xl mb-4">group</span>
-              <h3 className="text-lg font-bold text-on-surface">Select a Habit Group</h3>
+              <h3 className="text-lg font-bold text-on-surface">{t("groups.selectGroupHint")}</h3>
               <p className="text-xs text-on-surface-variant max-w-sm mt-2 leading-relaxed">
-                Click on any group in the list to see their daily progress, view the member leaderboard, check-in, or manage membership.
+                {t("groups.selectGroupDesc")}
               </p>
             </div>
           )}
@@ -434,7 +436,7 @@ export const GroupsPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="glass-card relative w-full max-w-md p-6 rounded-3xl border border-white/10 shadow-2xl bg-slate-900/90 backdrop-blur-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-on-surface">Create Habit Group</h3>
+              <h3 className="text-lg font-bold text-on-surface">{t("groups.createGroup")}</h3>
               <button
                 onClick={() => setShowCreateModal(false)}
                 className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-on-surface border-none cursor-pointer"
@@ -445,11 +447,11 @@ export const GroupsPage: React.FC = () => {
 
             <form onSubmit={handleCreateGroup} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">Group Name</label>
+                <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">{t("groups.groupName")}</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Chạy bộ 5km mỗi ngày cùng phòng"
+                  placeholder={t("groups.groupNamePlaceholder")}
                   className="bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-xs focus:ring-2 focus:ring-primary w-full text-on-surface outline-none"
                   style={{ border: "1px solid var(--border-subtle)" }}
                   value={groupName}
@@ -458,10 +460,10 @@ export const GroupsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">Description</label>
+                <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">{t("groups.groupDesc")}</label>
                 <textarea
                   rows={3}
-                  placeholder="Describe the group and details of the habit..."
+                  placeholder={t("groups.groupDescPlaceholder")}
                   className="bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-xs focus:ring-2 focus:ring-primary w-full text-on-surface outline-none resize-none"
                   style={{ border: "1px solid var(--border-subtle)" }}
                   value={groupDesc}
@@ -471,11 +473,11 @@ export const GroupsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">Habit Goal</label>
+                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">{t("goals.goalTitle")}</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Chạy bộ 5km"
+                    placeholder={t("groups.habitGoalPlaceholder")}
                     className="bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-xs focus:ring-2 focus:ring-primary w-full text-on-surface outline-none"
                     style={{ border: "1px solid var(--border-subtle)" }}
                     value={goalTitle}
@@ -484,26 +486,26 @@ export const GroupsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">Category</label>
+                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">{t("goals.category")}</label>
                   <select
                     className="bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-xs focus:ring-2 focus:ring-primary w-full text-on-surface outline-none"
                     style={{ border: "1px solid var(--border-subtle)" }}
                     value={goalCat}
                     onChange={(e) => setGoalCat(e.target.value)}
                   >
-                    <option value="Health">Health</option>
-                    <option value="Fitness">Fitness</option>
-                    <option value="Work">Work</option>
-                    <option value="Learning">Learning</option>
-                    <option value="Routine">Routine</option>
-                    <option value="Finance">Finance</option>
+                    <option value="Health">{t("category.health")}</option>
+                    <option value="Fitness">{t("category.fitness")}</option>
+                    <option value="Work">{t("category.work")}</option>
+                    <option value="Learning">{t("category.learning")}</option>
+                    <option value="Routine">{t("category.routine")}</option>
+                    <option value="Finance">{t("category.finance")}</option>
                   </select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">Daily Target Logs</label>
+                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">{t("goals.targetCount")}</label>
                   <input
                     type="number"
                     min={1}
@@ -516,16 +518,16 @@ export const GroupsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">Frequency</label>
+                  <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 uppercase tracking-wider">{t("goals.frequency")}</label>
                   <select
                     className="bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-xs focus:ring-2 focus:ring-primary w-full text-on-surface outline-none"
                     style={{ border: "1px solid var(--border-subtle)" }}
                     value={goalFreq}
                     onChange={(e) => setGoalFreq(e.target.value)}
                   >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
+                    <option value="daily">{t("common.daily")}</option>
+                    <option value="weekly">{t("common.weekly")}</option>
+                    <option value="monthly">{t("common.monthly")}</option>
                   </select>
                 </div>
               </div>
@@ -541,7 +543,7 @@ export const GroupsPage: React.FC = () => {
                 disabled={loading}
                 className="btn-primary w-full py-3 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50 mt-2"
               >
-                {loading ? "Creating..." : "Create Group Habit"}
+                {loading ? t("common.saving") : t("groups.createGroup")}
               </button>
             </form>
           </div>

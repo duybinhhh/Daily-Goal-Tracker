@@ -4,6 +4,8 @@ import authRoutes from "./routes/auth";
 import goalRoutes from "./routes/goals";
 import statsRoutes from "./routes/stats";
 import groupRoutes from "./routes/groups";
+import aiRoutes from "./routes/ai";
+import freezeRoutes from "./routes/freeze";
 import { errorHandler } from "./middleware/errorHandler";
 import { db } from "../server/db";
 
@@ -17,6 +19,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/groups", groupRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/freeze", freezeRoutes);
 
 
 // Database seed utility and simple API health endpoint

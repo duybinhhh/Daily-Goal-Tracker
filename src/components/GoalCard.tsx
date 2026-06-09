@@ -1,9 +1,11 @@
 // src/components/GoalCard.tsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Flame, Edit2, Trash2, CheckCircle, Plus, MessageSquare, Undo2 } from "lucide-react";
 import { Goal } from "../types";
 import { motion } from "motion/react";
+import { useTranslation } from "../i18n";
+import api from "../services/api";
 
 interface GoalCardProps {
   goal: Goal;
@@ -20,12 +22,12 @@ const CATEGORY_CONFIG: Record<
   string,
   { icon: string; color: string; bg: string; pillClass: string; progressColor: string }
 > = {
-  health:   { icon: "water_drop",     color: "var(--color-error)",     bg: "rgba(255,180,171,0.10)", pillClass: "cat-health",   progressColor: "var(--color-error)" },
-  fitness:  { icon: "fitness_center", color: "var(--color-secondary)", bg: "rgba(78,222,163,0.10)",  pillClass: "cat-fitness",  progressColor: "var(--color-secondary)" },
-  work:     { icon: "work",           color: "var(--color-primary)",   bg: "rgba(192,193,255,0.10)", pillClass: "cat-work",     progressColor: "var(--color-primary)" },
-  learning: { icon: "menu_book",      color: "var(--color-primary)",   bg: "rgba(192,193,255,0.12)", pillClass: "cat-learning", progressColor: "var(--color-primary)" },
-  finance:  { icon: "savings",        color: "var(--color-tertiary)",  bg: "rgba(255,182,144,0.10)", pillClass: "cat-finance",  progressColor: "var(--color-tertiary)" },
-  routine:  { icon: "repeat",         color: "var(--color-on-surface-variant)", bg: "rgba(199,196,215,0.08)", pillClass: "cat-routine", progressColor: "var(--color-on-surface-variant)" },
+  health: { icon: "water_drop", color: "var(--color-error)", bg: "rgba(255,180,171,0.10)", pillClass: "cat-health", progressColor: "var(--color-error)" },
+  fitness: { icon: "fitness_center", color: "var(--color-secondary)", bg: "rgba(78,222,163,0.10)", pillClass: "cat-fitness", progressColor: "var(--color-secondary)" },
+  work: { icon: "work", color: "var(--color-primary)", bg: "rgba(192,193,255,0.10)", pillClass: "cat-work", progressColor: "var(--color-primary)" },
+  learning: { icon: "menu_book", color: "var(--color-primary)", bg: "rgba(192,193,255,0.12)", pillClass: "cat-learning", progressColor: "var(--color-primary)" },
+  finance: { icon: "savings", color: "var(--color-tertiary)", bg: "rgba(255,182,144,0.10)", pillClass: "cat-finance", progressColor: "var(--color-tertiary)" },
+  routine: { icon: "repeat", color: "var(--color-on-surface-variant)", bg: "rgba(199,196,215,0.08)", pillClass: "cat-routine", progressColor: "var(--color-on-surface-variant)" },
 };
 
 const DEFAULT_CONFIG = {
@@ -37,10 +39,15 @@ const DEFAULT_CONFIG = {
 };
 
 export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, disappearing, onUndo }) => {
+  const { t } = useTranslation();
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [completing, setCompleting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [freezing, setFreezing] = useState(false);
+  const [tokensLeft, setTokensLeft] = useState<number | null>(null);
+  const [frozenToday, setFrozenToday] = useState(false);
+  const [freezeError, setFreezeError] = useState<string | null>(null);
 
   const catKey = goal.category.toLowerCase();
   const config = CATEGORY_CONFIG[catKey] || DEFAULT_CONFIG;
@@ -53,6 +60,23 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
       : 0;
   const currentStreak = goal.streak?.current_streak || 0;
   const longestStreak = goal.streak?.longest_streak || 0;
+  const currentHour = new Date().getHours();
+  const showFreezeButton = currentHour >= 18 && !isCompleted && currentStreak > 0;
+
+  useEffect(() => {
+    if (!showFreezeButton) return;
+
+    api.get("/api/freeze/tokens")
+      .then((res) => setTokensLeft(res.data.tokens_left))
+      .catch(() => { });
+
+    api.get(`/api/freeze/dates?goal_id=${goal.id}`)
+      .then((res) => {
+        const today = new Date().toISOString().split("T")[0];
+        setFrozenToday(res.data.frozen_dates.includes(today));
+      })
+      .catch(() => { });
+  }, [showFreezeButton, goal.id]);
 
   const handleComplete = async () => {
     if (completing) return;
@@ -69,7 +93,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
   };
 
   const handleDelete = async () => {
-    if (window.confirm(`Delete goal "${goal.title}"?`)) {
+    if (window.confirm(t("goals.confirmDelete"))) {
       setDeleting(true);
       try {
         await onDelete(goal.id);
@@ -78,6 +102,21 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
       } finally {
         setDeleting(false);
       }
+    }
+  };
+
+  const handleFreezeToday = async () => {
+    setFreezing(true);
+    setFreezeError(null);
+    try {
+      const res = await api.post("/api/freeze/activate", { goal_id: goal.id });
+      setTokensLeft(res.data.tokens_left);
+      setFrozenToday(true);
+      window.dispatchEvent(new CustomEvent("freeze-tokens-updated", { detail: res.data.tokens_left }));
+    } catch (err: any) {
+      setFreezeError(err.response?.data?.message || "Cannot activate Freeze Token.");
+    } finally {
+      setFreezing(false);
     }
   };
 
@@ -144,7 +183,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
                 whiteSpace: "nowrap",
               }}
             >
-              Completed. Disappearing in {disappearing?.secondsLeft}s
+              {t("goalCard.hideIn", { sec: disappearing?.secondsLeft ?? 0 })}
             </span>
           </div>
           <button
@@ -158,10 +197,10 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
               border: "1px solid var(--color-outline-variant)",
               flexShrink: 0,
             }}
-            title="Undo progress log"
+            title={t("common.undo")}
           >
             <Undo2 size={12} />
-            Undo
+            {t("common.undo")}
           </button>
         </div>
       )}
@@ -268,7 +307,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
                   title="This goal belongs to an Accountability Habit Group"
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>group</span>
-                  Group Habit
+                  {t("goalCard.groupHabit")}
                 </span>
               )}
             </div>
@@ -340,7 +379,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
                   to={`/edit-goal/${goal.id}`}
                   className="btn-ghost"
                   style={{ padding: "5px", borderRadius: "8px" }}
-                  title="Edit"
+                  title={t("common.edit")}
                 >
                   <Edit2 size={13} />
                 </Link>
@@ -349,7 +388,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
                   disabled={deleting}
                   className="btn-danger-ghost"
                   style={{ padding: "5px", borderRadius: "8px" }}
-                  title="Delete"
+                  title={t("common.delete")}
                 >
                   {deleting ? (
                     <div
@@ -365,25 +404,49 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
               {isCompleted ? (
                 <div className="goal-met-badge" style={{ fontSize: "10px", padding: "3px 8px" }}>
                   <CheckCircle size={11} />
-                  <span>Met</span>
+                  <span>{t("goalCard.met")}</span>
                 </div>
               ) : (
-                <button
-                  className="btn-primary"
-                  onClick={handleComplete}
-                  disabled={completing}
-                  style={{ padding: "5px 12px", fontSize: "11px" }}
-                >
-                  {completing ? (
-                    <div
-                      className="spinner"
-                      style={{ width: "11px", height: "11px" }}
-                    />
-                  ) : (
-                    <Plus size={12} />
+                <>
+                  <button
+                    className="btn-primary"
+                    onClick={handleComplete}
+                    disabled={completing}
+                    style={{ padding: "5px 12px", fontSize: "11px" }}
+                  >
+                    {completing ? (
+                      <div
+                        className="spinner"
+                        style={{ width: "11px", height: "11px" }}
+                      />
+                    ) : (
+                      <Plus size={12} />
+                    )}
+                    {t("goalCard.checkIn")}
+                  </button>
+                  {showFreezeButton && (
+                    <button
+                      type="button"
+                      onClick={handleFreezeToday}
+                      disabled={freezing || frozenToday || tokensLeft === 0}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-sky-500/10 text-sky-400 border border-sky-500/30 hover:bg-sky-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title={
+                        frozenToday
+                          ? "Already frozen today"
+                          : tokensLeft === 0
+                            ? "No Freeze Tokens left this month"
+                            : `Use 1 token to protect streak (${tokensLeft ?? "..."} left)`
+                      }
+                    >
+                      {frozenToday ? "❄ Protected" : `❄ Protect Streak${tokensLeft !== null ? ` (${tokensLeft})` : ""}`}
+                    </button>
                   )}
-                  Log
-                </button>
+                  {freezeError && (
+                    <span className="text-[10px] text-red-400 max-w-[140px] text-center">
+                      {freezeError}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -421,7 +484,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
                 size={14}
                 style={{ fill: "rgba(255,182,144,0.25)", flexShrink: 0 }}
               />
-              <span>{currentStreak}d streak</span>
+              <span>{t("goalCard.streakDays", { days: currentStreak })}</span>
             </div>
           ) : (
             <div
@@ -434,14 +497,14 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
               }}
             >
               <Flame size={14} style={{ opacity: 0.3 }} />
-              <span>No streak yet</span>
+              <span>{t("goalCard.noStreak")}</span>
             </div>
           )}
           {longestStreak > 1 && (
             <span
               style={{ fontSize: "10px", color: "var(--color-outline)" }}
             >
-              best: {longestStreak}d
+              {t("goalCard.bestStreak", { days: longestStreak })}
             </span>
           )}
         </div>
@@ -463,10 +526,10 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
                 ? "var(--color-surface-container-high)"
                 : "transparent",
             }}
-            title="Add note"
+            title={t("common.note")}
           >
             <MessageSquare size={12} />
-            Note
+            {t("common.note")}
           </button>
         )}
       </div>
@@ -483,7 +546,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
         >
           <input
             type="text"
-            placeholder="E.g., ran 5km, read 20 pages…"
+            placeholder={t("common.notePlaceholder")}
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleComplete()}
@@ -503,7 +566,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
                 style={{ width: "12px", height: "12px" }}
               />
             ) : (
-              "Save"
+              t("common.save")
             )}
           </button>
         </div>

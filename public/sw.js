@@ -1,4 +1,5 @@
-const CACHE_NAME = "daily-goal-tracker-v1";
+const CACHE_NAME = "daily-goal-tracker-v3";
+const IS_LOCALHOST_SW = ["localhost", "127.0.0.1"].includes(self.location.hostname);
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -7,6 +8,11 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener("install", (event) => {
+  if (IS_LOCALHOST_SW) {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
@@ -15,6 +21,17 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
+  if (IS_LOCALHOST_SW) {
+    event.waitUntil(
+      caches.keys()
+        .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.matchAll({ type: "window" }))
+        .then((clients) => Promise.all(clients.map((client) => client.navigate(client.url))))
+    );
+    return;
+  }
+
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
@@ -29,6 +46,10 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  if (IS_LOCALHOST_SW) {
+    return;
+  }
+
   const { request } = event;
   
   // Only handle GET requests

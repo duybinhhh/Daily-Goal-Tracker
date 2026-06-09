@@ -4,8 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
+import { useTranslation } from "../i18n";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
 export const LoginPage: React.FC = () => {
+  const { t } = useTranslation();
   const { login, register, isAuthenticated, loading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
 
@@ -25,13 +28,13 @@ export const LoginPage: React.FC = () => {
 
   const validate = () => {
     const errors: { [key: string]: string } = {};
-    if (!formData.email) errors.email = "Email is required.";
+    if (!formData.email) errors.email = t("auth.emailRequired");
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
-      errors.email = "Please enter a valid email address.";
-    if (!formData.password) errors.password = "Password is required.";
+      errors.email = t("auth.emailInvalid");
+    if (!formData.password) errors.password = t("auth.passwordRequired");
     else if (formData.password.length < 6)
-      errors.password = "Password must be at least 6 characters.";
-    if (isRegister && !formData.name) errors.name = "Full name is required.";
+      errors.password = t("auth.passwordTooShort");
+    if (isRegister && !formData.name) errors.name = t("auth.nameRequired");
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -92,6 +95,12 @@ export const LoginPage: React.FC = () => {
       />
 
       <div
+        className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6"
+      >
+        <LanguageSwitcher compact />
+      </div>
+
+      <div
         className="glass-card animate-fade-in w-full max-w-[420px] p-6 sm:p-9 relative"
       >
         {/* Brand */}
@@ -125,12 +134,10 @@ export const LoginPage: React.FC = () => {
               marginBottom: "6px",
             }}
           >
-            {isRegister ? "Create Account" : "Welcome Back"}
+            {isRegister ? t("auth.registerTitle") : t("auth.loginTitle")}
           </h1>
           <p style={{ fontSize: "13px", color: "var(--color-on-surface-variant)" }}>
-            {isRegister
-              ? "Start tracking your daily goals and build better habits"
-              : "Sign in to access your daily goal tracker"}
+            {isRegister ? t("auth.registerDesc") : t("auth.loginDesc")}
           </p>
         </div>
 
@@ -172,8 +179,8 @@ export const LoginPage: React.FC = () => {
               </span>
               <Input
                 id="name"
-                label="Full Name"
-                placeholder="E.g., Binh Nguyen"
+                label={t("auth.nameLabel")}
+                placeholder={t("auth.namePlaceholderInput")}
                 className="pl-10"
                 style={{ paddingLeft: "40px" }}
                 value={formData.name}
@@ -202,9 +209,9 @@ export const LoginPage: React.FC = () => {
             </span>
             <Input
               id="email"
-              label="Email Address"
+              label={t("auth.emailLabel")}
               type="email"
-              placeholder="you@example.com"
+              placeholder={t("auth.emailPlaceholder")}
               style={{ paddingLeft: "40px" }}
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -231,7 +238,7 @@ export const LoginPage: React.FC = () => {
             </span>
             <Input
               id="password"
-              label="Password"
+              label={t("auth.passwordLabel")}
               type="password"
               placeholder="••••••••"
               style={{ paddingLeft: "40px" }}
@@ -249,7 +256,7 @@ export const LoginPage: React.FC = () => {
             isLoading={loading}
             style={{ width: "100%", padding: "12px 20px", marginTop: "8px", fontSize: "14px" }}
           >
-            {isRegister ? "Create Account" : "Sign In"}
+            {isRegister ? t("auth.register") : t("auth.login")}
           </Button>
         </form>
 
@@ -265,7 +272,7 @@ export const LoginPage: React.FC = () => {
         >
           {isRegister ? (
             <p>
-              Already have an account?{" "}
+              {t("auth.haveAccount")}{" "}
               <button
                 onClick={() => setIsRegister(false)}
                 style={{
@@ -278,12 +285,12 @@ export const LoginPage: React.FC = () => {
                   fontSize: "12px",
                 }}
               >
-                Sign In
+                {t("auth.login")}
               </button>
             </p>
           ) : (
             <p>
-              New here?{" "}
+              {t("auth.noAccount")}{" "}
               <button
                 onClick={() => setIsRegister(true)}
                 style={{
@@ -296,7 +303,7 @@ export const LoginPage: React.FC = () => {
                   fontSize: "12px",
                 }}
               >
-                Create an Account
+                {t("auth.register")}
               </button>
             </p>
           )}

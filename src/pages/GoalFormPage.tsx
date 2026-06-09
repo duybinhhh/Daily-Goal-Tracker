@@ -6,8 +6,10 @@ import { useGoalStore } from "../store/goalStore";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
+import { useTranslation } from "../i18n";
 
 export const GoalFormPage: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const isEdit = !!id;
   const navigate = useNavigate();
@@ -66,17 +68,17 @@ export const GoalFormPage: React.FC = () => {
     const errors: { [key: string]: string } = {};
 
     if (!formData.title.trim()) {
-      errors.title = "Goal title is required.";
+      errors.title = t("goals.titleRequired");
     } else if (formData.title.length < 3) {
-      errors.title = "Goal title must be at least 3 characters.";
+      errors.title = t("goals.titleTooShort");
     }
 
     if (!formData.category) {
-      errors.category = "Category selection is required.";
+      errors.category = t("goals.categoryRequired");
     }
 
     if (!formData.target_count || formData.target_count <= 0) {
-      errors.target_count = "Target count must be at least 1.";
+      errors.target_count = t("goals.targetCountMin");
     }
 
     setFormErrors(errors);
@@ -89,7 +91,7 @@ export const GoalFormPage: React.FC = () => {
 
     if (!navigator.onLine) {
       useGoalStore.setState({ 
-        error: "Unable to connect to the database server. Please check your network connection and try again." 
+        error: t("goals.offlineFormError")
       });
       return;
     }
@@ -121,14 +123,13 @@ export const GoalFormPage: React.FC = () => {
           <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-full bg-orange-500/15 text-orange-400">
             <span className="material-symbols-outlined" style={{ fontSize: "28px" }}>cloud_off</span>
           </div>
-          <h2 className="text-lg font-bold text-on-surface">Connection Required</h2>
+          <h2 className="text-lg font-bold text-on-surface">{t("goals.connectionRequired")}</h2>
           <p className="text-xs text-on-surface-variant leading-relaxed">
-            Creating or editing goals requires a connection to the server database. 
-            Please check your network connection and try again when you are back online.
+            {t("goals.offlineFormError")}
           </p>
           <div className="pt-2">
             <Link to="/" className="btn-primary inline-flex">
-              Back to Dashboard
+              {t("goals.backToDashboard")}
             </Link>
           </div>
         </div>
@@ -145,7 +146,7 @@ export const GoalFormPage: React.FC = () => {
           className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-on-surface-variant hover:text-on-surface transition-all"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Dashboard
+          {t("goals.backToDashboard")}
         </Link>
  
         {/* Content Card Form */}
@@ -156,10 +157,10 @@ export const GoalFormPage: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-on-surface tracking-tight">
-                {isEdit ? "Edit your Goal" : "Create a Target Goal"}
+                {isEdit ? t("goals.editGoal") : t("goals.newGoal")}
               </h1>
               <p className="text-xs text-on-surface-variant">
-                Define actionable micro-goals with distinct target frequencies.
+                {t("goals.formSubtitle")}
               </p>
             </div>
           </div>
@@ -181,8 +182,8 @@ export const GoalFormPage: React.FC = () => {
             <div className="relative">
               <Input
                 id="title"
-                label="Goal Title"
-                placeholder="E.g., Read a structural book, Workout plank..."
+                label={t("goals.goalTitle")}
+                placeholder={t("goals.goalTitlePlaceholder")}
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 error={formErrors.title}
@@ -196,11 +197,11 @@ export const GoalFormPage: React.FC = () => {
                 htmlFor="description"
                 className="block text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-1.5"
               >
-                Description (Optional)
+                {t("goals.description")} ({t("common.optional")})
               </label>
               <textarea
                 id="description"
-                placeholder="Details or notes about your goal..."
+                placeholder={t("goals.descriptionPlaceholder")}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
@@ -212,7 +213,7 @@ export const GoalFormPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="flex flex-col">
                 <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                  <Tag className="w-3 w-[12px]" /> Category
+                  <Tag className="w-3 w-[12px]" /> {t("goals.category")}
                 </label>
                 <select
                   value={formData.category}
@@ -221,7 +222,7 @@ export const GoalFormPage: React.FC = () => {
                 >
                   {categories.map((cat) => (
                     <option key={cat} value={cat} className="bg-surface-container-high text-on-surface">
-                      {cat}
+                      {t("category." + cat.toLowerCase())}
                     </option>
                   ))}
                 </select>
@@ -229,16 +230,16 @@ export const GoalFormPage: React.FC = () => {
  
               <div className="flex flex-col">
                 <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                  <Clock className="w-3 w-[12px]" /> Frequency
+                  <Clock className="w-3 w-[12px]" /> {t("goals.frequency")}
                 </label>
                 <select
                   value={formData.frequency}
                   onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
                   className="m-input cursor-pointer"
                 >
-                  <option value="daily" className="bg-surface-container-high text-on-surface">Daily</option>
-                  <option value="weekly" className="bg-surface-container-high text-on-surface">Weekly</option>
-                  <option value="monthly" className="bg-surface-container-high text-on-surface">Monthly</option>
+                  <option value="daily" className="bg-surface-container-high text-on-surface">{t("common.daily")}</option>
+                  <option value="weekly" className="bg-surface-container-high text-on-surface">{t("common.weekly")}</option>
+                  <option value="monthly" className="bg-surface-container-high text-on-surface">{t("common.monthly")}</option>
                 </select>
               </div>
             </div>
@@ -249,7 +250,7 @@ export const GoalFormPage: React.FC = () => {
                 <Input
                   id="target_count"
                   type="number"
-                  label="Target frequency completions today"
+                  label={t("goals.targetCount")}
                   min="1"
                   value={formData.target_count}
                   onChange={(e) => setFormData({ ...formData, target_count: Math.max(1, parseInt(e.target.value) || 1) })}
@@ -260,7 +261,7 @@ export const GoalFormPage: React.FC = () => {
  
               <div className="flex flex-col">
                 <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-1.5">
-                  Due Date (Optional)
+                  {t("goals.dueDateOptional")}
                 </label>
                 <input
                   type="date"
@@ -275,11 +276,11 @@ export const GoalFormPage: React.FC = () => {
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-outline-variant/30">
               <Link to="/">
                 <Button variant="ghost" type="button" disabled={loading} className="text-on-surface-variant hover:text-on-surface">
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </Link>
               <Button variant="primary" type="submit" isLoading={loading}>
-                {isEdit ? "Update Goal" : "Save Goal"}
+                {isEdit ? t("goals.saveGoal") : t("goals.createGoal")}
               </Button>
             </div>
           </form>

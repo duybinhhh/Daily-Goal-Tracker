@@ -1,7 +1,10 @@
 // src/components/BottomNav.tsx
 import React from "react";
 import { NavLink } from "react-router-dom";
+import { Brain } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import { useAICoachStore } from "../store/aiCoachStore";
+import { useTranslation } from "../i18n";
 
 interface BottomNavItemProps {
   to: string;
@@ -31,8 +34,17 @@ const BottomNavItem: React.FC<BottomNavItemProps> = ({ to, icon, label, end }) =
 
 export default function BottomNav() {
   const { isAuthenticated } = useAuthStore();
+  const { openDrawer } = useAICoachStore();
+  const { t } = useTranslation();
 
   if (!isAuthenticated) return null;
+
+  const handleOpenAICoach = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    window.dispatchEvent(new CustomEvent("open-ai-coach"));
+    openDrawer();
+  };
 
   return (
     <nav
@@ -48,12 +60,21 @@ export default function BottomNav() {
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      <BottomNavItem to="/" icon="home" label="Home" end />
-      <BottomNavItem to="/stats" icon="query_stats" label="Stats" />
-      <BottomNavItem to="/goals" icon="checklist" label="Goals" />
-      <BottomNavItem to="/groups" icon="group" label="Groups" />
-      <BottomNavItem to="/timeline" icon="timeline" label="Timeline" />
-      <BottomNavItem to="/settings" icon="settings" label="Settings" />
+      <BottomNavItem to="/" icon="home" label={t("nav.home")} end />
+      <BottomNavItem to="/stats" icon="query_stats" label={t("nav.stats")} />
+      <BottomNavItem to="/goals" icon="checklist" label={t("nav.goals")} />
+      <BottomNavItem to="/groups" icon="group" label={t("nav.groups")} />
+      <BottomNavItem to="/timeline" icon="timeline" label={t("nav.timeline")} />
+      <button
+        type="button"
+        onClick={handleOpenAICoach}
+        className="flex min-w-[54px] flex-1 cursor-pointer flex-col items-center justify-center border-0 bg-transparent py-1.5 text-center text-[var(--color-on-surface-variant)] opacity-70 transition-all hover:opacity-100 pointer-events-auto"
+        style={{ fontFamily: "inherit" }}
+      >
+        <Brain size={22} />
+        <span style={{ fontSize: "9px", marginTop: "2px", letterSpacing: "0.02em" }}>AI Coach</span>
+      </button>
+      <BottomNavItem to="/settings" icon="settings" label={t("nav.settings")} />
     </nav>
   );
 }
