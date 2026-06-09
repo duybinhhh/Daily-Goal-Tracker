@@ -119,6 +119,16 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       set({ loading: false });
       await get().fetchGroupById(id);
       await get().fetchGroups();
+
+      // Award XP (AC-1) - Fire and forget
+      try {
+        const { useXPStore } = await import("./xpStore");
+        const { XP_RULES } = await import("../lib/xpSystem");
+        const { awardXP } = useXPStore.getState();
+        awardXP(XP_RULES.JOIN_GROUP, "join_group").catch(() => {});
+      } catch (xpErr) {
+        console.warn("[XP] Award trigger failed:", xpErr);
+      }
     } catch (error: any) {
       const msg = error.response?.data?.message || "Failed to join habit group.";
       set({ error: msg, loading: false });

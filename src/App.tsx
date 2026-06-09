@@ -5,6 +5,7 @@ import { useAuthStore } from "./store/authStore";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import { AICoachDrawer } from "./components/AICoachDrawer";
+import { InAppReminderCenter } from "./components/InAppReminderCenter";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { GoalFormPage } from "./pages/GoalFormPage";
@@ -19,6 +20,7 @@ import { OnboardingPage } from "./pages/OnboardingPage";
 import { useGoalStore } from "./store/goalStore";
 import { syncOfflineData } from "./services/syncManager";
 import { LanguageProvider } from "./i18n";
+import LevelUpModal from "./components/LevelUpModal";
 
 
 // Auth Guard for protected workspace screens
@@ -149,6 +151,7 @@ export default function App() {
           </Routes>
         </RedirectHandler>
       </HashRouter>
+      <LevelUpModal />
     </LanguageProvider>
   );
 }
@@ -201,6 +204,8 @@ function AppLayout() {
 
       {/* Bottom Nav for Mobile */}
       <BottomNav />
+
+      <InAppReminderCenter />
 
       <AICoachDrawer isOpen={isAICoachOpen} onClose={() => setIsAICoachOpen(false)} />
     </div>

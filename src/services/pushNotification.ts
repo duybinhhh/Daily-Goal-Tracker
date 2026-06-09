@@ -27,8 +27,17 @@ export async function getActiveSubscription(): Promise<PushSubscription | null> 
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
     return null;
   }
-  const registration = await navigator.serviceWorker.ready;
-  return await registration.pushManager.getSubscription();
+  try {
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500))
+    ]);
+    if (!registration) return null;
+    return await registration.pushManager.getSubscription();
+  } catch (err) {
+    console.warn("Failed to get active push subscription:", err);
+    return null;
+  }
 }
 
 export async function subscribeToPush(): Promise<PushSubscription | null> {
@@ -42,7 +51,14 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
     throw new Error("Notification permission denied.");
   }
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+  ]);
+
+  if (!registration) {
+    throw new Error("Service Worker is not ready to register push subscriptions.");
+  }
 
   // 2. Fetch VAPID Public Key from server
   const response = await api.get("/api/auth/vapid-public-key");
@@ -72,7 +88,12 @@ export async function unsubscribeFromPush(): Promise<boolean> {
     return false;
   }
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+  ]);
+
+  if (!registration) return false;
   const subscription = await registration.pushManager.getSubscription();
 
   if (subscription) {

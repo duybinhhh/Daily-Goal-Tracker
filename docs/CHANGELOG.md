@@ -3,6 +3,96 @@
 
 
 # Changelog
+## [Đã hoàn thành] - Sprint 8 - Hoàn thiện nhắc hẹn trong app và gỡ thông báo thử - 2026-06-09 (GMT+7)
+
+### Đã thêm & cải tiến
+* **Bổ sung cơ chế nhắc hẹn trong app theo logic giống Zalo:**
+  - Thêm `src/components/InAppReminderCenter.tsx` để hiển thị popup/toast nhắc hẹn trực tiếp trong giao diện khi app đang mở.
+  - Popup nhắc hẹn hoạt động độc lập với Web Push của Chrome/Windows, giúp người dùng vẫn nhận được nhắc nhở ngay cả khi notification hệ điều hành bị chặn hoặc không hiển thị.
+  - Tự kiểm tra các mục tiêu `active`, có `reminder_time`, chưa hoàn thành đủ `target_count`, và chỉ nhắc đúng phút đã cài đặt.
+  - Thêm cơ chế chống nhắc trùng trong cùng ngày bằng key lưu trong `localStorage`.
+  - Popup có nút **Hoàn thành** để check-in nhanh và nút **Mở mục tiêu** để chuyển tới trang mục tiêu.
+  - Thêm âm báo nhẹ bằng Web Audio API khi tới giờ nhắc, với fallback an toàn nếu trình duyệt chặn audio.
+  - Vẫn thử hiển thị system notification qua browser/service worker nếu quyền notification đang được bật, nhưng không phụ thuộc vào nó.
+
+* **Tích hợp nhắc hẹn vào layout chính:**
+  - Gắn `InAppReminderCenter` vào `AppLayout` trong `src/App.tsx` để bộ nhắc hoạt động trên toàn bộ app: Dashboard, Goals, Settings, Stats, Timeline, Groups.
+
+* **Cải thiện Service Worker cho thông báo thật:**
+  - Giữ Service Worker hoạt động trên localhost để hỗ trợ Web Push khi test nhắc hẹn.
+  - Không dùng tag cố định `active-reminder-tag` nữa; mỗi notification có tag riêng để tránh Chrome gộp hoặc ghi đè thông báo cũ.
+  - Thêm `requireInteraction: true` cho push notification để thông báo khó bị tự ẩn quá nhanh.
+
+### Đã gỡ bỏ
+* **Gỡ chức năng gửi thông báo thử:**
+  - Xóa nút **Gửi thông báo thử** khỏi trang Settings.
+  - Xóa state, handler và thông báo thành công/lỗi chỉ phục vụ test trong `SettingsPage.tsx`.
+  - Xóa endpoint backend `POST /api/auth/test-notification`.
+  - Xóa controller `sendTestNotification` khỏi `authController.ts`.
+  - Xóa các helper test notification không còn dùng trong `pushNotification.ts`.
+
+### Kiểm tra
+* `npm run lint`: pass.
+* `npm run build`: pass.
+* Restart dev server thành công.
+* `GET /api/health`: trả `200`.
+* `POST /api/auth/test-notification`: trả `404`, xác nhận endpoint test đã được gỡ.
+
+## [Đã hoàn thành] - Sprint 8 - Cập nhật sửa lỗi XP & Cấp độ (US-21) - 2026-06-09 (GMT+7)
+
+### Đã sửa lỗi
+* **Sửa lỗi không nhận được thông báo popup (nhắc nhở từng mục tiêu):**
+  - **Tránh kẹt Promise do Service Worker:** Trong `InAppReminderCenter.tsx` và `pushNotification.ts`, hàm hiển thị thông báo từng mục tiêu bị kẹt vô hạn ở `await navigator.serviceWorker.ready` khi chạy trên localhost hoặc khi Service Worker chưa sẵn sàng. Đã tối ưu bằng cách bọc `ready` qua `Promise.race` kèm thời gian chờ (safety timeout) 1.5 - 3 giây, đồng thời ưu tiên tạo thông báo trực tiếp qua `new Notification(...)` trên môi trường Desktop để hiển thị tức thời mà không cần chờ Service Worker.
+  - **Sửa lỗi lọc thông báo và crash DB Helper:** Hàm `db.notifications.findMany()` trong `server/db.ts` bị lỗi `TypeError` khi gọi không tham số. Đã sửa điều kiện `where` thành tùy chọn (`where?: ...`) để kiểm tra an toàn trước khi truy vấn database.
+  - **Tránh bỏ lỡ mốc giờ do lệch nhịp giây:** Cập nhật tần suất quét của scheduler (`startReminderScheduler`) từ 60 giây thành 30 giây để đảm bảo quét kịp mốc giờ người dùng cài đặt, kết hợp cơ chế ghi nhận đệm đã có để loại trừ trùng lặp thông báo.
+* **Sửa lỗi trắng màn sau khi thêm hệ thống XP & Cấp độ:**
+  - `Sidebar.tsx` đang render các biến `currentLevelData`, `totalXP`, `xpToNext`, `progressPercent` nhưng chưa khai báo/import, làm React/TypeScript lỗi và khiến app trắng màn. Đã bổ sung import từ `xpSystem` và tính toán các giá trị này trước khi render.
+  - `LevelUpModal` có thể crash nếu `toLevel` vượt ngoài danh sách `LEVELS`. Đã clamp level trong khoảng 1-10 trước khi lấy dữ liệu level.
+  - Đồng bộ Prisma Client sau khi cập nhật schema để backend nhận các field XP mới.
+
+### Backend & Database
+* **Backend XP API:**
+  - Thêm `src/controllers/xpController.ts` để xử lý cộng XP cho user đã đăng nhập.
+  - Thêm `src/routes/xp.ts`.
+  - Đăng ký `/api/xp` trong `src/express-app.ts`.
+  - Thêm endpoint `POST /api/xp/award`.
+  - Validate XP amount là số nguyên dương và giới hạn amount tối đa để tránh cộng XP bất thường.
+
+* **Database & Auth:**
+  - Thêm `total_xp Int @default(0)` và `level Int @default(1)` vào model `User`.
+  - Đồng bộ Supabase bằng SQL, thêm cột `User.total_xp` và `User.level` với default tương ứng.
+  - Cập nhật response register/login/update profile để trả `total_xp` và `level`, giúp frontend render XP ngay sau khi xác thực.
+
+### Kiểm tra
+* `npm run lint`: pass.
+* `npm run build`: pass.
+* Restart dev server thành công.
+* `GET /api/health`: trả `200`.
+* `GET /login#/login`: trả `200`.
+* `POST /api/xp/award` khi chưa đăng nhập trả `401`, xác nhận route tồn tại và được bảo vệ bởi auth middleware.
+* Prisma đọc được user với `total_xp` và `level`.
+
+### Thông tin còn thiếu / cần hoàn thiện
+* Chưa có migration file chính thức trong `prisma/migrations` cho `User.total_xp` và `User.level`; hiện Supabase đã được bổ sung thủ công bằng SQL.
+* Chưa có cơ chế chống cộng XP trùng lặp theo từng action/log ở backend. Hiện frontend gọi fire-and-forget, nên cần bổ sung idempotency nếu muốn chặt chẽ.
+* Một số copy XP/Level đang hardcoded tiếng Việt/Anh, cần đưa vào i18n.
+* Cần test thực tế luồng check-in, hoàn thành ngày, tham gia nhóm và mốc streak để xác nhận XP cộng đúng từng case.
+
+## [Đã hoàn thành] - Sprint 8 - Hệ thống XP & Cấp độ (US-21) - 2026-06-09 (GMT+7)
+
+### Đã thêm & Cải tiến (Added & Improved)
+* **Hệ thống XP & Cấp độ (XP & Level System):**
+  - **Cơ chế cộng XP (AC-1):** Tự động cộng điểm cho các hành động: Check-in (+10), Hoàn thành mục tiêu ngày (+25), Mốc streak (7 ngày: +100, 30 ngày: +300...), Tham gia nhóm (+30).
+  - **Hệ thống 10 Cấp độ (AC-2):** Xây dựng lộ trình từ 🌱 Beginner đến 👑 Legend với icon và tên cấp độ riêng biệt.
+  - **Giao diện Sidebar mới (AC-3):** Thay thế dòng "Pro Member" bằng Badge Level và thanh tiến trình XP trực quan ngay dưới tên người dùng.
+  - **Màn hình Chúc mừng Level Up (AC-4):** Hiệu ứng full-screen với Confetti khi người dùng đạt cấp độ mới, tự động đóng sau 5 giây.
+  - **Widget XP & Level trong Thống kê (AC-5):** Thêm khu vực Dashboard chi tiết trong trang Stats hiển thị XP tổng, lộ trình cấp độ và bảng quy tắc cộng điểm.
+  - **Lưu trữ & Bảo toàn XP (AC-6):** XP được lưu vào database (total_xp, level) và không bị trừ khi người dùng xóa lịch sử nhật ký.
+
+### Tệp mới (New Files)
+- `src/lib/xpSystem.ts`: Định nghĩa levels, rules và các hàm tính toán XP thuần túy.
+- `src/store/xpStore.ts`: Zustand store quản lý trạng thái XP, action awardXP và level up.
+- `src/components/LevelUpModal.tsx`: Component hiển thị màn hình chúc mừng lên cấp.
 
 ## [Đã hoàn thành] - Sprint 7 - Ổn định hệ thống, AI Coach và Streak Freeze - 2026-06-09 (GMT+7)
 
@@ -12,6 +102,14 @@
   - Xây dựng danh mục mẫu đa dạng: Sức khỏe, Học tập, Thể lực, Công việc, Tài chính và Thói quen hàng ngày (`goalTemplates.ts`).
   - Tích hợp nút "Chọn từ Template" vào trang tạo mục tiêu (`GoalFormPage.tsx`), hỗ trợ pre-fill thông tin tiêu đề, mô tả, danh mục, mục tiêu và tần suất.
   - Hỗ trợ tìm kiếm template theo từ khóa và lọc theo danh mục ngay trong modal.
+
+* **Hệ thống XP & Cấp độ (XP & Level System - US-21):**
+  - Triển khai cơ chế cộng điểm kinh nghiệm (XP) cho các hành động: Check-in (+10), Hoàn thành ngày (+25), Mốc streak đặc biệt (+50 đến +1000), Tham gia nhóm (+30), Mời bạn (+20).
+  - Hệ thống 10 cấp độ từ 🌱 Beginner đến 👑 Legend với icon và tên riêng biệt (`src/lib/xpSystem.ts`).
+  - Cập nhật Sidebar hiển thị Avatar kết hợp Badge Level và thanh tiến độ XP thay cho dòng "Pro Member".
+  - Tạo mới component `LevelUpModal.tsx` hiển thị màn hình chúc mừng full-screen kèm hiệu ứng Confetti khi người dùng lên cấp.
+  - Thêm widget "XP & Level" chi tiết vào trang Thống kê (Stats.tsx) hiển thị lộ trình 10 cấp độ và bảng quy tắc cộng điểm.
+  - Lưu trữ bền vững `total_xp` và `level` trong cơ sở dữ liệu, đảm bảo XP chỉ tăng và không bị trừ khi xóa nhật ký lịch sử.
 
 * **Nhắc nhở riêng từng mục tiêu (US-19):**
   - Thêm trường tùy chọn "Nhắc nhở lúc" (Time picker HH:mm) vào trang tạo và chỉnh sửa mục tiêu.

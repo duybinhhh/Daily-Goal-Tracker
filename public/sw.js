@@ -25,9 +25,7 @@ self.addEventListener("activate", (event) => {
     event.waitUntil(
       caches.keys()
         .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
-        .then(() => self.registration.unregister())
-        .then(() => self.clients.matchAll({ type: "window" }))
-        .then((clients) => Promise.all(clients.map((client) => client.navigate(client.url))))
+        .then(() => self.clients.claim())
     );
     return;
   }
@@ -114,7 +112,8 @@ self.addEventListener("push", (event) => {
     icon: data.icon || "/icon.png",
     badge: data.badge || "/icon.png",
     data: data.data || { url: "/" },
-    tag: "active-reminder-tag", // Prevents stacking duplicate notifications
+    tag: data.tag || `dailygoal-push-${Date.now()}`,
+    requireInteraction: true,
     renotify: true,
     vibrate: [200, 100, 200]
   };

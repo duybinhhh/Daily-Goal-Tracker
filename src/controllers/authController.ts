@@ -82,6 +82,8 @@ export const register = async (req: Request, res: Response, next: NextFunction):
         timezone: newUser.timezone,
         created_at: newUser.created_at,
         onboarding_completed: newUser.onboarding_completed,
+        total_xp: newUser.total_xp ?? 0,
+        level: newUser.level ?? 1,
       },
     });
   } catch (error) {
@@ -122,6 +124,8 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
         timezone: user.timezone,
         created_at: user.created_at,
         onboarding_completed: user.onboarding_completed,
+        total_xp: user.total_xp ?? 0,
+        level: user.level ?? 1,
       },
     });
   } catch (error) {
@@ -200,6 +204,8 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
           timezone: updatedUser.timezone,
           created_at: updatedUser.created_at,
           onboarding_completed: updatedUser.onboarding_completed,
+          total_xp: updatedUser.total_xp ?? 0,
+          level: updatedUser.level ?? 1,
         },
         accessToken,
       });
@@ -237,6 +243,8 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
         timezone: updatedUser.timezone,
         created_at: updatedUser.created_at,
         onboarding_completed: updatedUser.onboarding_completed,
+        total_xp: updatedUser.total_xp ?? 0,
+        level: updatedUser.level ?? 1,
       },
       accessToken,
     });

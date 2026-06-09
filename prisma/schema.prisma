@@ -23,6 +23,8 @@ model User {
   push_subscription     String?
   last_reminder_sent_date String?
   last_freeze_reminder_date String?
+  total_xp      Int            @default(0)
+  level         Int            @default(1)
   created_groups HabitGroup[] @relation("GroupCreator")
   group_memberships HabitGroupMember[]
 }

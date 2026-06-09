@@ -7,6 +7,8 @@ export interface User {
   timezone: string;
   onboarding_completed?: boolean;
   created_at?: string;
+  total_xp?: number;
+  level?: number;
 }
 
 export interface Streak {

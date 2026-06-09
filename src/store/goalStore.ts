@@ -444,6 +444,34 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       get().fetchStats();
       get().fetchHistory();
       
+      // Award XP (AC-1) - Fire and forget
+      try {
+        const { useXPStore } = await import("./xpStore");
+        const { XP_RULES, getStreakMilestoneXP } = await import("../lib/xpSystem");
+        const { awardXP } = useXPStore.getState();
+
+        let totalAward = XP_RULES.CHECK_IN;
+        const reasons = ["check_in"];
+
+        // +25 XP if fully completed today
+        if (updatedGoal.current_count >= updatedGoal.target_count) {
+          totalAward += XP_RULES.COMPLETE_DAY;
+          reasons.push("complete_day");
+        }
+
+        // Streak milestone XP
+        const newStreak = updatedGoal.streak?.current_streak ?? 0;
+        const milestoneXP = getStreakMilestoneXP(newStreak);
+        if (milestoneXP > 0) {
+          totalAward += milestoneXP;
+          reasons.push(`streak_milestone_${newStreak}`);
+        }
+
+        awardXP(totalAward, reasons.join("+")).catch(() => {});
+      } catch (xpErr) {
+        console.warn("[XP] Award trigger failed:", xpErr);
+      }
+
       // Return log data so caller can use its ID
       return response.data;
     } catch (error: any) {

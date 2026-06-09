@@ -119,11 +119,14 @@ class PrismaDB {
         last_reminder_sent_date?: string | null;
         last_freeze_reminder_date?: string | null;
         onboarding_completed?: boolean;
+        total_xp?: number;
+        level?: number;
       }
     ) => {
+      const prismaUpdate: any = { ...updateData };
       const updated = await prisma.user.update({
         where: { id },
-        data: updateData,
+        data: prismaUpdate,
       });
       return mapUser(updated);
     },
@@ -348,11 +351,13 @@ class PrismaDB {
 
   // Notifications Helpers
   public notifications = {
-    findMany: async (where: { user_id?: string; is_read?: boolean }) => {
+    findMany: async (where?: { user_id?: string; is_read?: boolean }) => {
       const prismaWhere: any = {};
-      if (where.user_id) prismaWhere.user_id = where.user_id;
-      if (where.is_read !== undefined) {
-        prismaWhere.is_read = where.is_read;
+      if (where) {
+        if (where.user_id) prismaWhere.user_id = where.user_id;
+        if (where.is_read !== undefined) {
+          prismaWhere.is_read = where.is_read;
+        }
       }
       const notifications = await prisma.notification.findMany({ 
         where: prismaWhere,

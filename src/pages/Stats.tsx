@@ -6,6 +6,7 @@ import { useAuthStore } from "../store/authStore";
 import api from "../services/api";
 import { ShareModal } from "../components/ShareModal";
 import { useTranslation } from "../i18n";
+import { getLevelFromXP, getLevelProgress, getXPToNextLevel, LEVELS, XP_RULES } from "../lib/xpSystem";
 
 export const Stats: React.FC = () => {
   const { t, language } = useTranslation();
@@ -515,6 +516,136 @@ export const Stats: React.FC = () => {
             <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">{t("stats.title")}</h1>
             <p className="text-base text-on-surface-variant mt-2">{t("stats.subtitle")}</p>
           </div>
+        </section>
+
+        {/* ── XP & Level Widget (AC-5) ── */}
+        <section className="glass-card p-5 mb-6">
+          <h2
+            className="text-sm font-semibold mb-4 flex items-center gap-2"
+            style={{ color: 'var(--color-on-surface)' }}
+          >
+            <span className="material-symbols-outlined" style={{ color: 'var(--color-primary)', fontSize: '20px' }}>
+              military_tech
+            </span>
+            XP & Level
+          </h2>
+
+          {(() => {
+            const totalXP = user?.total_xp ?? 0;
+            const currentLevel = getLevelFromXP(totalXP);
+            const progress = getLevelProgress(totalXP);
+            const xpToNext = getXPToNextLevel(totalXP);
+            const isMaxLevel = currentLevel.level === 10;
+
+            return (
+              <div className="space-y-4">
+                {/* Level header */}
+                <div className="flex items-center gap-4">
+                  <span style={{ fontSize: '48px', lineHeight: 1 }}>{currentLevel.icon}</span>
+                  <div className="flex-1">
+                    <p className="font-bold text-lg" style={{ color: 'var(--color-on-surface)' }}>
+                      Level {currentLevel.level} — {currentLevel.name}
+                    </p>
+                    <p className="text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      {totalXP.toLocaleString()} XP tổng cộng
+                    </p>
+                  </div>
+                </div>
+
+                {/* XP Progress bar */}
+                {!isMaxLevel && (
+                  <div>
+                    <div className="flex justify-between text-xs mb-1.5" style={{ color: 'var(--color-on-surface-variant)' }}>
+                      <span>{progress}% tiến độ Level {currentLevel.level}</span>
+                      <span>Cần thêm {xpToNext.toLocaleString()} XP → Lv.{currentLevel.level + 1}</span>
+                    </div>
+                    <div
+                      className="w-full rounded-full overflow-hidden"
+                      style={{ height: '8px', background: 'var(--color-surface-container-high)' }}
+                    >
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${progress}%`,
+                          background: 'linear-gradient(90deg, var(--color-primary), var(--color-secondary))',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {isMaxLevel && (
+                  <p className="text-sm font-semibold text-center py-2" style={{ color: 'var(--color-tertiary)' }}>
+                    👑 Bạn đã đạt cấp độ tối đa — LEGEND!
+                  </p>
+                )}
+
+                {/* XP Rules reference */}
+                <div
+                  className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2"
+                  style={{ borderTop: '1px solid var(--border-subtle)' }}
+                >
+                  {[
+                    { label: 'Check-in goal',      xp: XP_RULES.CHECK_IN,    icon: 'check_circle' },
+                    { label: 'Hoàn thành ngày',    xp: XP_RULES.COMPLETE_DAY, icon: 'done_all' },
+                    { label: 'Tham gia nhóm',      xp: XP_RULES.JOIN_GROUP,  icon: 'group_add' },
+                    { label: 'Mời bạn',            xp: XP_RULES.INVITE_FRIEND, icon: 'person_add' },
+                    { label: 'Mốc streak 7 ngày',  xp: 100,                  icon: 'local_fire_department' },
+                    { label: 'Mốc streak 30 ngày', xp: 300,                  icon: 'whatshot' },
+                  ].map((rule) => (
+                    <div
+                      key={rule.label}
+                      className="flex items-center gap-2 p-2 rounded-xl"
+                      style={{ background: 'var(--color-surface-container)' }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '16px', color: 'var(--color-primary)' }}>
+                        {rule.icon}
+                      </span>
+                      <div>
+                        <p style={{ fontSize: '10px', color: 'var(--color-on-surface-variant)' }}>{rule.label}</p>
+                        <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-on-surface)' }}>+{rule.xp} XP</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* All levels list */}
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
+                  <p className="text-xs font-semibold mb-2" style={{ color: 'var(--color-on-surface-variant)' }}>
+                    Lộ trình cấp độ
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {LEVELS.map((lv) => (
+                      <div
+                        key={lv.level}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+                        style={{
+                          background: lv.level === currentLevel.level
+                            ? 'var(--color-primary-container)'
+                            : 'var(--color-surface-container)',
+                          color: lv.level === currentLevel.level
+                            ? 'var(--color-on-primary-container)'
+                            : lv.level < currentLevel.level
+                              ? 'var(--color-secondary)'
+                              : 'var(--color-on-surface-variant)',
+                          opacity: lv.level > currentLevel.level ? 0.6 : 1,
+                        }}
+                      >
+                        <span>{lv.icon}</span>
+                        <span>Lv.{lv.level} {lv.name}</span>
+                        {lv.level < currentLevel.level && (
+                          <span className="ml-auto material-symbols-outlined" style={{ fontSize: '13px' }}>check</span>
+                        )}
+                        {lv.level === currentLevel.level && (
+                          <span className="ml-auto" style={{ fontSize: '10px', fontWeight: 700 }}>NOW</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </section>
 
         {/* Dynamic Warning for empty database */}

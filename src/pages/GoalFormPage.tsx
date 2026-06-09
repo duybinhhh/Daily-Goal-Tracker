@@ -9,6 +9,7 @@ import { Card } from "../components/ui/Card";
 import { useTranslation } from "../i18n";
 import { GoalTemplateModal } from "../components/GoalTemplateModal";
 import type { GoalTemplate } from "../data/goalTemplates";
+import { getActiveSubscription, subscribeToPush } from "../services/pushNotification";
 
 export const GoalFormPage: React.FC = () => {
   const { t } = useTranslation();
@@ -128,6 +129,20 @@ export const GoalFormPage: React.FC = () => {
     }
 
     try {
+      if (formData.reminder_time) {
+        try {
+          const activeSubscription = await getActiveSubscription();
+          if (!activeSubscription) {
+            await subscribeToPush();
+          }
+        } catch (pushError: any) {
+          useGoalStore.setState({
+            error: pushError.message || "Bạn cần cho phép thông báo để dùng nhắc nhở riêng từng mục tiêu.",
+          });
+          return;
+        }
+      }
+
       const payload = {
         ...formData,
         target_count: Number(formData.target_count),

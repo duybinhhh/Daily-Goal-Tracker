@@ -7,6 +7,7 @@ import { useGoalStore } from "../store/goalStore";
 import { useAICoachStore } from "../store/aiCoachStore";
 import { syncOfflineData } from "../services/syncManager";
 import { useTranslation } from "../i18n";
+import { getLevelFromXP, getLevelProgress, getXPToNextLevel } from "../lib/xpSystem";
 
 interface NavItemProps {
   to: string;
@@ -38,6 +39,10 @@ export default function Sidebar() {
   const { t } = useTranslation();
 
   const bestStreak = Math.max(0, ...goals.map((g) => g.streak?.current_streak || 0));
+  const totalXP = Math.max(0, user?.total_xp ?? 0);
+  const currentLevelData = getLevelFromXP(totalXP);
+  const xpToNext = getXPToNextLevel(totalXP);
+  const progressPercent = getLevelProgress(totalXP);
 
   if (!isAuthenticated) return null;
 
@@ -163,48 +168,93 @@ export default function Sidebar() {
 
       {/* User section */}
       <div
-        className="mx-3 mb-3 p-3 rounded-2xl flex items-center gap-3"
+        className="mx-3 mb-3 p-3 rounded-2xl"
         style={{
           background: "var(--color-surface-container)",
           border: "1px solid var(--border-subtle)",
         }}
       >
-        {/* Avatar */}
-        <div
-          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold"
-          style={{
-            background: "color-mix(in srgb, var(--color-primary) 20%, var(--color-surface-container-high))",
-            color: "var(--color-primary)",
-            border: "1px solid rgba(192,193,255,0.2)",
-          }}
-        >
-          {(user?.name || "U").charAt(0).toUpperCase()}
-        </div>
-        {/* Name */}
-        <div className="flex-1 min-w-0">
-          <p
-            className="font-semibold truncate"
-            style={{ fontSize: "13px", color: "var(--color-on-surface)" }}
+        {/* Row 1: Avatar + Level Badge + Name + Logout */}
+        <div className="flex items-center gap-3 mb-2">
+          {/* Avatar với ring màu theo level */}
+          <div className="relative shrink-0">
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold"
+              style={{
+                background: "color-mix(in srgb, var(--color-primary) 20%, var(--color-surface-container-high))",
+                color: "var(--color-primary)",
+                border: "2px solid var(--color-primary)",
+              }}
+            >
+              {(user?.name || "U").charAt(0).toUpperCase()}
+            </div>
+            {/* Level badge nhỏ góc dưới phải avatar */}
+            <span
+              className="absolute -bottom-1 -right-1 text-xs leading-none"
+              title={`Level ${currentLevelData.level} — ${currentLevelData.name}`}
+            >
+              {currentLevelData.icon}
+            </span>
+          </div>
+
+          {/* Name + Level name */}
+          <div className="flex-1 min-w-0">
+            <p
+              className="font-semibold truncate"
+              style={{ fontSize: "13px", color: "var(--color-on-surface)" }}
+            >
+              {user?.name || "User"}
+            </p>
+            <p
+              className="truncate"
+              style={{ fontSize: "10px", color: "var(--color-primary)", fontWeight: 600 }}
+            >
+              Lv.{currentLevelData.level} {currentLevelData.name}
+            </p>
+          </div>
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            className="btn-danger-ghost"
+            title={t("auth.logout")}
           >
-            {user?.name || "User"}
-          </p>
-          <p
-            className="uppercase tracking-widest truncate"
-            style={{ fontSize: "9px", color: "var(--color-outline)", fontWeight: 600 }}
-          >
-            Pro Member
-          </p>
+            <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
+              logout
+            </span>
+          </button>
         </div>
-        {/* Logout */}
-        <button
-          onClick={handleLogout}
-          className="btn-danger-ghost"
-          title={t("auth.logout")}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
-            logout
-          </span>
-        </button>
+
+        {/* Row 2: XP Progress Bar */}
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <span style={{ fontSize: "10px", color: "var(--color-on-surface-variant)" }}>
+              {totalXP.toLocaleString()} XP
+            </span>
+            {currentLevelData.level < 10 ? (
+              <span style={{ fontSize: "10px", color: "var(--color-on-surface-variant)" }}>
+                +{xpToNext} XP → Lv.{currentLevelData.level + 1}
+              </span>
+            ) : (
+              <span style={{ fontSize: "10px", color: "var(--color-tertiary)" }}>
+                👑 MAX LEVEL
+              </span>
+            )}
+          </div>
+          {/* Progress bar */}
+          <div
+            className="w-full rounded-full overflow-hidden"
+            style={{ height: "5px", background: "var(--color-surface-container-high)" }}
+          >
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${progressPercent}%`,
+                background: "linear-gradient(90deg, var(--color-primary), var(--color-secondary))",
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* New Goal Button */}

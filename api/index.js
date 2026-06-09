@@ -33,7 +33,8 @@ function mapGoal(g) {
     ...g,
     created_at: g.created_at.toISOString(),
     updated_at: g.updated_at.toISOString(),
-    due_date: g.due_date ? g.due_date.toISOString() : null
+    due_date: g.due_date ? g.due_date.toISOString() : null,
+    reminder_time: g.reminder_time ?? null
   };
 }
 function mapGoalLog(l) {
@@ -105,9 +106,10 @@ var PrismaDB = class {
         return mapUser(created);
       },
       update: async (id, updateData) => {
+        const prismaUpdate = { ...updateData };
         const updated = await prisma.user.update({
           where: { id },
-          data: updateData
+          data: prismaUpdate
         });
         return mapUser(updated);
       },
@@ -143,6 +145,7 @@ var PrismaDB = class {
             target_count: data.target_count,
             frequency: data.frequency,
             due_date: data.due_date ? new Date(data.due_date) : null,
+            reminder_time: data.reminder_time || null,
             current_count: 0,
             status: "active"
           }
@@ -153,6 +156,9 @@ var PrismaDB = class {
         const prismaUpdate = { ...updateData };
         if (updateData.due_date !== void 0) {
           prismaUpdate.due_date = updateData.due_date ? new Date(updateData.due_date) : null;
+        }
+        if (updateData.reminder_time !== void 0) {
+          prismaUpdate.reminder_time = updateData.reminder_time || null;
         }
         const updated = await prisma.goal.update({
           where: { id },
@@ -300,11 +306,18 @@ var PrismaDB = class {
     // Notifications Helpers
     this.notifications = {
       findMany: async (where) => {
-        const prismaWhere = { user_id: where.user_id };
-        if (where.is_read !== void 0) {
-          prismaWhere.is_read = where.is_read;
+        const prismaWhere = {};
+        if (where) {
+          if (where.user_id) prismaWhere.user_id = where.user_id;
+          if (where.is_read !== void 0) {
+            prismaWhere.is_read = where.is_read;
+          }
         }
-        const notifications = await prisma.notification.findMany({ where: prismaWhere });
+        const notifications = await prisma.notification.findMany({
+          where: prismaWhere,
+          orderBy: { created_at: "desc" },
+          take: 100
+        });
         return notifications.map(mapNotification);
       },
       create: async (data) => {
@@ -555,7 +568,9 @@ var register = async (req, res, next) => {
         name: newUser.name,
         timezone: newUser.timezone,
         created_at: newUser.created_at,
-        onboarding_completed: newUser.onboarding_completed
+        onboarding_completed: newUser.onboarding_completed,
+        total_xp: newUser.total_xp ?? 0,
+        level: newUser.level ?? 1
       }
     });
   } catch (error) {
@@ -589,7 +604,9 @@ var login = async (req, res, next) => {
         name: user.name,
         timezone: user.timezone,
         created_at: user.created_at,
-        onboarding_completed: user.onboarding_completed
+        onboarding_completed: user.onboarding_completed,
+        total_xp: user.total_xp ?? 0,
+        level: user.level ?? 1
       }
     });
   } catch (error) {
@@ -654,7 +671,9 @@ var updateProfile = async (req, res, next) => {
           name: updatedUser2.name,
           timezone: updatedUser2.timezone,
           created_at: updatedUser2.created_at,
-          onboarding_completed: updatedUser2.onboarding_completed
+          onboarding_completed: updatedUser2.onboarding_completed,
+          total_xp: updatedUser2.total_xp ?? 0,
+          level: updatedUser2.level ?? 1
         },
         accessToken: accessToken2
       });
@@ -684,7 +703,9 @@ var updateProfile = async (req, res, next) => {
         name: updatedUser.name,
         timezone: updatedUser.timezone,
         created_at: updatedUser.created_at,
-        onboarding_completed: updatedUser.onboarding_completed
+        onboarding_completed: updatedUser.onboarding_completed,
+        total_xp: updatedUser.total_xp ?? 0,
+        level: updatedUser.level ?? 1
       },
       accessToken
     });
@@ -867,13 +888,16 @@ var createGoal = async (req, res, next) => {
   try {
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
-    const { title, description, category, target_count, frequency, due_date } = req.body;
+    const { title, description, category, target_count, frequency, due_date, reminder_time } = req.body;
     if (!title || !category) {
       throw new AppError("Goal title and category fields are required properties.", 400);
     }
     const goalTarget = target_count ? parseInt(target_count, 10) : 1;
     if (isNaN(goalTarget) || goalTarget <= 0) {
       throw new AppError("Target count must be a positive integer greater than zero.", 400);
+    }
+    if (reminder_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(reminder_time)) {
+      throw new AppError("Reminder time must use HH:mm format.", 400);
     }
     const newGoal = await db.goals.create({
       user_id: userId,
@@ -882,7 +906,8 @@ var createGoal = async (req, res, next) => {
       category,
       target_count: goalTarget,
       frequency: frequency || "daily",
-      due_date: due_date || null
+      due_date: due_date || null,
+      reminder_time: reminder_time || null
     });
     const newStreak = await db.streaks.create({
       user_id: userId,
@@ -934,7 +959,7 @@ var updateGoal = async (req, res, next) => {
     if (!goal || goal.user_id !== userId) {
       throw new AppError("Goal not found or access denied.", 404);
     }
-    const { title, description, category, target_count, current_count, frequency, status, due_date } = req.body;
+    const { title, description, category, target_count, current_count, frequency, status, due_date, reminder_time } = req.body;
     const updates = {};
     if (title !== void 0) updates.title = title;
     if (description !== void 0) updates.description = description;
@@ -942,6 +967,12 @@ var updateGoal = async (req, res, next) => {
     if (frequency !== void 0) updates.frequency = frequency;
     if (status !== void 0) updates.status = status;
     if (due_date !== void 0) updates.due_date = due_date;
+    if (reminder_time !== void 0) {
+      if (reminder_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(reminder_time)) {
+        throw new AppError("Reminder time must use HH:mm format.", 400);
+      }
+      updates.reminder_time = reminder_time || null;
+    }
     if (target_count !== void 0) {
       const parsed = parseInt(target_count, 10);
       if (isNaN(parsed) || parsed <= 0) throw new AppError("Target count must be a positive number.", 400);
@@ -1859,6 +1890,77 @@ router6.post("/activate", activateFreeze);
 router6.get("/dates", getFreezeDates);
 var freeze_default = router6;
 
+// src/routes/xp.ts
+import { Router as Router7 } from "express";
+
+// src/lib/xpSystem.ts
+var LEVELS = [
+  { level: 1, name: "Beginner", icon: "\u{1F331}", xp_required: 0 },
+  { level: 2, name: "Explorer", icon: "\u{1F50D}", xp_required: 100 },
+  { level: 3, name: "Achiever", icon: "\u26A1", xp_required: 300 },
+  { level: 4, name: "Challenger", icon: "\u{1F3AF}", xp_required: 600 },
+  { level: 5, name: "Warrior", icon: "\u2694\uFE0F", xp_required: 1e3 },
+  { level: 6, name: "Champion", icon: "\u{1F3C6}", xp_required: 1500 },
+  { level: 7, name: "Master", icon: "\u{1F31F}", xp_required: 2200 },
+  { level: 8, name: "Elite", icon: "\u{1F48E}", xp_required: 3e3 },
+  { level: 9, name: "Grandmaster", icon: "\u{1F525}", xp_required: 4e3 },
+  { level: 10, name: "Legend", icon: "\u{1F451}", xp_required: 5500 }
+];
+function getLevelFromXP(totalXP) {
+  for (let i = LEVELS.length - 1; i >= 0; i--) {
+    if (totalXP >= LEVELS[i].xp_required) {
+      return LEVELS[i];
+    }
+  }
+  return LEVELS[0];
+}
+
+// src/controllers/xpController.ts
+var MAX_XP_AWARD = 2e3;
+var awardXP = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const amount = Number(req.body?.amount);
+    const reason = String(req.body?.reason || "").trim();
+    if (!Number.isInteger(amount) || amount <= 0) {
+      throw new AppError("XP amount must be a positive integer.", 400);
+    }
+    if (amount > MAX_XP_AWARD) {
+      throw new AppError("XP amount is too large.", 400);
+    }
+    if (!reason) {
+      throw new AppError("XP reason is required.", 400);
+    }
+    const user = await db.users.findUnique({ id: userId });
+    if (!user) throw new AppError("User not found.", 404);
+    const previousLevel = user.level ?? 1;
+    const currentXP = user.total_xp ?? 0;
+    const nextXP = currentXP + amount;
+    const nextLevel = getLevelFromXP(nextXP).level;
+    const updatedUser = await db.users.update(userId, {
+      total_xp: nextXP,
+      level: nextLevel
+    });
+    res.status(200).json({
+      success: true,
+      reason,
+      awarded_xp: amount,
+      total_xp: updatedUser.total_xp ?? nextXP,
+      level: updatedUser.level ?? nextLevel,
+      previous_level: previousLevel
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// src/routes/xp.ts
+var router7 = Router7();
+router7.use(authMiddleware);
+router7.post("/award", awardXP);
+var xp_default = router7;
+
 // src/express-app.ts
 var app = express();
 app.use(express.json());
@@ -1868,6 +1970,7 @@ app.use("/api/stats", stats_default);
 app.use("/api/groups", groups_default);
 app.use("/api/ai", ai_default);
 app.use("/api/freeze", freeze_default);
+app.use("/api/xp", xp_default);
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,

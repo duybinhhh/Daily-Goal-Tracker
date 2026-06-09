@@ -255,7 +255,7 @@ export async function checkAndSendReminders() {
 }
 
 // Start the scheduler
-export function startReminderScheduler(intervalMs: number = 60000) {
+export function startReminderScheduler(intervalMs: number = 30000) {
   console.log(`[Reminder Scheduler] Starting background active reminders job (every ${intervalMs / 1000}s)...`);
   
   // Run once on startup
