@@ -121,6 +121,16 @@ Truy cập `/stats` để xem báo cáo trực quan về kỷ luật bản thân
 - **10-Week Trend Chart (Biểu đồ xu hướng 10 tuần)**: Gom nhóm dữ liệu tiến độ trong 70 ngày gần nhất vẽ thành các cột biểu đồ CSS động tự động điều chỉnh độ cao và hiển thị tooltip thông tin chi tiết khi rê chuột.
 - **Goal Distribution (Biểu đồ tròn phân bổ)**: Sử dụng kỹ thuật gradient conic hiện đại để chia tỷ lệ phần trăm thói quen của bạn theo danh mục (Sức khỏe, Công việc, v.v.), đi kèm bảng chú thích màu sắc tương tác.
 - **Milestone Feed**: Dòng thời gian vinh danh các cột mốc bạn đã đạt được (ví dụ: đạt Streak 7 ngày đầu tiên, hoàn thành thói quen đạt mốc đặc biệt, đạt cấp bậc "Achiever Elite Tier"). Tích hợp nút **Share** trên từng thẻ cột mốc.
+- **So sánh xu hướng (Trend Comparison)**:
+  - Widget nằm ngay sau Bento Grid trong trang Stats.
+  - Dùng toggle **Ngày / Tuần / Tháng** để so sánh hiệu suất giữa `Kỳ trước` và `Hiện tại`.
+  - Chọn dropdown **Tất cả mục tiêu** để xem dữ liệu toàn bộ goal, hoặc chọn một mục tiêu cụ thể để lọc riêng.
+  - Khi xem tất cả mục tiêu, có 2 chế độ:
+    - **Tổng thể:** hiển thị biểu đồ cột đôi tổng quan.
+    - **Chi tiết:** hiển thị từng mục tiêu theo hàng ngang, gồm số check-in kỳ trước, kỳ hiện tại, phần trăm thay đổi và trạng thái hôm qua/hôm nay.
+  - Bảng **Hôm qua** và **Hôm nay** dùng nhãn **Đã đạt / Chưa đạt**. Một mục tiêu chỉ được tính là **Đã đạt** khi số lần check-in trong ngày đạt đủ `target_count`, ví dụ goal cần 8 lần thì mới check-in 1 lần vẫn thuộc nhóm **Chưa đạt**.
+  - Khối **Gợi ý cần cải thiện theo ngày** đưa ra gợi ý dựa trên các mục tiêu chưa đạt target của hôm qua hoặc hôm nay.
+  - Chế độ tuần dùng tuần lịch Monday-Sunday và so sánh với tuần lịch liền trước, không dùng cách lấy hôm nay trừ 7 ngày.
 
 ---
 

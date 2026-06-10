@@ -222,6 +222,12 @@ export const getTrendComparison = async (req: AuthenticatedRequest, res: Respons
       }).length;
     };
 
+    const getGoalDateProgress = (targetGoalId: string, dateKey: string) => {
+      return uniqueAllLogs.filter((log) => {
+        return log.goal_id === targetGoalId && getDateKey(new Date(log.completed_at)) === dateKey;
+      }).length;
+    };
+
     const nowParts = getLocalDateParts(new Date(), timezone);
     const localToday = new Date(nowParts.year, nowParts.month, nowParts.day);
     const todayStr = formatDateStr(nowParts.year, nowParts.month, nowParts.day);
@@ -361,18 +367,19 @@ export const getTrendComparison = async (req: AuthenticatedRequest, res: Respons
     const yesterdayNotCheckedIn: string[] = [];
 
     summaryGoals.forEach((goal) => {
-      const goalLogs = uniqueAllLogs.filter((log) => log.goal_id === goal.id);
+      const targetCount = Math.max(1, Number(goal.target_count) || 1);
+      const todayProgress = getGoalDateProgress(goal.id, todayStr);
+      const yesterdayProgress = getGoalDateProgress(goal.id, yesterdayStr);
+      const hasTodayCompletedTarget = todayProgress >= targetCount;
+      const hasYesterdayCompletedTarget = yesterdayProgress >= targetCount;
 
-      const hasTodayLog = goalLogs.some((log) => getDateKey(new Date(log.completed_at)) === todayStr);
-      const hasYesterdayLog = goalLogs.some((log) => getDateKey(new Date(log.completed_at)) === yesterdayStr);
-
-      if (hasTodayLog) {
+      if (hasTodayCompletedTarget) {
         todayCheckedIn.push(goal.title);
       } else {
         todayNotCheckedIn.push(goal.title);
       }
 
-      if (hasYesterdayLog) {
+      if (hasYesterdayCompletedTarget) {
         yesterdayCheckedIn.push(goal.title);
       } else {
         yesterdayNotCheckedIn.push(goal.title);
@@ -382,8 +389,9 @@ export const getTrendComparison = async (req: AuthenticatedRequest, res: Respons
     const goalBreakdown = summaryGoals.map((goal) => {
       const current = sumGoalByDateKeys(goal.id, currentPeriodDateKeys);
       const previous = sumGoalByDateKeys(goal.id, previousPeriodDateKeys);
-      const todayCheckedIn = uniqueAllLogs.some((log) => log.goal_id === goal.id && getDateKey(new Date(log.completed_at)) === todayStr);
-      const yesterdayCheckedIn = uniqueAllLogs.some((log) => log.goal_id === goal.id && getDateKey(new Date(log.completed_at)) === yesterdayStr);
+      const targetCount = Math.max(1, Number(goal.target_count) || 1);
+      const todayCheckedIn = getGoalDateProgress(goal.id, todayStr) >= targetCount;
+      const yesterdayCheckedIn = getGoalDateProgress(goal.id, yesterdayStr) >= targetCount;
 
       return {
         goalId: goal.id,

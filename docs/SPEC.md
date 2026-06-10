@@ -168,6 +168,22 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * **AC-5:** Nếu mục tiêu đã được hoàn thành trước giờ nhắc → không gửi thông báo cho goal đó.
     * **AC-6:** Nhắc chung 21h loại trừ các goal đã cài đặt `reminder_time` riêng (dù goal đó đã xong hay chưa).
 
+#### US-22: So sánh xu hướng hiệu suất thói quen (Trend Comparison)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 4.0
+* **Mục tiêu:** Người dùng có thể so sánh hiệu suất thói quen theo ngày, tuần và tháng để biết mình đang tiến bộ hay giảm hiệu suất.
+* **Tiêu chí chấp nhận (AC):**
+    * **AC-1:** Trang Stats hiển thị widget **So sánh xu hướng** ngay sau Bento Grid.
+    * **AC-2:** Widget hỗ trợ biểu đồ cột đôi so sánh `Kỳ trước` và `Hiện tại`.
+    * **AC-3:** Có toggle `Ngày`, `Tuần`, `Tháng`; dữ liệu cập nhật khi đổi chế độ.
+    * **AC-4:** Chế độ tuần dùng tuần lịch Monday-Sunday và so sánh với tuần lịch liền trước.
+    * **AC-5:** Chế độ tháng hiển thị phần trăm thay đổi, màu xanh khi tăng và màu đỏ khi giảm.
+    * **AC-6:** Có dropdown lọc theo `Tất cả mục tiêu` hoặc từng mục tiêu cụ thể của user.
+    * **AC-7:** Khi chọn `Tất cả mục tiêu`, có 2 chế độ: `Tổng thể` để xem biểu đồ chung và `Chi tiết` để xem từng mục tiêu theo hàng ngang.
+    * **AC-8:** Bảng `Hôm qua` và `Hôm nay` hiển thị số mục tiêu `Đã đạt` và `Chưa đạt` theo `target_count`, không chỉ dựa vào việc có log hay chưa.
+    * **AC-9:** Tooltip biểu đồ hiển thị mốc thời gian, giá trị kỳ trước, giá trị hiện tại và tên mục tiêu nếu đang lọc theo goal cụ thể.
+    * **AC-10:** API `GET /api/stats/trend` trả về dữ liệu realtime từ `GoalLog`, hỗ trợ query `period=day|week|month` và `goalId?: string`.
+
 ---
 
 ### 📦 Module 6: Accountability Partners & Social Sharing (Sprint 6 — 8.0 SP)

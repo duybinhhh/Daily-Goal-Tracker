@@ -4,6 +4,22 @@
 
 # Changelog
 
+## [Sprint 8] - 2026-06-10 (Trend Comparison - Realtime Daily Summary)
+### Đã thêm
+* **Trend Comparison trên Stats Dashboard:** Thêm widget so sánh xu hướng hiệu suất thói quen theo ngày, tuần và tháng ngay sau Bento Grid.
+* **API thống kê xu hướng:** Thêm endpoint `GET /api/stats/trend` hỗ trợ `period=day|week|month` và `goalId` tùy chọn để lọc theo từng mục tiêu.
+* **Chế độ xem tất cả mục tiêu:** Thêm 2 chế độ hiển thị khi chọn `Tất cả mục tiêu`: `Tổng thể` để xem biểu đồ chung và `Chi tiết` để xem từng mục tiêu theo hàng ngang.
+* **Tổng kết theo ngày:** Thêm bảng `Hôm qua` và `Hôm nay` hiển thị số mục tiêu đã đạt target và chưa đạt target.
+* **Gợi ý cải thiện theo ngày:** Thêm khối gợi ý dựa trên các mục tiêu hôm qua/hôm nay chưa đạt target.
+
+### Cải tiến
+* **Dữ liệu realtime và thực tế hơn:** API đọc trực tiếp từ `GoalLog`, chống cache bằng `Cache-Control: no-store` và tính toán lại theo dữ liệu hiện tại.
+* **So sánh tuần theo tuần lịch:** Chế độ tuần dùng tuần lịch Monday-Sunday và so sánh với tuần lịch liền trước, không còn dùng cách lấy hôm nay trừ 7 ngày.
+* **Logic bảng Hôm qua/Hôm nay chính xác hơn:** Bảng ngày không còn tính goal là hoàn thành chỉ vì có ít nhất 1 log; hiện tại goal chỉ được tính `Đã đạt` khi số log trong ngày lớn hơn hoặc bằng `target_count`.
+* **Hiển thị tiếng Việt có dấu:** Chuẩn hóa text trong widget sang tiếng Việt, bao gồm `Tổng thể`, `Chi tiết`, `Kỳ trước`, `Hiện tại`, `Đã đạt`, `Chưa đạt`.
+* **UX khi lọc mục tiêu:** Khi chọn một mục tiêu cụ thể, widget hiển thị rõ tên mục tiêu đang lọc; khi xem tất cả mục tiêu, widget ghi rõ đang xem tổng thể hay chi tiết.
+* **Thứ tự so sánh trực quan hơn:** `Kỳ trước` hiển thị bên trái, `Hiện tại` hiển thị bên phải trong biểu đồ và thẻ chi tiết.
+
 ## [Sprint 8] - 2026-06-10 (Trend Comparison & Goal Comparison)
 ### Thêm mới & Cải tiến (Added & Improved)
 * **Widget Trend Comparison (So sánh xu hướng):** Thêm component `TrendComparison` trong `src/components/stats/` sử dụng `recharts` để vẽ biểu đồ cột đôi (Grouped Bar Chart). Tích hợp trực tiếp vào màn hình `Stats Dashboard` ngay bên dưới khối Bento Grid.

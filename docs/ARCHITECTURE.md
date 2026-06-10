@@ -159,6 +159,11 @@ model HabitGroupMember {
     *   Biểu đồ xu hiện năng nhóm tiến độ 70 ngày gần nhất thành 10 tuần, hiển thị cột CSS trực quan với hiệu ứng hover tooltip.
     *   Sử dụng CSS `conic-gradient` tạo biểu đồ tròn Donut động biểu diễn tỉ lệ phân loại thói quen của người dùng.
     *   Các hành động như tải file báo cáo CSV (`Export CSV`) và làm mới nhanh dữ liệu được tích hợp trực tiếp trên thanh tiêu đề sticky chuẩn hóa.
+    *   Widget `TrendComparison` trong `src/components/stats/TrendComparison.tsx` gọi API `GET /api/stats/trend` để lấy dữ liệu so sánh xu hướng realtime theo `period=day|week|month` và `goalId` tùy chọn.
+    *   Backend xử lý logic xu hướng trong `src/controllers/statsController.ts`, đọc trực tiếp từ `GoalLog`, loại trùng log bằng khóa `goal_id + completed_at + note`, chuẩn hóa ngày theo timezone của user và trả `Cache-Control: no-store`.
+    *   Chế độ tuần dùng tuần lịch Monday-Sunday. Chế độ tháng nhóm dữ liệu theo các cụm ngày trong tháng để hiển thị biểu đồ cột đôi bằng Recharts.
+    *   `dailySummary` cho `Hôm qua` và `Hôm nay` không chỉ kiểm tra có log hay chưa; mỗi goal chỉ được tính là `Đã đạt` khi số log trong ngày lớn hơn hoặc bằng `target_count`.
+    *   Khi không lọc `goalId`, response trả thêm `goalBreakdown` để frontend có thể hiển thị chế độ `Chi tiết` theo từng mục tiêu ở dạng hàng ngang.
 5.  **Trục thời gian hoạt động (Activity Timeline)**:
     *   Trang Timeline (`TimelinePage.tsx`) tự động tính toán ngày bắt đầu và kết thúc của tháng đang chọn để gọi API `GET /api/stats/history?from=&to=` lấy toàn bộ lịch sử log.
     *   Calendar Grid hiển thị các chấm xanh nếu ngày đó có ít nhất 1 log, và hiển thị ngôi sao lấp lánh nếu có từ 3 logs trở lên (cột mốc đột phá).
