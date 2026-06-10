@@ -5,7 +5,9 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 import { useGoals } from "../hooks/useGoals";
 import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
+import { usePomodoroStore } from "../store/pomodoroStore";
 import { GoalCard } from "../components/GoalCard";
+import FriendsTodayCard from "../components/dashboard/FriendsTodayCard";
 import { useTranslation } from "../i18n";
 
 /* ── Shared section label style ── */
@@ -434,6 +436,8 @@ export const DashboardPage: React.FC = () => {
     ...goals.map((g) => g.streak?.current_streak || 0)
   );
   const totalCompleted = goals.reduce((sum, g) => sum + g.current_count, 0);
+  const { getTodayCompletedSessions } = usePomodoroStore();
+  const pomodoroToday = getTodayCompletedSessions();
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -565,7 +569,7 @@ export const DashboardPage: React.FC = () => {
 
         {/* ── Bento Stats Row ── */}
         <div
-          className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
         >
           {/* Today's Progress */}
           <div className="glass-card glass-card-glow stat-card">
@@ -753,6 +757,56 @@ export const DashboardPage: React.FC = () => {
                 {doneTodayCount >= totalActCount && totalActCount > 0
                   ? t("dashboard.eliteMilestone")
                   : t("dashboard.totalLoggedDesc")}
+              </p>
+            </div>
+          </div>
+
+          {/* Pomodoro Stats */}
+          <div className="glass-card glass-card-glow stat-card" style={{ background: "linear-gradient(135deg, rgba(255, 180, 171, 0.05), rgba(192, 193, 255, 0.05))" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--color-on-surface-variant)",
+                }}
+              >
+                {t("pomodoro.timer")}
+              </span>
+              <span
+                className="material-symbols-outlined ms-filled"
+                style={{ fontSize: "20px", color: "var(--color-error)" }}
+              >
+                timer
+              </span>
+            </div>
+            <div>
+              <span
+                style={{
+                  fontSize: "32px",
+                  fontWeight: 800,
+                  letterSpacing: "-0.04em",
+                  color: "var(--color-on-surface)",
+                }}
+              >
+                {pomodoroToday} 🍅
+              </span>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--color-on-surface-variant)",
+                  marginTop: "4px",
+                }}
+              >
+                {t("pomodoro.todayCompleted", { count: pomodoroToday })}
               </p>
             </div>
           </div>
@@ -1063,6 +1117,7 @@ export const DashboardPage: React.FC = () => {
               totalActCount={totalActCount}
               goals={goals}
             />
+            <FriendsTodayCard />
           </div>
         </div>
       </main>

@@ -9,6 +9,9 @@ import {
   deleteGoal,
   completeGoal,
   deleteLog,
+  bulkArchiveGoals,
+  bulkPauseGoals,
+  bulkDeleteGoals,
 } from "../controllers/goalController";
 
 const router = Router();
@@ -18,6 +21,9 @@ router.use(authMiddleware as any);
 
 router.get("/", getGoals);
 router.post("/", createGoal);
+router.put("/bulk/archive", bulkArchiveGoals);
+router.put("/bulk/pause", bulkPauseGoals);
+router.post("/bulk/delete", bulkDeleteGoals);
 router.get("/:id", getGoalById);
 router.put("/:id", updateGoal);
 router.delete("/:id", deleteGoal);

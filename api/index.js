@@ -24,7 +24,8 @@ function mapUser(u) {
   return {
     ...u,
     created_at: u.created_at.toISOString(),
-    updated_at: u.updated_at.toISOString()
+    updated_at: u.updated_at.toISOString(),
+    show_activity_in_feed: u.show_activity_in_feed ?? true
   };
 }
 function mapGoal(g) {
@@ -70,6 +71,20 @@ function mapFreeze(f) {
     goal_id: f.goal_id,
     frozen_date: f.frozen_date,
     created_at: f.created_at.toISOString()
+  };
+}
+function mapGroupMessage(m) {
+  if (!m) return null;
+  return {
+    ...m,
+    created_at: m.created_at.toISOString(),
+    updated_at: m.updated_at.toISOString(),
+    sender: m.sender ? {
+      id: m.sender.id,
+      name: m.sender.name,
+      avatarInitials: m.sender.name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2)
+    } : null,
+    reactions: m.reactions || []
   };
 }
 var PrismaDB = class {
@@ -120,6 +135,116 @@ var PrismaDB = class {
         return mapUser(deleted);
       }
     };
+    this.friends = {
+      search: async (currentUserId, query) => {
+        const users = await prisma.user.findMany({
+          where: {
+            OR: [
+              { name: { contains: query, mode: "insensitive" } },
+              { email: { contains: query, mode: "insensitive" } }
+            ],
+            id: { not: currentUserId }
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            level: true,
+            total_xp: true,
+            followers: {
+              where: { follower_id: currentUserId }
+            },
+            goals: {
+              select: {
+                streaks: {
+                  select: {
+                    current_streak: true,
+                    longest_streak: true
+                  }
+                }
+              }
+            }
+          },
+          take: 20
+        });
+        return users.map((u) => {
+          let maxStreak = 0;
+          u.goals.forEach((g) => {
+            g.streaks.forEach((s) => {
+              if (s.current_streak > maxStreak) maxStreak = s.current_streak;
+            });
+          });
+          return {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            level: u.level,
+            streak: maxStreak,
+            isFollowing: u.followers.length > 0,
+            avatarInitials: u.name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2)
+          };
+        });
+      },
+      follow: async (followerId, followingId) => {
+        if (followerId === followingId) throw new Error("You cannot follow yourself.");
+        return await prisma.follow.upsert({
+          where: {
+            follower_id_following_id: {
+              follower_id: followerId,
+              following_id: followingId
+            }
+          },
+          update: {},
+          create: {
+            follower_id: followerId,
+            following_id: followingId
+          }
+        });
+      },
+      unfollow: async (followerId, followingId) => {
+        return await prisma.follow.deleteMany({
+          where: {
+            follower_id: followerId,
+            following_id: followingId
+          }
+        });
+      },
+      getFeed: async (userId) => {
+        const following = await prisma.follow.findMany({
+          where: { follower_id: userId },
+          select: { following_id: true }
+        });
+        const followingIds = following.map((f) => f.following_id);
+        const logs = await prisma.goalLog.findMany({
+          where: {
+            user_id: { in: followingIds },
+            user: { show_activity_in_feed: true }
+          },
+          include: {
+            user: true,
+            goal: true
+          },
+          orderBy: { completed_at: "desc" },
+          take: 5
+        });
+        return logs.map((l) => ({
+          id: l.id,
+          userId: l.user_id,
+          userName: l.user.name,
+          goalTitle: l.goal.title,
+          type: "checkin",
+          createdAt: l.completed_at.toISOString(),
+          avatarInitials: l.user.name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2)
+        }));
+      },
+      getStats: async (userId) => {
+        const [followingCount, followersCount] = await Promise.all([
+          prisma.follow.count({ where: { follower_id: userId } }),
+          prisma.follow.count({ where: { following_id: userId } })
+        ]);
+        return { followingCount, followersCount };
+      }
+    };
     // Goals CRUD Operations
     this.goals = {
       findMany: async (where) => {
@@ -146,6 +271,7 @@ var PrismaDB = class {
             frequency: data.frequency,
             due_date: data.due_date ? new Date(data.due_date) : null,
             reminder_time: data.reminder_time || null,
+            group_id: data.group_id || null,
             current_count: 0,
             status: "active"
           }
@@ -156,6 +282,9 @@ var PrismaDB = class {
         const prismaUpdate = { ...updateData };
         if (updateData.due_date !== void 0) {
           prismaUpdate.due_date = updateData.due_date ? new Date(updateData.due_date) : null;
+        }
+        if (updateData.archived_at !== void 0) {
+          prismaUpdate.archived_at = updateData.archived_at ? new Date(updateData.archived_at) : null;
         }
         if (updateData.reminder_time !== void 0) {
           prismaUpdate.reminder_time = updateData.reminder_time || null;
@@ -372,6 +501,20 @@ var PrismaDB = class {
         });
         return group;
       },
+      findByInviteCode: async (inviteCode) => {
+        const group = await prisma.habitGroup.findUnique({
+          where: { invite_code: inviteCode },
+          include: {
+            creator: true,
+            members: {
+              include: {
+                user: true
+              }
+            }
+          }
+        });
+        return group;
+      },
       create: async (data) => {
         const created = await prisma.habitGroup.create({
           data: {
@@ -381,10 +524,18 @@ var PrismaDB = class {
             goal_title: data.goal_title,
             goal_category: data.goal_category,
             goal_target_count: data.goal_target_count,
-            goal_frequency: data.goal_frequency
+            goal_frequency: data.goal_frequency,
+            max_members: data.max_members ?? 20
           }
         });
         return created;
+      },
+      update: async (id, data) => {
+        const updated = await prisma.habitGroup.update({
+          where: { id },
+          data
+        });
+        return updated;
       },
       delete: async (id) => {
         const deleted = await prisma.habitGroup.delete({ where: { id } });
@@ -423,6 +574,115 @@ var PrismaDB = class {
           }
         });
         return deleted;
+      }
+    };
+    this.groupMessages = {
+      findMany: async (where, take = 30) => {
+        const messages = await prisma.groupMessage.findMany({
+          where: { group_id: where.group_id },
+          include: {
+            sender: true,
+            reactions: {
+              include: {
+                user: true
+              }
+            }
+          },
+          orderBy: { created_at: "desc" },
+          take
+        });
+        return messages.reverse().map(mapGroupMessage);
+      },
+      findUnique: async (id) => {
+        const msg = await prisma.groupMessage.findUnique({
+          where: { id },
+          include: {
+            sender: true,
+            reactions: true
+          }
+        });
+        return mapGroupMessage(msg);
+      },
+      create: async (data) => {
+        const created = await prisma.groupMessage.create({
+          data: {
+            group_id: data.group_id,
+            sender_id: data.sender_id,
+            content: data.content
+          },
+          include: {
+            sender: true,
+            reactions: true
+          }
+        });
+        return mapGroupMessage(created);
+      },
+      delete: async (id) => {
+        return await prisma.groupMessage.delete({ where: { id } });
+      }
+    };
+    this.messageReactions = {
+      findUnique: async (where) => {
+        return await prisma.messageReaction.findUnique({
+          where: {
+            message_id_user_id_emoji: {
+              message_id: where.message_id,
+              user_id: where.user_id,
+              emoji: where.emoji
+            }
+          }
+        });
+      },
+      create: async (data) => {
+        return await prisma.messageReaction.create({
+          data: {
+            message_id: data.message_id,
+            user_id: data.user_id,
+            emoji: data.emoji
+          }
+        });
+      },
+      delete: async (id) => {
+        return await prisma.messageReaction.delete({ where: { id } });
+      },
+      toggle: async (message_id, user_id, emoji) => {
+        const existing = await prisma.messageReaction.findUnique({
+          where: {
+            message_id_user_id_emoji: {
+              message_id,
+              user_id,
+              emoji
+            }
+          }
+        });
+        if (existing) {
+          await prisma.messageReaction.delete({ where: { id: existing.id } });
+          return { action: "removed" };
+        } else {
+          await prisma.messageReaction.create({
+            data: { message_id, user_id, emoji }
+          });
+          return { action: "added" };
+        }
+      }
+    };
+    this.groupChatNotificationLogs = {
+      countToday: async (user_id) => {
+        const today = /* @__PURE__ */ new Date();
+        today.setHours(0, 0, 0, 0);
+        return await prisma.groupChatNotificationLog.count({
+          where: {
+            user_id,
+            created_at: {
+              gte: today
+            }
+          }
+        });
+      },
+      create: async (user_id, group_id) => {
+        return await prisma.groupChatNotificationLog.create({
+          data: { user_id, group_id }
+        });
       }
     };
   }
@@ -776,8 +1036,96 @@ router.put("/push-subscription", authMiddleware, updatePushSubscription);
 router.get("/vapid-public-key", getVapidPublicKey);
 var auth_default = router;
 
-// src/routes/goals.ts
+// src/routes/friends.ts
 import { Router as Router2 } from "express";
+
+// src/controllers/friendsController.ts
+var searchUsers = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", 401);
+    const query = req.query.q;
+    if (!query || query.trim().length === 0) {
+      return res.status(200).json({ users: [] });
+    }
+    const users = await db.friends.search(userId, query);
+    res.status(200).json({ users });
+  } catch (error) {
+    next(error);
+  }
+};
+var followUser = async (req, res, next) => {
+  try {
+    const followerId = req.user?.id;
+    if (!followerId) throw new AppError("Unauthorized", 401);
+    const { userId: followingId } = req.body;
+    if (!followingId) throw new AppError("Following User ID is required", 400);
+    await db.friends.follow(followerId, followingId);
+    res.status(200).json({ success: true, message: "Successfully followed user." });
+  } catch (error) {
+    next(error);
+  }
+};
+var unfollowUser = async (req, res, next) => {
+  try {
+    const followerId = req.user?.id;
+    if (!followerId) throw new AppError("Unauthorized", 401);
+    const { userId: followingId } = req.body;
+    if (!followingId) throw new AppError("Following User ID is required", 400);
+    await db.friends.unfollow(followerId, followingId);
+    res.status(200).json({ success: true, message: "Successfully unfollowed user." });
+  } catch (error) {
+    next(error);
+  }
+};
+var getActivityFeed = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", 401);
+    const activities = await db.friends.getFeed(userId);
+    res.status(200).json({ activities });
+  } catch (error) {
+    next(error);
+  }
+};
+var getFollowStats = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", 401);
+    const stats = await db.friends.getStats(userId);
+    res.status(200).json({ ...stats });
+  } catch (error) {
+    next(error);
+  }
+};
+var updatePrivacySetting = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", 401);
+    const { showActivityInFeed } = req.body;
+    if (showActivityInFeed === void 0) {
+      throw new AppError("showActivityInFeed is required", 400);
+    }
+    await db.users.update(userId, { show_activity_in_feed: !!showActivityInFeed });
+    res.status(200).json({ success: true, message: "Privacy setting updated." });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// src/routes/friends.ts
+var router2 = Router2();
+router2.use(authMiddleware);
+router2.get("/search", searchUsers);
+router2.post("/follow", followUser);
+router2.delete("/follow", unfollowUser);
+router2.get("/feed", getActivityFeed);
+router2.get("/stats", getFollowStats);
+router2.patch("/privacy", updatePrivacySetting);
+var friends_default = router2;
+
+// src/routes/goals.ts
+import { Router as Router3 } from "express";
 
 // src/controllers/goalController.ts
 var getLocalDateParts = (date, timezone) => {
@@ -849,7 +1197,7 @@ var syncAndResetGoalProgress = async (goal, timezone) => {
   });
   const correctCount = currentCycleLogs.length;
   const isCompleted = correctCount >= goal.target_count;
-  const correctStatus = isCompleted ? "completed" : "active";
+  const correctStatus = goal.status === "paused" ? "paused" : isCompleted ? "completed" : "active";
   if (goal.current_count !== correctCount || goal.status !== correctStatus) {
     const updated = await db.goals.update(goal.id, {
       current_count: correctCount,
@@ -959,13 +1307,17 @@ var updateGoal = async (req, res, next) => {
     if (!goal || goal.user_id !== userId) {
       throw new AppError("Goal not found or access denied.", 404);
     }
-    const { title, description, category, target_count, current_count, frequency, status, due_date, reminder_time } = req.body;
+    const { title, description, category, target_count, current_count, frequency, status, is_archived, due_date, reminder_time } = req.body;
     const updates = {};
     if (title !== void 0) updates.title = title;
     if (description !== void 0) updates.description = description;
     if (category !== void 0) updates.category = category;
     if (frequency !== void 0) updates.frequency = frequency;
     if (status !== void 0) updates.status = status;
+    if (is_archived !== void 0) {
+      updates.is_archived = is_archived;
+      updates.archived_at = is_archived ? (/* @__PURE__ */ new Date()).toISOString() : null;
+    }
     if (due_date !== void 0) updates.due_date = due_date;
     if (reminder_time !== void 0) {
       if (reminder_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(reminder_time)) {
@@ -1241,21 +1593,70 @@ var deleteLog = async (req, res, next) => {
     next(error);
   }
 };
+var bulkArchiveGoals = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { goalIds } = req.body;
+    if (!Array.isArray(goalIds)) throw new AppError("Invalid payload.", 400);
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const ownedIds = new Set(userGoals.map((g) => g.id));
+    const validIds = goalIds.filter((id) => ownedIds.has(id));
+    const archivedAt = (/* @__PURE__ */ new Date()).toISOString();
+    await Promise.all(validIds.map((id) => db.goals.update(id, { is_archived: true, archived_at: archivedAt })));
+    res.status(200).json({ success: true, message: "Goals archived successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
+var bulkPauseGoals = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { goalIds } = req.body;
+    if (!Array.isArray(goalIds)) throw new AppError("Invalid payload.", 400);
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const ownedIds = new Set(userGoals.map((g) => g.id));
+    const validIds = goalIds.filter((id) => ownedIds.has(id));
+    await Promise.all(validIds.map((id) => db.goals.update(id, { status: "paused" })));
+    res.status(200).json({ success: true, message: "Goals paused successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
+var bulkDeleteGoals = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { goalIds } = req.body;
+    if (!Array.isArray(goalIds)) throw new AppError("Invalid payload.", 400);
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const ownedIds = new Set(userGoals.map((g) => g.id));
+    const validIds = goalIds.filter((id) => ownedIds.has(id));
+    await Promise.all(validIds.map((id) => db.goals.delete(id)));
+    res.status(200).json({ success: true, message: "Goals deleted successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // src/routes/goals.ts
-var router2 = Router2();
-router2.use(authMiddleware);
-router2.get("/", getGoals);
-router2.post("/", createGoal);
-router2.get("/:id", getGoalById);
-router2.put("/:id", updateGoal);
-router2.delete("/:id", deleteGoal);
-router2.post("/:id/complete", completeGoal);
-router2.delete("/logs/:logId", deleteLog);
-var goals_default = router2;
+var router3 = Router3();
+router3.use(authMiddleware);
+router3.get("/", getGoals);
+router3.post("/", createGoal);
+router3.put("/bulk/archive", bulkArchiveGoals);
+router3.put("/bulk/pause", bulkPauseGoals);
+router3.post("/bulk/delete", bulkDeleteGoals);
+router3.get("/:id", getGoalById);
+router3.put("/:id", updateGoal);
+router3.delete("/:id", deleteGoal);
+router3.post("/:id/complete", completeGoal);
+router3.delete("/logs/:logId", deleteLog);
+var goals_default = router3;
 
 // src/routes/stats.ts
-import { Router as Router3 } from "express";
+import { Router as Router4 } from "express";
 
 // src/controllers/statsController.ts
 function getLogDedupeKey(log) {
@@ -1265,6 +1666,27 @@ function getLogDedupeKey(log) {
     (log.note || "").trim()
   ].join("|");
 }
+var getLocalDateParts2 = (date, timezone) => {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parseInt(parts.find((p) => p.type === "year").value, 10);
+    const month = parseInt(parts.find((p) => p.type === "month").value, 10) - 1;
+    const day = parseInt(parts.find((p) => p.type === "day").value, 10);
+    return { year, month, day };
+  } catch (e) {
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth(),
+      day: date.getUTCDate()
+    };
+  }
+};
 var getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -1308,7 +1730,7 @@ var getHistory = async (req, res, next) => {
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
     const { from, to } = req.query;
-    const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1e3);
+    const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3);
     const toDate = to ? new Date(to) : /* @__PURE__ */ new Date();
     fromDate.setHours(0, 0, 0, 0);
     toDate.setHours(23, 59, 59, 999);
@@ -1358,16 +1780,257 @@ var getHistory = async (req, res, next) => {
     next(error);
   }
 };
+var getTrendComparison = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const period = String(req.query.period || "");
+    const goalId = typeof req.query.goalId === "string" && req.query.goalId.trim() ? req.query.goalId.trim() : void 0;
+    if (!["day", "week", "month"].includes(period)) {
+      throw new AppError("Invalid period. Must be day, week, or month.", 400);
+    }
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const rawUserGoals = await db.goals.findMany({ user_id: userId });
+    const userGoals = rawUserGoals.filter((g) => !g.is_archived);
+    const selectedGoal = goalId ? userGoals.find((goal) => goal.id === goalId) : null;
+    if (goalId && !selectedGoal) {
+      throw new AppError("Goal not found.", 404);
+    }
+    const allLogs = await db.logs.findMany({ user_id: userId });
+    const seenLogIds = /* @__PURE__ */ new Set();
+    const seenLogKeys = /* @__PURE__ */ new Set();
+    const uniqueAllLogs = allLogs.filter((log) => {
+      const key = getLogDedupeKey(log);
+      if (seenLogIds.has(log.id) || seenLogKeys.has(key)) {
+        return false;
+      }
+      seenLogIds.add(log.id);
+      seenLogKeys.add(key);
+      return true;
+    });
+    const uniqueLogs = uniqueAllLogs.filter((log) => !goalId || log.goal_id === goalId);
+    const formatDateStr = (year, month, day) => {
+      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    };
+    const getDateKey = (date) => {
+      const parts = getLocalDateParts2(date, timezone);
+      return formatDateStr(parts.year, parts.month, parts.day);
+    };
+    const addDays = (date, days) => {
+      const next2 = new Date(date);
+      next2.setDate(next2.getDate() + days);
+      return next2;
+    };
+    const sumByDateKeys = (dateKeys) => {
+      const dateSet = new Set(dateKeys);
+      return uniqueLogs.filter((log) => dateSet.has(getDateKey(new Date(log.completed_at)))).length;
+    };
+    const sumGoalByDateKeys = (targetGoalId, dateKeys) => {
+      const dateSet = new Set(dateKeys);
+      return uniqueAllLogs.filter((log) => {
+        return log.goal_id === targetGoalId && dateSet.has(getDateKey(new Date(log.completed_at)));
+      }).length;
+    };
+    const getGoalDateProgress = (targetGoalId, dateKey) => {
+      return uniqueAllLogs.filter((log) => {
+        return log.goal_id === targetGoalId && getDateKey(new Date(log.completed_at)) === dateKey;
+      }).length;
+    };
+    const nowParts = getLocalDateParts2(/* @__PURE__ */ new Date(), timezone);
+    const localToday = new Date(nowParts.year, nowParts.month, nowParts.day);
+    const todayStr = formatDateStr(nowParts.year, nowParts.month, nowParts.day);
+    const yesterdayDate = addDays(localToday, -1);
+    const yesterdayStr = formatDateStr(yesterdayDate.getFullYear(), yesterdayDate.getMonth(), yesterdayDate.getDate());
+    let currentTotal = 0;
+    let previousTotal = 0;
+    let currentPeriodDateKeys = [];
+    let previousPeriodDateKeys = [];
+    let data = [];
+    let currentRangeLabel = "";
+    let previousRangeLabel = "";
+    if (period === "day") {
+      currentPeriodDateKeys = [todayStr];
+      previousPeriodDateKeys = [yesterdayStr];
+      currentTotal = sumByDateKeys([todayStr]);
+      previousTotal = sumByDateKeys([yesterdayStr]);
+      currentRangeLabel = todayStr;
+      previousRangeLabel = yesterdayStr;
+      data = [
+        {
+          label: "Today",
+          current: currentTotal,
+          previous: previousTotal,
+          currentPeriodLabel: todayStr,
+          previousPeriodLabel: yesterdayStr
+        }
+      ];
+    }
+    if (period === "week") {
+      const dayOfWeek = localToday.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const localMondayThisWeek = new Date(localToday);
+      localMondayThisWeek.setDate(localToday.getDate() + diffToMonday);
+      const thisWeekDays = [];
+      const lastWeekDays = [];
+      for (let i = 0; i < 7; i++) {
+        const dThis = new Date(localMondayThisWeek);
+        dThis.setDate(localMondayThisWeek.getDate() + i);
+        thisWeekDays.push(formatDateStr(dThis.getFullYear(), dThis.getMonth(), dThis.getDate()));
+        const dLast = new Date(localMondayThisWeek);
+        dLast.setDate(localMondayThisWeek.getDate() - 7 + i);
+        lastWeekDays.push(formatDateStr(dLast.getFullYear(), dLast.getMonth(), dLast.getDate()));
+      }
+      const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      currentPeriodDateKeys = thisWeekDays;
+      previousPeriodDateKeys = lastWeekDays;
+      currentRangeLabel = `${thisWeekDays[0]} - ${thisWeekDays[6]}`;
+      previousRangeLabel = `${lastWeekDays[0]} - ${lastWeekDays[6]}`;
+      data = labels.map((label, index) => {
+        const current = sumByDateKeys([thisWeekDays[index]]);
+        const previous = sumByDateKeys([lastWeekDays[index]]);
+        currentTotal += current;
+        previousTotal += previous;
+        return {
+          label,
+          current,
+          previous,
+          currentPeriodLabel: thisWeekDays[index],
+          previousPeriodLabel: lastWeekDays[index]
+        };
+      });
+    }
+    if (period === "month") {
+      const currentYear = nowParts.year;
+      const currentMonth = nowParts.month;
+      const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+      const prevYear = prevMonthDate.getFullYear();
+      const prevMonth = prevMonthDate.getMonth();
+      const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const daysInPreviousMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
+      const bucketStarts = [1, 8, 15, 22, 29].filter((day) => day <= Math.max(daysInCurrentMonth, daysInPreviousMonth));
+      currentRangeLabel = formatDateStr(currentYear, currentMonth, 1) + " - " + formatDateStr(currentYear, currentMonth, daysInCurrentMonth);
+      previousRangeLabel = formatDateStr(prevYear, prevMonth, 1) + " - " + formatDateStr(prevYear, prevMonth, daysInPreviousMonth);
+      currentPeriodDateKeys = Array.from({ length: daysInCurrentMonth }, (_, index) => formatDateStr(currentYear, currentMonth, index + 1));
+      previousPeriodDateKeys = Array.from({ length: daysInPreviousMonth }, (_, index) => formatDateStr(prevYear, prevMonth, index + 1));
+      data = bucketStarts.map((startDay, index) => {
+        const endDay = Math.min(startDay + 6, Math.max(daysInCurrentMonth, daysInPreviousMonth));
+        const currentKeys = [];
+        const previousKeys = [];
+        for (let day = startDay; day <= endDay; day++) {
+          if (day <= daysInCurrentMonth) {
+            currentKeys.push(formatDateStr(currentYear, currentMonth, day));
+          }
+          if (day <= daysInPreviousMonth) {
+            previousKeys.push(formatDateStr(prevYear, prevMonth, day));
+          }
+        }
+        const current = sumByDateKeys(currentKeys);
+        const previous = sumByDateKeys(previousKeys);
+        currentTotal += current;
+        previousTotal += previous;
+        return {
+          label: `W${index + 1}`,
+          current,
+          previous,
+          currentPeriodLabel: `${currentKeys[0] || ""} - ${currentKeys[currentKeys.length - 1] || ""}`,
+          previousPeriodLabel: `${previousKeys[0] || ""} - ${previousKeys[previousKeys.length - 1] || ""}`
+        };
+      });
+    }
+    const getChangePercent = (current, previous) => {
+      if (previous > 0) {
+        return Math.round((current - previous) / previous * 100);
+      }
+      return current > 0 ? 100 : 0;
+    };
+    const changePercent = getChangePercent(currentTotal, previousTotal);
+    const summaryGoals = (goalId && selectedGoal ? [selectedGoal] : userGoals).filter((goal) => goal.status !== "paused");
+    const todayCheckedIn = [];
+    const todayNotCheckedIn = [];
+    const yesterdayCheckedIn = [];
+    const yesterdayNotCheckedIn = [];
+    summaryGoals.forEach((goal) => {
+      const targetCount = Math.max(1, Number(goal.target_count) || 1);
+      const todayProgress = getGoalDateProgress(goal.id, todayStr);
+      const yesterdayProgress = getGoalDateProgress(goal.id, yesterdayStr);
+      const hasTodayCompletedTarget = todayProgress >= targetCount;
+      const hasYesterdayCompletedTarget = yesterdayProgress >= targetCount;
+      if (hasTodayCompletedTarget) {
+        todayCheckedIn.push(goal.title);
+      } else {
+        todayNotCheckedIn.push(goal.title);
+      }
+      if (hasYesterdayCompletedTarget) {
+        yesterdayCheckedIn.push(goal.title);
+      } else {
+        yesterdayNotCheckedIn.push(goal.title);
+      }
+    });
+    const goalBreakdown = summaryGoals.map((goal) => {
+      const current = sumGoalByDateKeys(goal.id, currentPeriodDateKeys);
+      const previous = sumGoalByDateKeys(goal.id, previousPeriodDateKeys);
+      const targetCount = Math.max(1, Number(goal.target_count) || 1);
+      const todayCheckedIn2 = getGoalDateProgress(goal.id, todayStr) >= targetCount;
+      const yesterdayCheckedIn2 = getGoalDateProgress(goal.id, yesterdayStr) >= targetCount;
+      return {
+        goalId: goal.id,
+        title: goal.title,
+        category: goal.category,
+        status: goal.status,
+        current,
+        previous,
+        changePercent: getChangePercent(current, previous),
+        todayCheckedIn: todayCheckedIn2,
+        yesterdayCheckedIn: yesterdayCheckedIn2
+      };
+    });
+    res.setHeader("Cache-Control", "no-store");
+    res.status(200).json({
+      success: true,
+      period,
+      goalId: goalId || void 0,
+      goalTitle: selectedGoal?.title,
+      generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      currentRangeLabel,
+      previousRangeLabel,
+      currentTotal,
+      previousTotal,
+      changePercent,
+      data,
+      goalBreakdown,
+      dailySummary: {
+        today: {
+          checkedInCount: todayCheckedIn.length,
+          notCheckedInCount: todayNotCheckedIn.length,
+          checkedInGoals: todayCheckedIn,
+          notCheckedInGoals: todayNotCheckedIn,
+          date: todayStr
+        },
+        yesterday: {
+          checkedInCount: yesterdayCheckedIn.length,
+          notCheckedInCount: yesterdayNotCheckedIn.length,
+          checkedInGoals: yesterdayCheckedIn,
+          notCheckedInGoals: yesterdayNotCheckedIn,
+          date: yesterdayStr
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // src/routes/stats.ts
-var router3 = Router3();
-router3.use(authMiddleware);
-router3.get("/dashboard", getDashboardStats);
-router3.get("/history", getHistory);
-var stats_default = router3;
+var router4 = Router4();
+router4.use(authMiddleware);
+router4.get("/dashboard", getDashboardStats);
+router4.get("/history", getHistory);
+router4.get("/trend", getTrendComparison);
+var stats_default = router4;
 
 // src/routes/groups.ts
-import { Router as Router4 } from "express";
+import { Router as Router5 } from "express";
 
 // src/controllers/groupController.ts
 var getGroups = async (req, res, next) => {
@@ -1385,6 +2048,9 @@ var getGroups = async (req, res, next) => {
       goal_target_count: group.goal_target_count,
       goal_frequency: group.goal_frequency,
       created_at: group.created_at,
+      invite_code: group.invite_code,
+      invite_expires_at: group.invite_expires_at,
+      max_members: group.max_members,
       memberCount: group.members.length,
       isJoined: group.members.some((m) => m.user_id === userId)
     }));
@@ -1428,9 +2094,9 @@ var createGroup = async (req, res, next) => {
       category: goal_category,
       target_count: targetCount,
       frequency: goal_frequency || "daily",
-      due_date: null
+      due_date: null,
+      group_id: group.id
     });
-    await db.goals.update(goal.id, { group_id: group.id });
     await db.streaks.create({
       user_id: userId,
       goal_id: goal.id
@@ -1499,10 +2165,151 @@ var getGroupById = async (req, res, next) => {
         goal_category: group.goal_category,
         goal_target_count: group.goal_target_count,
         goal_frequency: group.goal_frequency,
+        invite_code: group.invite_code,
+        invite_expires_at: group.invite_expires_at,
+        max_members: group.max_members,
         created_at: group.created_at,
         isJoined,
         members: membersProgress
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+function generateInviteCode(length = 8) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+var createInviteCode = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+    if (group.creator_id !== userId) {
+      throw new AppError("Only the group creator can generate invite links.", 403);
+    }
+    if (group.members.length >= group.max_members) {
+      throw new AppError(`Nh\xF3m \u0111\xE3 \u0111\u1EE7 ${group.max_members} th\xE0nh vi\xEAn, kh\xF4ng th\u1EC3 t\u1EA1o link m\u1EDDi.`, 400);
+    }
+    let inviteCode = generateInviteCode();
+    let isUnique = false;
+    let attempts = 0;
+    while (!isUnique && attempts < 10) {
+      const existing = await db.groups.findByInviteCode(inviteCode);
+      if (!existing) {
+        isUnique = true;
+      } else {
+        inviteCode = generateInviteCode();
+        attempts++;
+      }
+    }
+    if (!isUnique) {
+      throw new AppError("Could not generate a unique invite code. Please try again.", 500);
+    }
+    const expiresAt = /* @__PURE__ */ new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    await db.groups.update(id, {
+      invite_code: inviteCode,
+      invite_expires_at: expiresAt
+    });
+    res.status(200).json({
+      success: true,
+      inviteCode,
+      expiresAt: expiresAt.toISOString()
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var getGroupByInviteCode = async (req, res, next) => {
+  try {
+    const { inviteCode } = req.params;
+    const group = await db.groups.findByInviteCode(inviteCode);
+    if (!group) {
+      throw new AppError("Link m\u1EDDi kh\xF4ng h\u1EE3p l\u1EC7.", 404);
+    }
+    const now = /* @__PURE__ */ new Date();
+    if (group.invite_expires_at && new Date(group.invite_expires_at) < now) {
+      return res.status(200).json({
+        success: true,
+        status: "expired",
+        message: "Link m\u1EDDi \u0111\xE3 h\u1EBFt h\u1EA1n."
+      });
+    }
+    if (group.members.length >= group.max_members) {
+      return res.status(200).json({
+        success: true,
+        status: "full",
+        message: "Nh\xF3m \u0111\xE3 \u0111\u1EA7y."
+      });
+    }
+    res.status(200).json({
+      success: true,
+      status: "valid",
+      group: {
+        id: group.id,
+        name: group.name,
+        memberCount: group.members.length,
+        maxMembers: group.max_members
+      },
+      expiresAt: group.invite_expires_at
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var joinGroupByInviteCode = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { inviteCode } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findByInviteCode(inviteCode);
+    if (!group) {
+      throw new AppError("Link m\u1EDDi kh\xF4ng h\u1EE3p l\u1EC7.", 404);
+    }
+    const now = /* @__PURE__ */ new Date();
+    if (group.invite_expires_at && new Date(group.invite_expires_at) < now) {
+      throw new AppError("Link m\u1EDDi \u0111\xE3 h\u1EBFt h\u1EA1n.", 400);
+    }
+    if (group.members.length >= group.max_members) {
+      throw new AppError("Nh\xF3m \u0111\xE3 \u0111\u1EA7y.", 400);
+    }
+    const isMember = group.members.some((m) => m.user_id === userId);
+    if (isMember) {
+      return res.status(200).json({
+        success: true,
+        alreadyMember: true,
+        groupId: group.id,
+        message: "B\u1EA1n \u0111\xE3 l\xE0 th\xE0nh vi\xEAn c\u1EE7a nh\xF3m n\xE0y."
+      });
+    }
+    await db.groupMembers.create({
+      group_id: group.id,
+      user_id: userId
+    });
+    const goal = await db.goals.create({
+      user_id: userId,
+      title: group.goal_title,
+      description: group.description ? `Group Habit: ${group.description}` : `Habit Group Goal: ${group.name}`,
+      category: group.goal_category,
+      target_count: group.goal_target_count,
+      frequency: group.goal_frequency,
+      due_date: null,
+      group_id: group.id
+    });
+    await db.streaks.create({
+      user_id: userId,
+      goal_id: goal.id
+    });
+    res.status(200).json({
+      success: true,
+      groupId: group.id,
+      message: "\u0110\xE3 tham gia nh\xF3m!"
     });
   } catch (error) {
     next(error);
@@ -1516,6 +2323,9 @@ var joinGroup = async (req, res, next) => {
     const group = await db.groups.findUnique({ id });
     if (!group) {
       throw new AppError("Group not found.", 404);
+    }
+    if (group.members.length >= group.max_members) {
+      throw new AppError("Nh\xF3m \u0111\xE3 \u0111\u1EA7y.", 400);
     }
     const isMember = group.members.some((m) => m.user_id === userId);
     if (isMember) {
@@ -1532,9 +2342,9 @@ var joinGroup = async (req, res, next) => {
       category: group.goal_category,
       target_count: group.goal_target_count,
       frequency: group.goal_frequency,
-      due_date: null
+      due_date: null,
+      group_id: group.id
     });
-    await db.goals.update(goal.id, { group_id: group.id });
     await db.streaks.create({
       user_id: userId,
       goal_id: goal.id
@@ -1577,6 +2387,42 @@ var leaveGroup = async (req, res, next) => {
     next(error);
   }
 };
+var removeMember = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { id, userId: targetUserId } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+    if (group.creator_id !== userId) {
+      throw new AppError("Only the group creator can remove members.", 403);
+    }
+    if (targetUserId === userId) {
+      throw new AppError("You cannot remove yourself. Use 'Leave Group' instead.", 400);
+    }
+    const isMember = group.members.some((m) => m.user_id === targetUserId);
+    if (!isMember) {
+      throw new AppError("User is not a member of this group.", 400);
+    }
+    await db.groupMembers.delete({
+      group_id: group.id,
+      user_id: targetUserId
+    });
+    const goals = await db.goals.findMany();
+    const groupGoal = goals.find((g) => g.group_id === group.id && g.user_id === targetUserId);
+    if (groupGoal) {
+      await db.goals.delete(groupGoal.id);
+    }
+    res.status(200).json({
+      success: true,
+      message: "Member successfully removed from the group."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 var deleteGroup = async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -1599,19 +2445,219 @@ var deleteGroup = async (req, res, next) => {
   }
 };
 
+// src/controllers/groupChatController.ts
+import webpush from "web-push";
+var getGroupMessages = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { groupId } = req.params;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    const membership = await db.groupMembers.findMany({ group_id: groupId, user_id: userId });
+    if (membership.length === 0) {
+      throw new AppError("You are not a member of this group.", 403);
+    }
+    const group = await db.groups.findUnique({ id: groupId });
+    if (!group) throw new AppError("Group not found.", 404);
+    const messages = await db.groupMessages.findMany({ group_id: groupId });
+    const formattedMessages = messages.map((msg) => {
+      const reactionCounts = {
+        "\u{1F525}": 0,
+        "\u{1F4AA}": 0,
+        "\u{1F44F}": 0,
+        "\u2764\uFE0F": 0,
+        "\u{1F602}": 0
+      };
+      const myReactions = [];
+      msg.reactions.forEach((r) => {
+        if (reactionCounts[r.emoji] !== void 0) {
+          reactionCounts[r.emoji]++;
+          if (r.user_id === userId) {
+            myReactions.push(r.emoji);
+          }
+        }
+      });
+      return {
+        id: msg.id,
+        groupId: msg.group_id,
+        senderId: msg.sender_id,
+        senderName: msg.sender?.name,
+        senderAvatarInitials: msg.sender?.avatarInitials,
+        content: msg.content,
+        createdAt: msg.created_at,
+        canDelete: userId === msg.sender_id || userId === group.creator_id,
+        reactions: reactionCounts,
+        myReactions
+      };
+    });
+    res.status(200).json({
+      success: true,
+      messages: formattedMessages
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var sendGroupMessage = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { groupId } = req.params;
+    const { content } = req.body;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    if (!content || content.trim().length === 0) {
+      throw new AppError("Message content cannot be empty.", 400);
+    }
+    if (content.trim().length > 200) {
+      throw new AppError("Message content cannot exceed 200 characters.", 400);
+    }
+    const membership = await db.groupMembers.findMany({ group_id: groupId, user_id: userId });
+    if (membership.length === 0) {
+      throw new AppError("You are not a member of this group.", 403);
+    }
+    const group = await db.groups.findUnique({ id: groupId });
+    if (!group) throw new AppError("Group not found.", 404);
+    const message = await db.groupMessages.create({
+      group_id: groupId,
+      sender_id: userId,
+      content: content.trim()
+    });
+    res.status(201).json({
+      success: true,
+      message: {
+        ...message,
+        reactions: { "\u{1F525}": 0, "\u{1F4AA}": 0, "\u{1F44F}": 0, "\u2764\uFE0F": 0, "\u{1F602}": 0 },
+        myReactions: [],
+        canDelete: true,
+        senderName: req.user?.name,
+        senderAvatarInitials: message.sender?.avatarInitials
+      }
+    });
+    sendGroupChatNotifications(groupId, userId, content.trim(), group.name, req.user?.name || "Someone").catch((err) => {
+      console.error("[Push Notification] Error sending group chat notifications:", err);
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var toggleReaction = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { groupId, messageId } = req.params;
+    const { emoji } = req.body;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    const allowedEmojis = ["\u{1F525}", "\u{1F4AA}", "\u{1F44F}", "\u2764\uFE0F", "\u{1F602}"];
+    if (!allowedEmojis.includes(emoji)) {
+      throw new AppError("Invalid emoji reaction.", 400);
+    }
+    const membership = await db.groupMembers.findMany({ group_id: groupId, user_id: userId });
+    if (membership.length === 0) {
+      throw new AppError("You are not a member of this group.", 403);
+    }
+    await db.messageReactions.toggle(messageId, userId, emoji);
+    const message = await db.groupMessages.findUnique(messageId);
+    if (!message) throw new AppError("Message not found.", 404);
+    const reactionCounts = {
+      "\u{1F525}": 0,
+      "\u{1F4AA}": 0,
+      "\u{1F44F}": 0,
+      "\u2764\uFE0F": 0,
+      "\u{1F602}": 0
+    };
+    const myReactions = [];
+    message.reactions.forEach((r) => {
+      if (reactionCounts[r.emoji] !== void 0) {
+        reactionCounts[r.emoji]++;
+        if (r.user_id === userId) {
+          myReactions.push(r.emoji);
+        }
+      }
+    });
+    res.status(200).json({
+      success: true,
+      reactions: reactionCounts,
+      myReactions
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var deleteMessage = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { groupId, messageId } = req.params;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    const message = await db.groupMessages.findUnique(messageId);
+    if (!message) throw new AppError("Message not found.", 404);
+    const group = await db.groups.findUnique({ id: groupId });
+    if (!group) throw new AppError("Group not found.", 404);
+    const canDelete = userId === message.sender_id || userId === group.creator_id;
+    if (!canDelete) {
+      throw new AppError("You do not have permission to delete this message.", 403);
+    }
+    await db.groupMessages.delete(messageId);
+    res.status(200).json({
+      success: true,
+      message: "Message deleted successfully."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+async function sendGroupChatNotifications(groupId, senderId, content, groupName, senderName) {
+  try {
+    const group = await db.groups.findUnique({ id: groupId });
+    if (!group) return;
+    const members = group.members.filter((m) => m.user_id !== senderId && m.user.push_subscription);
+    const truncatedContent = content.length > 50 ? content.substring(0, 47) + "..." : content;
+    const payload = JSON.stringify({
+      title: `Tin nh\u1EAFn m\u1EDBi trong nh\xF3m ${groupName}`,
+      body: `${senderName}: ${truncatedContent}`,
+      icon: "/icon.png",
+      badge: "/icon.png",
+      data: { url: `/#/groups?id=${groupId}` }
+    });
+    for (const member of members) {
+      const countToday = await db.groupChatNotificationLogs.countToday(member.user_id);
+      if (countToday >= 3) {
+        console.log(`[Push Notification] User ${member.user_id} reached daily limit for group chat notifications.`);
+        continue;
+      }
+      try {
+        const subscription = JSON.parse(member.user.push_subscription);
+        await webpush.sendNotification(subscription, payload);
+        await db.groupChatNotificationLogs.create(member.user_id, groupId);
+      } catch (pushErr) {
+        console.error(`[Push Notification] Failed for user ${member.user_id}:`, pushErr.message);
+        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
+          await db.users.update(member.user_id, { push_subscription: null });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[Push Notification] sendGroupChatNotifications failed:", err);
+  }
+}
+
 // src/routes/groups.ts
-var router4 = Router4();
-router4.use(authMiddleware);
-router4.get("/", getGroups);
-router4.post("/", createGroup);
-router4.get("/:id", getGroupById);
-router4.post("/:id/join", joinGroup);
-router4.post("/:id/leave", leaveGroup);
-router4.delete("/:id", deleteGroup);
-var groups_default = router4;
+var router5 = Router5();
+router5.get("/invite/:inviteCode", getGroupByInviteCode);
+router5.use(authMiddleware);
+router5.get("/", getGroups);
+router5.post("/", createGroup);
+router5.post("/join/:inviteCode", joinGroupByInviteCode);
+router5.get("/:id", getGroupById);
+router5.post("/:id/invite", createInviteCode);
+router5.post("/:id/join", joinGroup);
+router5.post("/:id/leave", leaveGroup);
+router5.delete("/:id/members/:userId", removeMember);
+router5.delete("/:id", deleteGroup);
+router5.get("/:groupId/messages", getGroupMessages);
+router5.post("/:groupId/messages", sendGroupMessage);
+router5.post("/:groupId/messages/:messageId/reactions", toggleReaction);
+router5.delete("/:groupId/messages/:messageId", deleteMessage);
+var groups_default = router5;
 
 // src/routes/ai.ts
-import { Router as Router5 } from "express";
+import { Router as Router6 } from "express";
 
 // src/controllers/aiController.ts
 import { GoogleGenAI } from "@google/genai";
@@ -1803,14 +2849,14 @@ var postAIChat = async (req, res, next) => {
 };
 
 // src/routes/ai.ts
-var router5 = Router5();
-router5.use(authMiddleware);
-router5.post("/report", getAIReport);
-router5.post("/chat", postAIChat);
-var ai_default = router5;
+var router6 = Router6();
+router6.use(authMiddleware);
+router6.post("/report", getAIReport);
+router6.post("/chat", postAIChat);
+var ai_default = router6;
 
 // src/routes/freeze.ts
-import { Router as Router6 } from "express";
+import { Router as Router7 } from "express";
 
 // src/controllers/freezeController.ts
 function getLocalDateString2(date, timezone) {
@@ -1883,15 +2929,15 @@ var getFreezeDates = async (req, res, next) => {
 };
 
 // src/routes/freeze.ts
-var router6 = Router6();
-router6.use(authMiddleware);
-router6.get("/tokens", getFreezeTokens);
-router6.post("/activate", activateFreeze);
-router6.get("/dates", getFreezeDates);
-var freeze_default = router6;
+var router7 = Router7();
+router7.use(authMiddleware);
+router7.get("/tokens", getFreezeTokens);
+router7.post("/activate", activateFreeze);
+router7.get("/dates", getFreezeDates);
+var freeze_default = router7;
 
 // src/routes/xp.ts
-import { Router as Router7 } from "express";
+import { Router as Router8 } from "express";
 
 // src/lib/xpSystem.ts
 var LEVELS = [
@@ -1956,15 +3002,16 @@ var awardXP = async (req, res, next) => {
 };
 
 // src/routes/xp.ts
-var router7 = Router7();
-router7.use(authMiddleware);
-router7.post("/award", awardXP);
-var xp_default = router7;
+var router8 = Router8();
+router8.use(authMiddleware);
+router8.post("/award", awardXP);
+var xp_default = router8;
 
 // src/express-app.ts
 var app = express();
 app.use(express.json());
 app.use("/api/auth", auth_default);
+app.use("/api/friends", friends_default);
 app.use("/api/goals", goals_default);
 app.use("/api/stats", stats_default);
 app.use("/api/groups", groups_default);

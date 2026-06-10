@@ -12,8 +12,12 @@ Chào mừng bạn đến với **Momentum**, hệ thống theo dõi và quản 
 5. [Trục Thời Gian Hoạt Động (Activity Timeline)](#5-trục-thời-gian-hoạt-động-activity-timeline)
 6. [Cấu Hình & Cài Đặt (Settings) & Nhắc nhở chủ động](#6-cấu-hình--cài-đặt-settings)
 7. [Đồng Đội Giám Sát (Habit Groups)](#7-đồng-đội-giám-sát-habit-groups)
-8. [Chia Sẻ Thành Tích Một Chạm (Social Sharing)](#8-chia-sẻ-thành-tích-một-chạm-social-sharing)
-9. [Các Câu Hỏi Thường Gặp (FAQs)](#9-các-câu-hỏi-thường-gặp-faqs)
+8. [Bình luận & Chat nhóm (Group Chat)](#8-bình-luận--chat-nhóm-group-chat)
+9. [Chia Sẻ Thành Tích Một Chạm (Social Sharing)](#9-chia-sẻ-thành-tích-một-chạm-social-sharing)
+10. [Hẹn Giờ Pomodoro (Pomodoro Timer)](#10-hẹn-giờ-pomodoro-pomodoro-timer)
+11. [Theo dõi Bạn bè & Feed hoạt động (Friends)](#11-theo-dõi-bạn-bè--feed-hoạt-động-friends)
+12. [Phòng Kỷ Luật (Discipline Room)](#12-phòng-kỷ-luật-discipline-room)
+13. [Các Câu Hỏi Thường Gặp (FAQs)](#13-các-câu-hỏi-thường-gặp-faqs)
 
 ---
 
@@ -73,7 +77,9 @@ Khi bạn thực hiện check-in thói quen và đạt chỉ tiêu mục tiêu t
 
 ## 3. Quản Lý Danh Sách Mục Tiêu (My Goals)
 
-Trang Quản lý mục tiêu (`/goals`) được thiết kế dưới dạng lưới bento tối tân hiển thị tất cả các thói quen của bạn.
+Trang Quản lý mục tiêu (`/goals`) được thiết kế dưới dạng lưới bento tối tân hiển thị tất cả các thói quen của bạn. Trang được chia làm hai Tab chính:
+- **Đang hoạt động:** Chứa các mục tiêu bạn đang thực hiện hoặc tạm dừng.
+- **Đã lưu trữ:** Chứa các mục tiêu cũ bạn không còn theo dõi nhưng muốn giữ lại lịch sử.
 
 ### 3.1. Tạo Thói Quen Mới (`/new-goal`)
 Click vào nút **Add Goal** trên header để mở giao diện tạo thói quen. Bạn có thể thiết lập:
@@ -86,7 +92,17 @@ Click vào nút **Add Goal** trên header để mở giao diện tạo thói que
   - `Quantity` (Định lượng): Thiết lập mục tiêu theo số lượng cụ thể trong ngày (ví dụ: 8 cốc, 10 km). Bạn cần điền thêm đơn vị (**Unit**) và chỉ tiêu cần đạt (**Target Count**).
 - **Priority (Độ ưu tiên)**: Low (Thấp), Medium (Trung bình), High (Cao). Thói quen độ ưu tiên cao sẽ có viền sáng động nổi bật.
 
-### 3.2. Tìm Kiếm, Lọc & Sắp Xếp Nâng Cao
+### 3.2. Lưu Trữ & Thao Tác Hàng Loạt (Bulk Actions) [NEW]
+Để giúp không gian làm việc gọn gàng hơn, bạn có thể sử dụng tính năng thao tác hàng loạt:
+- **Lưu trữ đơn lẻ:** Nhấn vào dấu 3 chấm trên một Goal Card bất kỳ và chọn **"Lưu trữ"**. Mục tiêu sẽ được chuyển sang Tab "Đã lưu trữ" và ngừng hiển thị ở các thống kê. Để lấy lại, vào Tab "Đã lưu trữ" và chọn **"Khôi phục"**.
+- **Chế độ Chọn nhiều:** Bấm nút **"Chọn nhiều"** trên thanh bộ lọc. Các thẻ mục tiêu sẽ hiển thị Checkbox.
+- **Thanh công cụ nổi (FAB):** Khi chọn 1 hoặc nhiều mục tiêu, một thanh công cụ sẽ trượt lên từ đáy màn hình cho phép bạn:
+  - Lưu trữ hàng loạt (Archive)
+  - Tạm dừng hàng loạt (Pause)
+  - Khôi phục hàng loạt (Restore - nếu ở tab Đã lưu trữ)
+  - Xóa hàng loạt (Delete - sẽ có bảng Modal yêu cầu bạn xác nhận lần cuối tên các mục tiêu sẽ bị xóa).
+
+### 3.3. Tìm Kiếm, Lọc & Sắp Xếp Nâng Cao
 Tại trang `/goals`, bạn có các công cụ mạnh mẽ:
 - **Tìm kiếm**: Gõ từ khóa để lọc nhanh tiêu đề thói quen.
 - **Lọc theo trạng thái**: Click các nút lựa chọn để xem danh sách mục tiêu `All` (Tất cả), `Active` (Đang hoạt động), hoặc `Paused` (Đang tạm dừng).
@@ -95,11 +111,12 @@ Tại trang `/goals`, bạn có các công cụ mạnh mẽ:
   - `Recent`: Sắp xếp theo thói quen được tạo hoặc cập nhật gần nhất.
   - `Streak`: Sắp xếp theo thứ tự chuỗi ngày hoàn thành liên tục từ cao xuống thấp.
 
-### 3.3. Hiển thị thông tin trên Goal Card
+### 3.4. Hiển thị thông tin trên Goal Card
 - **Badge Nhắc nhở**: Nếu thói quen có cài đặt giờ nhắc riêng, một biểu tượng chuông 🔔 kèm giờ sẽ hiển thị ngay dưới tên thói quen để bạn dễ dàng theo dõi lịch trình.
 - **Menu Hành Động Nhanh**: Mỗi thẻ mục tiêu có một nút menu hành động nhanh (biểu tượng 3 chấm hoặc tùy chọn góc phải):
   - **Tạm dừng/Kích hoạt lại (Pause/Resume)**: Giúp bạn đóng băng thói quen khi đi du lịch hoặc nghỉ ngơi mà không làm mất lịch sử cũ hay ảnh hưởng đến thống kê ngày hiện tại.
   - **Chỉnh sửa (Edit)**: Thay đổi tiêu đề, chỉ tiêu, danh mục thói quen bất kỳ lúc nào.
+  - **Lưu trữ (Archive)**: Đưa thói quen vào thùng lưu trữ, loại bỏ khỏi radar hệ thống nhưng giữ nguyên lịch sử.
   - **Xóa (Delete)**: Gỡ bỏ thói quen khỏi hệ thống vĩnh viễn (sẽ xóa toàn bộ lịch sử check-in liên quan).
 
 ---
@@ -121,6 +138,16 @@ Truy cập `/stats` để xem báo cáo trực quan về kỷ luật bản thân
 - **10-Week Trend Chart (Biểu đồ xu hướng 10 tuần)**: Gom nhóm dữ liệu tiến độ trong 70 ngày gần nhất vẽ thành các cột biểu đồ CSS động tự động điều chỉnh độ cao và hiển thị tooltip thông tin chi tiết khi rê chuột.
 - **Goal Distribution (Biểu đồ tròn phân bổ)**: Sử dụng kỹ thuật gradient conic hiện đại để chia tỷ lệ phần trăm thói quen của bạn theo danh mục (Sức khỏe, Công việc, v.v.), đi kèm bảng chú thích màu sắc tương tác.
 - **Milestone Feed**: Dòng thời gian vinh danh các cột mốc bạn đã đạt được (ví dụ: đạt Streak 7 ngày đầu tiên, hoàn thành thói quen đạt mốc đặc biệt, đạt cấp bậc "Achiever Elite Tier"). Tích hợp nút **Share** trên từng thẻ cột mốc.
+- **So sánh xu hướng (Trend Comparison)**:
+  - Widget nằm ngay sau Bento Grid trong trang Stats.
+  - Dùng toggle **Ngày / Tuần / Tháng** để so sánh hiệu suất giữa `Kỳ trước` và `Hiện tại`.
+  - Chọn dropdown **Tất cả mục tiêu** để xem dữ liệu toàn bộ goal, hoặc chọn một mục tiêu cụ thể để lọc riêng.
+  - Khi xem tất cả mục tiêu, có 2 chế độ:
+    - **Tổng thể:** hiển thị biểu đồ cột đôi tổng quan.
+    - **Chi tiết:** hiển thị từng mục tiêu theo hàng ngang, gồm số check-in kỳ trước, kỳ hiện tại, phần trăm thay đổi và trạng thái hôm qua/hôm nay.
+  - Bảng **Hôm qua** và **Hôm nay** dùng nhãn **Đã đạt / Chưa đạt**. Một mục tiêu chỉ được tính là **Đã đạt** khi số lần check-in trong ngày đạt đủ `target_count`, ví dụ goal cần 8 lần thì mới check-in 1 lần vẫn thuộc nhóm **Chưa đạt**.
+  - Khối **Gợi ý cần cải thiện theo ngày** đưa ra gợi ý dựa trên các mục tiêu chưa đạt target của hôm qua hoặc hôm nay.
+  - Chế độ tuần dùng tuần lịch Monday-Sunday và so sánh với tuần lịch liền trước, không dùng cách lấy hôm nay trừ 7 ngày.
 
 ---
 
@@ -181,7 +208,7 @@ Tính năng **Đồng đội giám sát (Habit Groups)** giúp bạn không còn
 *   **Liên kết Dashboard cá nhân:**
     *   Khi bạn tạo hoặc tham gia một nhóm, hệ thống sẽ tự động sinh ra một thói quen tương ứng hiển thị trực tiếp trên Dashboard cá nhân của bạn, được đánh dấu bằng nhãn `👥 Group Habit`.
     *   Bạn có thể check-in tiến trình này ngay trên Dashboard chính hoặc check-in trực tiếp từ bảng xếp hạng của nhóm.
-*   **Bảng xếp hạng nhóm (Leaderboard):**
+*   **Leaderboard Real-time:**
     *   Trang chi tiết của nhóm hiển thị trực quan danh sách các thành viên cùng tiến trình check-in hôm nay của từng người (ví dụ: `1/1 Completed` hoặc `0/2 Active`).
     *   Chuỗi ngày Streak hiện tại của từng thành viên cũng được hiển thị kèm biểu tượng lửa 🔥.
 *   **Rời và xóa nhóm:**
@@ -190,7 +217,31 @@ Tính năng **Đồng đội giám sát (Habit Groups)** giúp bạn không còn
 
 ---
 
-## 8. Chia Sẻ Thành Tích Một Chạm (Social Sharing)
+## 8. Bình luận & Chat nhóm (Group Chat) [NEW]
+
+Tính năng **Bình luận nhóm** giúp các thành viên trao đổi, động viên và giữ trách nhiệm cho nhau ngay trong giao diện nhóm.
+
+*   **Vị trí:** Section chat nằm ngay dưới Leaderboard trong trang chi tiết nhóm. Chỉ những người đã gia nhập nhóm mới có thể xem và gửi tin nhắn.
+*   **Gửi tin nhắn:**
+    *   Nhập nội dung vào ô chat ở cuối danh sách (tối đa 200 ký tự).
+    *   Nhấn nút **Gửi** hoặc phím **Enter** để gửi nhanh. Dùng **Shift + Enter** nếu muốn xuống dòng.
+    *   Hệ thống sử dụng **Optimistic Update**, tin nhắn của bạn sẽ xuất hiện ngay lập tức mà không cần chờ server phản hồi.
+*   **Phản ứng bằng Emoji (Reactions):**
+    *   Mỗi tin nhắn có 5 emoji phản ứng nhanh: 🔥 💪 👏 ❤️ 😂.
+    *   Nhấn vào emoji để bày tỏ cảm xúc. Nhấn lại lần nữa để gỡ bỏ.
+    *   Số đếm bên cạnh emoji cho biết tổng số thành viên đã thả reaction đó.
+*   **Quản lý tin nhắn (Moderation):**
+    *   **Người tạo nhóm (Admin):** Có quyền xóa bất kỳ tin nhắn nào không phù hợp trong nhóm của mình.
+    *   **Thành viên:** Chỉ có quyền xóa tin nhắn do chính mình gửi.
+    *   Khi xóa, tin nhắn sẽ biến mất khỏi danh sách của tất cả mọi người.
+*   **Thông báo đẩy (Push Notifications):**
+    *   Khi có tin nhắn mới, các thành viên khác trong nhóm sẽ nhận được thông báo đẩy trên thiết bị (nếu đã bật Active Reminders).
+    *   Để tránh làm phiền, hệ thống giới hạn mỗi người dùng chỉ nhận tối đa **3 thông báo chat nhóm mỗi ngày**.
+
+---
+
+## 9. Chia Sẻ Thành Tích Một Chạm (Social Sharing)
+
 
 Momentum cung cấp tính năng **Social Sharing** cao cấp cho phép bạn khoe thành quả rèn luyện của mình với bạn bè chỉ với một click chuột:
 
@@ -209,7 +260,54 @@ Momentum cung cấp tính năng **Social Sharing** cao cấp cho phép bạn kho
 
 ---
 
-### 9. Các Câu Hỏi Thường Gặp (FAQs)
+## 11. Theo dõi Bạn bè & Feed hoạt động (Friends)
+
+Tính năng **Theo dõi Bạn bè** giúp bạn kết nối với những người dùng khác để cùng nhau tạo động lực rèn luyện.
+
+*   **Tìm kiếm và Theo dõi:**
+    1.  Truy cập trang **Bạn bè** qua biểu tượng 👥 trên thanh điều hướng.
+    2.  Nhập tên hoặc email của người bạn muốn tìm vào thanh tìm kiếm.
+    3.  Kết quả sẽ hiển thị Level và Chuỗi ngày (Streak) cao nhất của họ.
+    4.  Nhấn **Theo dõi** để bắt đầu kết nối. Nút sẽ chuyển thành **Đang theo dõi**.
+*   **Feed hoạt động (Hoạt động bạn bè):**
+    1.  Tại màn hình **Dashboard**, bạn sẽ thấy khung **"Bạn bè hôm nay"**.
+    2.  Khung này hiển thị tối đa 5 hoạt động check-in mới nhất từ những người bạn đang theo dõi.
+    3.  Thông tin hiển thị bao gồm: Tên bạn bè, mục tiêu họ vừa hoàn thành và thời gian thực hiện.
+*   **Quản lý Quyền riêng tư:**
+    1.  Nếu bạn không muốn hoạt động của mình xuất hiện trên feed của người khác, hãy vào **Cài đặt**.
+    2.  Tìm mục **"Hiển thị hoạt động trong Feed bạn bè"** và tắt nó đi.
+    3.  Lưu ý: Bạn vẫn có thể xem hoạt động của người khác nếu đang theo dõi họ, nhưng họ sẽ không thấy hoạt động của bạn.
+*   **Xem chỉ số Follow:**
+    1.  Trong trang **Cài đặt**, dưới phần thông tin cá nhân, bạn có thể xem số lượng người bạn đang theo dõi (**Đang theo dõi**) và số người đang theo dõi bạn (**Người theo dõi**).
+
+---
+
+## 12. Phòng Kỷ Luật (Discipline Room)
+
+Phòng Kỷ Luật (Discipline Room) là tính năng mô phỏng không gian học tập và làm việc chung, ứng dụng trí tuệ nhân tạo (AI Camera Coach) để giám sát và đánh giá sự tập trung của bạn trong thời gian thực. Hiện tại tính năng đang ở phiên bản Demo.
+
+*   **Tạo phòng (Create Room):**
+    1.  Truy cập trang **Phòng Kỷ Luật** qua thanh điều hướng (Sidebar hoặc BottomNav).
+    2.  Nhập tên mục tiêu cho phiên làm việc.
+    3.  Chọn chế độ làm việc (Study hoặc Deep Work).
+    4.  Lựa chọn thời gian phiên (5, 15, hoặc 25 phút).
+    5.  Nhấn nút **Tạo phòng**.
+*   **Chờ partner (Waiting Room):**
+    *   Hệ thống sẽ cấp cho bạn một **Mã mời (Invite Code)** để chia sẻ cho bạn bè.
+    *   Trong bản Demo, hệ thống sẽ tự động giả lập có một partner tham gia phòng sau 3 giây.
+    *   Nhấn **Start Demo Session** để bắt đầu phiên.
+*   **Phiên tập trung (Active Session):**
+    *   Bạn cần cấp quyền truy cập Camera cho trình duyệt để AI có thể đánh giá mức độ tập trung. (Lưu ý: Video không được lưu trữ hoặc gửi lên server).
+    *   Trong quá trình đếm ngược, AI Coach (giả lập) sẽ tự động phân tích và hiển thị trạng thái của bạn (Focused, Away).
+    *   Hệ thống tự động cập nhật **Focus Score** và **Presence Score**.
+*   **Báo cáo phiên (Session Report):**
+    *   Sau khi hết thời gian (hoặc khi bạn nhấn Kết thúc sớm), hệ thống sẽ tính toán **XP Earned** dựa trên độ tập trung của bạn.
+    *   Bạn sẽ nhận được những lời khuyên (Insight) hữu ích từ AI Coach để cải thiện trong các phiên tiếp theo.
+
+---
+
+## 13. Các Câu Hỏi Thường Gặp (FAQs)
+
 
 **Q: Tại sao tôi vào trang tạo thói quen lại báo "Yêu cầu kết nối mạng" dù tôi vẫn đang online?**
 > **A:** Một số trình duyệt có thể báo nhầm trạng thái kết nối mạng (false offline). Trong trường hợp này, Momentum cung cấp một nút **"Tôi vẫn đang online, cho tôi tiếp tục"** ở ngay màn hình thông báo lỗi đó. Hãy bấm vào nút này để bỏ qua cảnh báo và tiếp tục thiết lập thói quen. Lưu ý: Khi lưu mục tiêu, bạn vẫn cần có kết nối mạng thực tế để dữ liệu được gửi lên máy chủ thành công.
@@ -275,6 +373,36 @@ const showFreezeButton =
 API liên quan:
 - `GET /api/freeze/tokens`: xem số token còn lại trong tháng.
 - `POST /api/freeze/activate`: dùng 1 token để bảo vệ streak cho goal.
+- `GET /api/freeze/dates?goal_id=...`: xem danh sách ngày đã đóng băng của goal.
+
+Lỗi thường gặp khi test:
+- Không thấy nút: chưa tới giờ mở tính năng, goal chưa có streak, hoặc goal đã hoàn thành hôm nay.
+- Báo hết token: tài khoản đã dùng đủ 3 token trong tháng.
+- Bấm lại cùng ngày không được: mỗi goal chỉ được đóng băng một lần cho một ngày.
+- Lỗi database operation: kiểm tra DB đã có cột `User.last_freeze_reminder_date`, bảng `StreakFreeze`, bảng `FreezeToken`.
+
+### AI Coach
+AI Coach dùng Gemini API ở phía backend. Nếu giao diện trả fallback như "Mình đang gặp chút khó khăn khi kết nối AI", cần kiểm tra:
+- `.env` có `GEMINI_API_KEY`.
+- Key Gemini còn quota.
+- Backend đã restart sau khi đổi `.env`.
+- Route `/api/ai/chat` và `/api/ai/report` đã được đăng ký trong Express.
+
+Trường hợp key hợp lệ nhưng Gemini trả `429 RESOURCE_EXHAUSTED`, đây là lỗi quota của Google/Gemini, không phải lỗi giao diện chat.
+
+### Khi web bị trắng trang hoặc treo ở localhost
+Các nguyên nhân đã gặp:
+- `localStorage.user` bị hỏng JSON làm app crash ngay khi khởi động.
+- Service worker cache bản JS/app shell cũ ở `localhost`.
+- Database schema chưa đồng bộ với Prisma schema.
+
+Cách xử lý nhanh:
+1. Bấm `Ctrl + F5` để hard refresh.
+2. Nếu vẫn trắng, clear site data cho `localhost:3000`.
+3. Restart dev server bằng `npm run dev`.
+4. Kiểm tra backend trả HTML ở `http://localhost:3000/login#/login`.
+5. Nếu login báo lỗi database, kiểm tra migration/schema DB.
+l.
 - `GET /api/freeze/dates?goal_id=...`: xem danh sách ngày đã đóng băng của goal.
 
 Lỗi thường gặp khi test:

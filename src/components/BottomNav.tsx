@@ -63,6 +63,8 @@ export default function BottomNav() {
       <BottomNavItem to="/" icon="home" label={t("nav.home")} end />
       <BottomNavItem to="/stats" icon="query_stats" label={t("nav.stats")} />
       <BottomNavItem to="/goals" icon="checklist" label={t("nav.goals")} />
+      <BottomNavItem to="/friends" icon="people" label="Bạn bè" />
+      <BottomNavItem to="/discipline-room" icon="video_camera_front" label="Kỷ luật" />
       <BottomNavItem to="/groups" icon="group" label={t("nav.groups")} />
       <BottomNavItem to="/timeline" icon="timeline" label={t("nav.timeline")} />
       <button

@@ -47,14 +47,25 @@ export default function GoalsPage() {
   const { user } = useAuthStore();
   const { isOffline } = useGoalStore();
   const {
-    goals,
+    activeGoalsList,
+    archivedGoalsList,
     loading,
     error,
     refreshAll,
     completeGoalProgress,
     deleteGoal,
     updateGoal,
+    archiveGoal,
+    restoreGoal,
+    bulkArchiveGoals,
+    bulkPauseGoals,
+    bulkDeleteGoals,
   } = useGoals();
+
+  const [currentTab, setCurrentTab] = useState<"active" | "archived">("active");
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedGoalIds, setSelectedGoalIds] = useState<string[]>([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "paused">("all");
@@ -117,19 +128,23 @@ export default function GoalsPage() {
     }
   };
 
-  // Get distinct categories
-  const categories = ["All", ...Array.from(new Set(goals.map((g) => g.category)))];
+  // Get distinct categories based on current tab
+  const activeList = currentTab === "active" ? activeGoalsList : archivedGoalsList;
+  const categories = ["All", ...Array.from(new Set(activeList.map((g) => g.category)))];
 
   // Counts for tabs
-  const totalCount = goals.length;
-  const activeCount = goals.filter((g) => g.status === "active").length;
-  const pausedCount = goals.filter((g) => g.status === "paused").length;
+  const totalCount = activeGoalsList.length;
+  const activeCount = activeGoalsList.filter((g) => g.status === "active").length;
+  const pausedCount = activeGoalsList.filter((g) => g.status === "paused").length;
+  const archivedCount = archivedGoalsList.length;
 
   // Filter & Search Logic
-  const filteredAndSearchedGoals = goals.filter((goal) => {
-    // 1. Status Filter
-    if (statusFilter === "active" && goal.status !== "active") return false;
-    if (statusFilter === "paused" && goal.status !== "paused") return false;
+  const filteredAndSearchedGoals = activeList.filter((goal) => {
+    // 1. Status Filter (only applies to active tab)
+    if (currentTab === "active") {
+      if (statusFilter === "active" && goal.status !== "active") return false;
+      if (statusFilter === "paused" && goal.status !== "paused") return false;
+    }
 
     // 2. Category Filter
     if (activeCategory !== "All" && goal.category.toLowerCase() !== activeCategory.toLowerCase()) return false;
@@ -162,9 +177,38 @@ export default function GoalsPage() {
     return 0;
   });
 
+  // Selection Logic
+  const toggleSelection = (id: string) => {
+    setSelectedGoalIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkAction = async (action: "archive" | "pause" | "delete" | "restore") => {
+    if (isOffline) {
+      setOfflineActionMsg("Cannot perform bulk actions offline.");
+      return;
+    }
+    try {
+      if (action === "archive") await bulkArchiveGoals(selectedGoalIds);
+      if (action === "pause") await bulkPauseGoals(selectedGoalIds);
+      if (action === "restore") {
+        await Promise.all(selectedGoalIds.map(id => restoreGoal(id)));
+      }
+      if (action === "delete") {
+        await bulkDeleteGoals(selectedGoalIds);
+        setShowBulkDeleteModal(false);
+      }
+      setSelectedGoalIds([]);
+      setIsSelectionMode(false);
+    } catch (err) {
+      console.error("Bulk action failed:", err);
+    }
+  };
+
   // Overall Statistics logic
-  const bestCurrentStreak = Math.max(0, ...goals.map((g) => g.streak?.current_streak || 0));
-  const activeGoals = goals.filter((g) => g.status !== "paused");
+  const bestCurrentStreak = Math.max(0, ...activeGoalsList.map((g) => g.streak?.current_streak || 0));
+  const activeGoals = activeGoalsList.filter((g) => g.status !== "paused");
   const totalProgress = activeGoals.reduce((acc, g) => acc + (g.current_count / g.target_count), 0);
   const overallCompletionRate = activeGoals.length > 0 ? Math.round((totalProgress / activeGoals.length) * 100) : 0;
   const strokeDashoffset = 440 - (440 * overallCompletionRate) / 100;
@@ -302,39 +346,87 @@ export default function GoalsPage() {
           );
         })()}
 
+        {/* Top level tabs and Select button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                setCurrentTab("active");
+                setIsSelectionMode(false);
+                setSelectedGoalIds([]);
+              }}
+              className={`text-sm font-bold pb-2 border-b-2 transition-colors ${
+                currentTab === "active" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              Đang hoạt động ({totalCount})
+            </button>
+            <button
+              onClick={() => {
+                setCurrentTab("archived");
+                setIsSelectionMode(false);
+                setSelectedGoalIds([]);
+              }}
+              className={`text-sm font-bold pb-2 border-b-2 transition-colors ${
+                currentTab === "archived" ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              Đã lưu trữ ({archivedCount})
+            </button>
+          </div>
+          <button
+            onClick={() => {
+              if (isSelectionMode) {
+                setIsSelectionMode(false);
+                setSelectedGoalIds([]);
+              } else {
+                setIsSelectionMode(true);
+              }
+            }}
+            className="text-xs font-semibold px-3 py-1.5 rounded-full bg-surface-container-high hover:bg-surface-variant transition-colors flex items-center gap-1.5 text-on-surface"
+          >
+            <span className="material-symbols-outlined text-[16px]">{isSelectionMode ? "close" : "checklist"}</span>
+            {isSelectionMode ? "Hủy chọn" : "Chọn nhiều"}
+          </button>
+        </div>
+
         {/* Filters & Status Section */}
         <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <button
-              onClick={() => setStatusFilter("all")}
-              className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
-                statusFilter === "all"
-                  ? "bg-primary text-on-primary"
-                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
-              }`}
-            >
-              {t("goals.filterAll")} ({totalCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter("active")}
-              className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
-                statusFilter === "active"
-                  ? "bg-primary text-on-primary"
-                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
-              }`}
-            >
-              {t("goals.filterActive")} ({activeCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter("paused")}
-              className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
-                statusFilter === "paused"
-                  ? "bg-primary text-on-primary"
-                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
-              }`}
-            >
-              {t("goals.filterPaused")} ({pausedCount})
-            </button>
+            {currentTab === "active" && (
+              <>
+                <button
+                  onClick={() => setStatusFilter("all")}
+                  className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
+                    statusFilter === "all"
+                      ? "bg-primary text-on-primary"
+                      : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
+                  }`}
+                >
+                  {t("goals.filterAll")}
+                </button>
+                <button
+                  onClick={() => setStatusFilter("active")}
+                  className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
+                    statusFilter === "active"
+                      ? "bg-primary text-on-primary"
+                      : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
+                  }`}
+                >
+                  {t("goals.filterActive")} ({activeCount})
+                </button>
+                <button
+                  onClick={() => setStatusFilter("paused")}
+                  className={`px-4 py-2 rounded-full font-semibold text-xs transition-colors ${
+                    statusFilter === "paused"
+                      ? "bg-primary text-on-primary"
+                      : "bg-surface-container-high text-on-surface-variant hover:bg-surface-variant"
+                  }`}
+                >
+                  {t("goals.filterPaused")} ({pausedCount})
+                </button>
+              </>
+            )}
           </div>
 
           <div className="flex gap-2 w-full sm:w-auto justify-start sm:justify-end">
@@ -392,7 +484,11 @@ export default function GoalsPage() {
                   {/* Card Header */}
                   <div>
                     <div className="flex justify-between items-start mb-4">
-                      {isPaused ? (
+                      {goal.is_archived ? (
+                        <span className="px-3 py-1 bg-surface-variant text-on-surface-variant text-[10px] font-black uppercase tracking-widest rounded-full">
+                          {t("common.archived")}
+                        </span>
+                      ) : isPaused ? (
                         <span className="px-3 py-1 bg-surface-variant text-on-surface-variant text-[10px] font-black uppercase tracking-widest rounded-full">
                           {t("common.paused")}
                         </span>
@@ -423,39 +519,73 @@ export default function GoalsPage() {
                             className="absolute right-0 top-8 glass-card py-2 px-3 z-30 flex flex-col gap-1 shadow-2xl"
                             style={{ minWidth: "130px", background: "var(--color-surface-container-high)" }}
                           >
-                            <button
-                              onClick={() => handleToggleStatus(goal.id, goal.status)}
-                              className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
-                              disabled={isOffline}
-                              style={isOffline ? { opacity: 0.45, cursor: "not-allowed" } : {}}
-                              title={isOffline ? "Requires connection" : undefined}
-                            >
-                              <span className="material-symbols-outlined text-[16px]">
-                                {isPaused ? "play_arrow" : "pause"}
-                              </span>
-                              {isPaused ? t("goals.resumeGoal") : t("goals.pauseGoal")}
-                            </button>
-                            {isOffline ? (
-                              <div
-                                className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 rounded text-left w-full"
-                                style={{ opacity: 0.45, cursor: "not-allowed", color: "var(--color-on-surface)" }}
-                                title="Requires connection"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">edit</span>
-                                {t("common.edit")}
-                              </div>
-                            ) : (
-                              <Link
-                                to={`/edit-goal/${goal.id}`}
-                                className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">edit</span>
-                                {t("common.edit")}
-                              </Link>
+                            {currentTab === "active" && (
+                              <>
+                                <button
+                                  onClick={() => handleToggleStatus(goal.id, goal.status)}
+                                  className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
+                                  disabled={isOffline}
+                                  style={isOffline ? { opacity: 0.45, cursor: "not-allowed" } : {}}
+                                  title={isOffline ? "Requires connection" : undefined}
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">
+                                    {isPaused ? "play_arrow" : "pause"}
+                                  </span>
+                                  {isPaused ? t("goals.resumeGoal") : t("goals.pauseGoal")}
+                                </button>
+                                {isOffline ? (
+                                  <div
+                                    className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 rounded text-left w-full"
+                                    style={{ opacity: 0.45, cursor: "not-allowed", color: "var(--color-on-surface)" }}
+                                    title="Requires connection"
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                                    {t("common.edit")}
+                                  </div>
+                                ) : (
+                                  <Link
+                                    to={`/edit-goal/${goal.id}`}
+                                    className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
+                                  >
+                                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                                    {t("common.edit")}
+                                  </Link>
+                                )}
+                                <button
+                                  onClick={async () => {
+                                    if (isOffline) { setOfflineActionMsg("Cannot archive offline."); return; }
+                                    await archiveGoal(goal.id);
+                                    setActiveMenuId(null);
+                                  }}
+                                  className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
+                                  disabled={isOffline}
+                                  style={isOffline ? { opacity: 0.45, cursor: "not-allowed" } : {}}
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">inventory_2</span>
+                                  Lưu trữ
+                                </button>
+                              </>
                             )}
+                            
+                            {currentTab === "archived" && (
+                              <button
+                                onClick={async () => {
+                                  if (isOffline) { setOfflineActionMsg("Cannot restore offline."); return; }
+                                  await restoreGoal(goal.id);
+                                  setActiveMenuId(null);
+                                }}
+                                className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-white/5 rounded text-left w-full text-on-surface"
+                                disabled={isOffline}
+                                style={isOffline ? { opacity: 0.45, cursor: "not-allowed" } : {}}
+                              >
+                                <span className="material-symbols-outlined text-[16px]">unarchive</span>
+                                Khôi phục
+                              </button>
+                            )}
+
                             <button
                               onClick={() => handleDelete(goal.id, goal.title)}
-                              className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-rose-500/10 hover:text-rose-400 rounded text-left w-full text-rose-400"
+                              className="flex items-center gap-2 text-xs font-semibold py-1.5 px-2 hover:bg-rose-500/10 hover:text-rose-400 rounded text-left w-full text-rose-400 border-t border-white/5 mt-1 pt-1.5"
                               disabled={isOffline}
                               style={isOffline ? { opacity: 0.45, cursor: "not-allowed" } : {}}
                               title={isOffline ? "Requires connection" : undefined}
@@ -525,7 +655,7 @@ export default function GoalsPage() {
                       )}
                     </div>
 
-                    {!isCompleted && !isPaused && (
+                    {!isCompleted && !isPaused && currentTab === "active" && !isSelectionMode && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -616,7 +746,7 @@ export default function GoalsPage() {
       </main>
 
       {/* Floating Action Button (FAB) - hidden offline */}
-      {!isOffline && (
+      {!isOffline && !isSelectionMode && (
         <button
           onClick={() => navigate("/new-goal")}
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary text-on-primary shadow-[0_0_24px_rgba(192,193,255,0.4)] flex items-center justify-center group hover:scale-110 active:scale-95 transition-all duration-300 z-40"
@@ -624,6 +754,95 @@ export default function GoalsPage() {
           <span className="material-symbols-outlined text-[28px]">add</span>
           <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-20 group-hover:opacity-40 pointer-events-none"></div>
         </button>
+      )}
+
+      {/* Selection Mode Bulk Action Bar */}
+      {isSelectionMode && selectedGoalIds.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] z-50 flex justify-center pointer-events-none">
+          <div className="glass-card shadow-2xl rounded-full px-4 py-3 flex items-center gap-4 border border-primary/20 pointer-events-auto bg-surface-container-high/90 backdrop-blur-xl animate-in slide-in-from-bottom-10 fade-in duration-300">
+            <span className="text-sm font-bold text-on-surface whitespace-nowrap pl-2">
+              Đã chọn {selectedGoalIds.length} mục tiêu
+            </span>
+            <div className="h-6 w-px bg-white/10 mx-1"></div>
+            
+            {currentTab === "active" ? (
+              <>
+                <button
+                  onClick={() => handleBulkAction("archive")}
+                  className="p-2 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center"
+                  title="Lưu trữ hàng loạt"
+                >
+                  <span className="material-symbols-outlined">inventory_2</span>
+                </button>
+                <button
+                  onClick={() => handleBulkAction("pause")}
+                  className="p-2 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center"
+                  title="Tạm dừng hàng loạt"
+                >
+                  <span className="material-symbols-outlined">pause</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleBulkAction("restore")}
+                className="p-2 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center"
+                title="Khôi phục hàng loạt"
+              >
+                <span className="material-symbols-outlined">unarchive</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setShowBulkDeleteModal(true)}
+              className="p-2 rounded-full hover:bg-rose-500/10 text-on-surface-variant hover:text-rose-400 transition-colors flex items-center justify-center"
+              title="Xóa hàng loạt"
+            >
+              <span className="material-symbols-outlined">delete</span>
+            </button>
+            
+            <button
+              onClick={() => { setIsSelectionMode(false); setSelectedGoalIds([]); }}
+              className="p-2 rounded-full hover:bg-white/10 text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center ml-2"
+              title="Hủy"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="glass-card w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold text-on-surface mb-2">Xóa mục tiêu đã chọn?</h3>
+            <p className="text-sm text-on-surface-variant mb-4">
+              Bạn có chắc chắn muốn xóa {selectedGoalIds.length} mục tiêu này không? Hành động này không thể khôi phục.
+            </p>
+            <div className="max-h-32 overflow-y-auto mb-6 pr-2 custom-scrollbar">
+              <ul className="text-sm font-medium text-on-surface space-y-1">
+                {selectedGoalIds.map(id => {
+                  const goal = activeList.find(g => g.id === id);
+                  return <li key={id}>• {goal?.title || "Mục tiêu không xác định"}</li>;
+                })}
+              </ul>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-on-surface-variant hover:bg-white/5 transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => handleBulkAction("delete")}
+                className="px-4 py-2 rounded-xl text-sm font-bold bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

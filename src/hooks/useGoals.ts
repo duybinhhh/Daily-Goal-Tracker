@@ -15,6 +15,11 @@ export const useGoals = (filterCategory: string = "All") => {
     createGoal,
     updateGoal,
     deleteGoal,
+    archiveGoal,
+    restoreGoal,
+    bulkArchiveGoals,
+    bulkPauseGoals,
+    bulkDeleteGoals,
     completeGoalProgress,
     deleteLogProgress,
   } = useGoalStore();
@@ -29,18 +34,23 @@ export const useGoals = (filterCategory: string = "All") => {
     }
   }, [isAuthenticated, fetchGoals, fetchStats, fetchHistory]);
 
-  const filteredGoals = goals.filter((goal) => {
+  const activeGoalsList = goals.filter((g) => !g.is_archived);
+  const archivedGoalsList = goals.filter((g) => g.is_archived);
+
+  const filteredGoals = activeGoalsList.filter((goal) => {
     if (activeCategory === "All") return true;
     return goal.category.toLowerCase() === activeCategory.toLowerCase();
   });
 
-  const categories = ["All", ...Array.from(new Set(goals.map((g) => g.category)))];
+  const categories = ["All", ...Array.from(new Set(activeGoalsList.map((g) => g.category)))];
 
-  const todayPendingGoals = goals.filter((g) => g.status === "active" && g.current_count < g.target_count);
-  const todayCompletedGoals = goals.filter((g) => g.current_count >= g.target_count);
+  const todayPendingGoals = activeGoalsList.filter((g) => g.status === "active" && g.current_count < g.target_count);
+  const todayCompletedGoals = activeGoalsList.filter((g) => g.current_count >= g.target_count);
 
   return {
-    goals,
+    goals: activeGoalsList, // Backwards compatibility for components not aware of archived list yet
+    activeGoalsList,
+    archivedGoalsList,
     filteredGoals,
     categories,
     activeCategory,
@@ -56,6 +66,11 @@ export const useGoals = (filterCategory: string = "All") => {
     createGoal,
     updateGoal,
     deleteGoal,
+    archiveGoal,
+    restoreGoal,
+    bulkArchiveGoals,
+    bulkPauseGoals,
+    bulkDeleteGoals,
     completeGoalProgress,
     deleteLogProgress,
   };

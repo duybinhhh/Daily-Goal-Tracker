@@ -23,7 +23,11 @@ export const LoginPage: React.FC = () => {
   }, [isRegister, clearError]);
 
   useEffect(() => {
-    if (isAuthenticated) navigate("/");
+    if (isAuthenticated) {
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get("redirect");
+      navigate(redirect || "/");
+    }
   }, [isAuthenticated, navigate]);
 
   const validate = () => {
@@ -48,7 +52,10 @@ export const LoginPage: React.FC = () => {
       } else {
         await login(formData.email, formData.password);
       }
-      navigate("/");
+      
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get("redirect");
+      navigate(redirect || "/");
     } catch (err) {
       console.error("Auth failed:", err);
     }

@@ -1,11 +1,12 @@
 // src/components/GoalCard.tsx
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Flame, Edit2, Trash2, CheckCircle, Plus, MessageSquare, Undo2 } from "lucide-react";
+import { Flame, Edit2, Trash2, CheckCircle, Plus, MessageSquare, Undo2, Timer } from "lucide-react";
 import { Goal } from "../types";
 import { motion } from "motion/react";
 import { useTranslation } from "../i18n";
 import api from "../services/api";
+import { usePomodoroStore } from "../store/pomodoroStore";
 
 interface GoalCardProps {
   goal: Goal;
@@ -62,6 +63,17 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
   const longestStreak = goal.streak?.longest_streak || 0;
   const currentHour = new Date().getHours();
   const showFreezeButton = currentHour >= 18 && !isCompleted && currentStreak > 0;
+
+  const { startSession, activeSession } = usePomodoroStore();
+
+  const handleStartPomodoro = () => {
+    if (activeSession && activeSession.goalId !== goal.id && activeSession.isRunning) {
+      if (!window.confirm(t("pomodoro.confirmSwitch"))) {
+        return;
+      }
+    }
+    startSession(goal.id, goal.title);
+  };
 
   useEffect(() => {
     if (!showFreezeButton) return;
@@ -439,6 +451,17 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onComplete, onDelete, 
                     )}
                     {t("goalCard.checkIn")}
                   </button>
+                  {!goal.is_archived && goal.status !== "paused" && (
+                    <button
+                      className="btn-ghost"
+                      onClick={handleStartPomodoro}
+                      style={{ padding: "5px 12px", fontSize: "11px", gap: "5px", border: "1px solid var(--color-outline-variant)" }}
+                      title={t("pomodoro.start")}
+                    >
+                      <Timer size={12} />
+                      {t("goalCard.pomodoro")}
+                    </button>
+                  )}
                   {showFreezeButton && (
                     <button
                       type="button"

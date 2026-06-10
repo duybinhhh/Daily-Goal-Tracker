@@ -25,29 +25,33 @@
 2. **Chi tiết danh sách mục tiêu (`/goals`)**: Giao diện bento-grid hiển thị toàn bộ danh sách mục tiêu chi tiết, tích hợp tìm kiếm, bộ lọc trạng thái (Active/Paused/All), danh mục và sắp xếp (Priority/Recent/Streak). Hỗ trợ Log tiến độ nhanh, Popup Menu hành động (Pause/Resume, Edit, Delete) và Vòng tròn tổng quan (Overall Completion SVG Ring).
 3. **Tạo mục tiêu (`/new-goal`)**: Form tạo thói quen trong 30 giây (Nhị phân hoặc Số lượng định lượng như cốc nước, km). *Cập nhật:* Sử dụng màu sắc ngữ nghĩa tương thích động với giao diện Sáng/Tối.
 4. **Chỉnh sửa mục tiêu (`/edit-goal/:id`)**: Giao diện cập nhật thông tin mục tiêu thói quen.
-5. **Lịch sử & Thống kê (`/stats`)**: Bento metrics (Tỷ lệ hoàn thành %, so sánh xu hướng tăng trưởng tháng trước) + Biểu đồ cột hiệu năng 10 tuần gần nhất + GitHub-style Activity Heatmap (180 ngày) + Biểu đồ tròn Donut chia tỉ lệ thói quen + Milestones feed và xuất dữ liệu CSV nhanh trên header. Tích hợp nút **Share** cạnh tiêu đề Heatmap và trên từng Milestone Card để kích hoạt Share Modal.
+5. **Lịch sử & Thống kê (`/stats`)**: Bento metrics (Tỷ lệ hoàn thành %, so sánh xu hướng tăng trưởng tháng trước) + Biểu đồ cột hiệu năng 10 tuần gần nhất + GitHub-style Activity Heatmap (180 ngày) + Biểu đồ tròn Donut chia tỉ lệ thói quen + Milestones feed và xuất dữ liệu CSV nhanh trên header. Tích hợp nút **Share** cạnh tiêu đề Heatmap và trên từng Milestone Card để kích hoạt Share Modal. *Cập nhật:* Thêm widget **So sánh xu hướng** sau Bento Grid, hỗ trợ Ngày/Tuần/Tháng, lọc theo mục tiêu, chế độ Tổng thể/Chi tiết, bảng Hôm qua/Hôm nay tính `Đã đạt` theo `target_count` và gợi ý cải thiện theo ngày.
 6. **Trục thời gian hoạt động (`/timeline`)**: Lưới ô hiệu năng tháng (Performance Grid) tích hợp chấm xanh/sao vàng, feed hoạt động lọc động, nút xóa log lịch sử (Delete log) và xuất báo cáo CSV.
 7. **Cài đặt (`/settings`)**: Hồ sơ cá nhân (Múi giờ, Tên), công tắc bật hiệu ứng chúc mừng (Confetti) và Danger Zone (Xóa dữ liệu). *Cập nhật:* Mặc định khởi tạo giao diện Light Theme và thiết kế thanh tác vụ Lưu/Hủy dưới dạng Sticky Floating Bar nổi cố định ở cuối trang. Tích hợp công tắc bật/tắt **Nhắc nhở chủ động (Active Reminders)** chống đứt chuỗi (xin quyền thông báo của trình duyệt và đồng bộ subscription lên DB).
-8. **Đồng đội giám sát & Nhóm thói quen (`/groups`)**: Hiển thị danh sách các nhóm thói quen đang tham gia (My Groups) và danh sách nhóm có sẵn để khám phá (Discover). Hỗ trợ form tạo nhóm thói quen chung. Bảng chi tiết nhóm hiển thị thông tin mục tiêu chung và **Bảng tiến trình thành viên (Leaderboard)** thể hiện tiến độ hôm nay, trạng thái hoàn thành và chuỗi ngày Streak của từng thành viên. Hỗ trợ nút Check-in nhanh, sao chép link mời và nút Share khoe thành tích nhóm.
+8. **Đồng đội giám sát & Nhóm thói quen (`/groups`)**: Hiển thị danh sách các nhóm thói quen đang tham gia (My Groups) và danh sách nhóm có sẵn để khám phá (Discover). Hỗ trợ form tạo nhóm thói quen chung. Bảng chi tiết nhóm hiển thị thông tin mục tiêu chung và **Bảng tiến trình thành viên (Leaderboard)** thể hiện tiến độ hôm nay, trạng thái hoàn thành và chuỗi ngày Streak của từng thành viên. Hỗ trợ nút Check-in nhanh, sao chép link mời và nút Share khoe thành tích nhóm. Tích hợp **Section Chat nhóm** dưới Leaderboard cho phép thành viên thảo luận, thả reaction và nhận thông báo đẩy.
 9. **Check-in nhanh tối giản (`/quick-checkin`)**: Màn hình check-in tối giản bằng 1 chạm, thiết kế nút bấm lớn cho di động, tích hợp rung phản hồi haptic, đếm ngược hoàn tác 5 giây và đồng bộ offline tự động.
 
 ### 3.2. Giao diện API Endpoints (MVP Scope)
 - **Auth**: `/api/auth/register`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, `PUT /api/auth/profile` (cập nhật thông tin cá nhân), `DELETE /api/auth/profile` (xóa tài khoản vĩnh viễn), `PUT /api/auth/push-subscription` (đăng ký/hủy thông báo đẩy), `GET /api/auth/vapid-public-key` (lấy khóa công khai VAPID).
 - **Goals**: `GET /api/goals` (lọc theo status/category), `POST /api/goals`, `GET /api/goals/:id`, `PUT /api/goals/:id`, `DELETE /api/goals/:id`, `POST /api/goals/:id/complete` (Tăng tiến độ/Ghi log/Tính streak, hỗ trợ truyền tham số `completed_at` tùy chọn từ body để ghi nhận đúng ngày giờ check-in offline), `DELETE /api/goals/logs/:logId` (Xóa log và tự động tính lại Streak).
-- **Stats**: `GET /api/stats/dashboard` (bento data), `GET /api/stats/history?from=&to=` (heatmap data).
+- **Stats**: `GET /api/stats/dashboard` (bento data), `GET /api/stats/history?from=&to=` (heatmap data), `GET /api/stats/trend?period=day|week|month&goalId=` (dữ liệu Trend Comparison realtime, có lọc mục tiêu).
 - **Groups**: `GET /api/groups` (danh sách tất cả nhóm), `POST /api/groups` (tạo nhóm thói quen), `GET /api/groups/:id` (lấy chi tiết nhóm và bảng tiến độ thành viên), `POST /api/groups/:id/join` (gia nhập nhóm), `POST /api/groups/:id/leave` (rời nhóm), `DELETE /api/groups/:id` (xóa nhóm).
+- **Group Chat**: `GET /api/groups/:groupId/messages` (lấy tin nhắn), `POST /api/groups/:groupId/messages` (gửi tin), `POST /api/groups/:groupId/messages/:messageId/reactions` (phản ứng emoji), `DELETE /api/groups/:groupId/messages/:messageId` (xóa tin).
 ### Bổ sung 2026-06-09: Việc đã làm và việc còn thiếu
 
 ### Đã làm
 - Cập nhật chức năng lựa chọn ngôn ngữ bằng i18n Context, `LanguageSwitcher`, lưu `setting_language` vào localStorage.
 - Thêm AI Coach drawer, store, Sidebar/BottomNav trigger và backend route `/api/ai`.
 - Thêm Streak Freeze / Freeze Token với API `/api/freeze`, schema Prisma và UI `Protect Streak`.
-- **Nhắc nhở riêng từng mục tiêu (US-19)**: Thêm `reminder_time` vào Goal, tích hợp Time picker vào form, hiển thị badge trên GoalCard và nâng cấp Scheduler.
+- **Nhắc nhở riêng từng mục tiêu (US-19)**: Thêm `reminder_time` into Goal, tích hợp Time picker vào form, hiển thị badge trên GoalCard và nâng cấp Scheduler.
 - **Hệ thống Mẫu mục tiêu (Goal Templates)**: Thư viện mẫu mục tiêu giúp tạo thói quen nhanh chóng.
+- **Hẹn giờ Pomodoro (Pomodoro Timer)**: Tích hợp bộ hẹn giờ tập trung, widget nổi, chu kỳ Focus/Break, thông báo âm thanh và thống kê hàng ngày.
+- **Bình luận & Chat nhóm (Group Chat - US-26)**: Triển khai hệ thống thảo luận trong nhóm, reactions emoji, optimistic update, moderation quyền xóa và push notification giới hạn 3/ngày.
 - Sửa lỗi AI Coach bấm không mở bằng cách render drawer ở layout và mở bằng state/event.
 - Sửa lỗi trắng trang bằng cách parse `localStorage.user` an toàn.
 - Tắt service worker cache trên localhost để tránh dùng JS/app shell cũ.
 - Đồng bộ thủ công DB Supabase cho các phần còn thiếu của Freeze Token.
+- Thực hiện migration database cho Group Chat models.
 
 ### Còn thiếu / cần làm tiếp
 - Tạo migration chính thức cho Streak Freeze trong `prisma/migrations`.

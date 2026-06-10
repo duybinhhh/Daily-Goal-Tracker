@@ -12,10 +12,13 @@ import { GoalFormPage } from "./pages/GoalFormPage";
 import { Stats } from "./pages/Stats";
 import { SettingsPage } from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
+import FriendsPage from "./pages/FriendsPage";
 import GoalsPage from "./pages/GoalsPage";
 import GroupsPage from "./pages/GroupsPage";
+import { DisciplineRoomPage } from "./pages/DisciplineRoomPage";
 import { QuickCheckInPage } from "./pages/QuickCheckInPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
+import JoinGroupPage from "./pages/JoinGroupPage";
 
 import { useGoalStore } from "./store/goalStore";
 import { syncOfflineData } from "./services/syncManager";
@@ -129,6 +132,9 @@ export default function App() {
             {/* Public authentication page — no sidebar */}
             <Route path="/login" element={<LoginPage />} />
 
+            {/* Join page — handles its own auth logic */}
+            <Route path="/join/:inviteCode" element={<JoinGroupPage />} />
+
             {/* Onboarding page — no sidebar, but protected */}
             <Route
               path="/onboarding"
@@ -156,6 +162,8 @@ export default function App() {
   );
 }
 
+import { PomodoroWidget } from "./components/pomodoro/PomodoroWidget";
+
 function AppLayout() {
   const [isAICoachOpen, setIsAICoachOpen] = React.useState(false);
 
@@ -163,6 +171,19 @@ function AppLayout() {
     const handleOpenAICoach = () => setIsAICoachOpen(true);
     window.addEventListener("open-ai-coach", handleOpenAICoach);
     return () => window.removeEventListener("open-ai-coach", handleOpenAICoach);
+  }, []);
+
+  React.useEffect(() => {
+    const handleOpenCheckIn = (e: any) => {
+      // In this project, check-in is handled in DashboardPage via handleLogProgress
+      // or we can redirect to a specific check-in page if goalId is provided
+      // For simplicity, let's see if we can trigger the note input on the Dashboard
+      // or just navigate to the dashboard with a search param.
+      // Another option: navigate to /quick-checkin
+      window.location.hash = `#/quick-checkin?goalId=${e.detail}`;
+    };
+    window.addEventListener("open-check-in", handleOpenCheckIn);
+    return () => window.removeEventListener("open-check-in", handleOpenCheckIn);
   }, []);
 
   return (
@@ -195,9 +216,11 @@ function AppLayout() {
           <Route path="/stats" element={<Stats />} />
           <Route path="/goals" element={<GoalsPage />} />
           <Route path="/timeline" element={<TimelinePage />} />
+          <Route path="/friends" element={<FriendsPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/quick-checkin" element={<QuickCheckInPage />} />
+          <Route path="/discipline-room" element={<DisciplineRoomPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
@@ -208,6 +231,8 @@ function AppLayout() {
       <InAppReminderCenter />
 
       <AICoachDrawer isOpen={isAICoachOpen} onClose={() => setIsAICoachOpen(false)} />
+
+      <PomodoroWidget />
     </div>
   );
 }

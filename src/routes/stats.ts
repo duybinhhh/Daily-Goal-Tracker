@@ -1,7 +1,7 @@
 // src/routes/stats.ts
 import { Router } from "express";
 import { authMiddleware } from "../middleware/auth";
-import { getDashboardStats, getHistory } from "../controllers/statsController";
+import { getDashboardStats, getHistory, getTrendComparison } from "../controllers/statsController";
 
 const router = Router();
 
@@ -10,5 +10,6 @@ router.use(authMiddleware as any);
 
 router.get("/dashboard", getDashboardStats);
 router.get("/history", getHistory);
+router.get("/trend", getTrendComparison);
 
 export default router;

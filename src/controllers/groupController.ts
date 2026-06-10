@@ -24,6 +24,9 @@ export const getGroups = async (req: AuthenticatedRequest, res: Response, next: 
       goal_target_count: group.goal_target_count,
       goal_frequency: group.goal_frequency,
       created_at: group.created_at,
+      invite_code: group.invite_code,
+      invite_expires_at: group.invite_expires_at,
+      max_members: group.max_members,
       memberCount: group.members.length,
       isJoined: group.members.some((m: any) => m.user_id === userId),
     }));
@@ -80,10 +83,8 @@ export const createGroup = async (req: AuthenticatedRequest, res: Response, next
       target_count: targetCount,
       frequency: goal_frequency || "daily",
       due_date: null,
+      group_id: group.id,
     });
-
-    // Update goal with group_id (PrismaDB create doesn't support group_id in parameter signature, so we update it)
-    await db.goals.update(goal.id, { group_id: group.id } as any);
 
     // 4. Create default streak
     await db.streaks.create({
@@ -170,10 +171,185 @@ export const getGroupById = async (req: AuthenticatedRequest, res: Response, nex
         goal_category: group.goal_category,
         goal_target_count: group.goal_target_count,
         goal_frequency: group.goal_frequency,
+        invite_code: group.invite_code,
+        invite_expires_at: group.invite_expires_at,
+        max_members: group.max_members,
         created_at: group.created_at,
         isJoined,
         members: membersProgress,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Helper to generate a random 8-character invite code
+function generateInviteCode(length = 8) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+// Create invite link (Admin only)
+export const createInviteCode = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+
+    if (group.creator_id !== userId) {
+      throw new AppError("Only the group creator can generate invite links.", 403);
+    }
+
+    if (group.members.length >= group.max_members) {
+      throw new AppError(`Nhóm đã đủ ${group.max_members} thành viên, không thể tạo link mời.`, 400);
+    }
+
+    let inviteCode = generateInviteCode();
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 10) {
+      const existing = await db.groups.findByInviteCode(inviteCode);
+      if (!existing) {
+        isUnique = true;
+      } else {
+        inviteCode = generateInviteCode();
+        attempts++;
+      }
+    }
+
+    if (!isUnique) {
+      throw new AppError("Could not generate a unique invite code. Please try again.", 500);
+    }
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await db.groups.update(id, {
+      invite_code: inviteCode,
+      invite_expires_at: expiresAt,
+    });
+
+    res.status(200).json({
+      success: true,
+      inviteCode,
+      expiresAt: expiresAt.toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get group info by invite code
+export const getGroupByInviteCode = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { inviteCode } = req.params;
+
+    const group = await db.groups.findByInviteCode(inviteCode);
+    if (!group) {
+      throw new AppError("Link mời không hợp lệ.", 404);
+    }
+
+    const now = new Date();
+    if (group.invite_expires_at && new Date(group.invite_expires_at) < now) {
+      return res.status(200).json({
+        success: true,
+        status: "expired",
+        message: "Link mời đã hết hạn.",
+      }) as any;
+    }
+
+    if (group.members.length >= group.max_members) {
+      return res.status(200).json({
+        success: true,
+        status: "full",
+        message: "Nhóm đã đầy.",
+      }) as any;
+    }
+
+    res.status(200).json({
+      success: true,
+      status: "valid",
+      group: {
+        id: group.id,
+        name: group.name,
+        memberCount: group.members.length,
+        maxMembers: group.max_members,
+      },
+      expiresAt: group.invite_expires_at,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Join group via invite code
+export const joinGroupByInviteCode = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { inviteCode } = req.params;
+
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+
+    const group = await db.groups.findByInviteCode(inviteCode);
+    if (!group) {
+      throw new AppError("Link mời không hợp lệ.", 404);
+    }
+
+    const now = new Date();
+    if (group.invite_expires_at && new Date(group.invite_expires_at) < now) {
+      throw new AppError("Link mời đã hết hạn.", 400);
+    }
+
+    if (group.members.length >= group.max_members) {
+      throw new AppError("Nhóm đã đầy.", 400);
+    }
+
+    const isMember = group.members.some((m: any) => m.user_id === userId);
+    if (isMember) {
+      return res.status(200).json({
+        success: true,
+        alreadyMember: true,
+        groupId: group.id,
+        message: "Bạn đã là thành viên của nhóm này.",
+      }) as any;
+    }
+
+    // 1. Add membership
+    await db.groupMembers.create({
+      group_id: group.id,
+      user_id: userId,
+    });
+
+    // 2. Create personal goal linked to this group
+    const goal = await db.goals.create({
+      user_id: userId,
+      title: group.goal_title,
+      description: group.description ? `Group Habit: ${group.description}` : `Habit Group Goal: ${group.name}`,
+      category: group.goal_category,
+      target_count: group.goal_target_count,
+      frequency: group.goal_frequency,
+      due_date: null,
+      group_id: group.id,
+    });
+
+    // 3. Create default streak
+    await db.streaks.create({
+      user_id: userId,
+      goal_id: goal.id,
+    });
+
+    res.status(200).json({
+      success: true,
+      groupId: group.id,
+      message: "Đã tham gia nhóm!",
     });
   } catch (error) {
     next(error);
@@ -191,6 +367,10 @@ export const joinGroup = async (req: AuthenticatedRequest, res: Response, next: 
     const group = await db.groups.findUnique({ id });
     if (!group) {
       throw new AppError("Group not found.", 404);
+    }
+
+    if (group.members.length >= group.max_members) {
+      throw new AppError("Nhóm đã đầy.", 400);
     }
 
     const isMember = group.members.some((m: any) => m.user_id === userId);
@@ -213,10 +393,8 @@ export const joinGroup = async (req: AuthenticatedRequest, res: Response, next: 
       target_count: group.goal_target_count,
       frequency: group.goal_frequency,
       due_date: null,
+      group_id: group.id,
     });
-
-    // Update goal with group_id
-    await db.goals.update(goal.id, { group_id: group.id } as any);
 
     // 3. Create default streak
     await db.streaks.create({
@@ -267,6 +445,54 @@ export const leaveGroup = async (req: AuthenticatedRequest, res: Response, next:
     res.status(200).json({
       success: true,
       message: "Successfully left the habit group.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Remove a member from a group (Admin only)
+export const removeMember = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { id, userId: targetUserId } = req.params;
+
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+
+    if (group.creator_id !== userId) {
+      throw new AppError("Only the group creator can remove members.", 403);
+    }
+
+    if (targetUserId === userId) {
+      throw new AppError("You cannot remove yourself. Use 'Leave Group' instead.", 400);
+    }
+
+    const isMember = group.members.some((m: any) => m.user_id === targetUserId);
+    if (!isMember) {
+      throw new AppError("User is not a member of this group.", 400);
+    }
+
+    // 1. Delete membership
+    await db.groupMembers.delete({
+      group_id: group.id,
+      user_id: targetUserId,
+    });
+
+    // 2. Delete personal goal and streaks
+    const goals = await db.goals.findMany();
+    const groupGoal = goals.find((g: any) => g.group_id === group.id && g.user_id === targetUserId);
+    if (groupGoal) {
+      await db.goals.delete(groupGoal.id);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Member successfully removed from the group.",
     });
   } catch (error) {
     next(error);

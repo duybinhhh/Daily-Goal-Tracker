@@ -3,6 +3,215 @@
 
 
 # Changelog
+
+## [Sprint 10] - 2026-06-10 (Discipline Room Demo - Breakthrough Feature)
+### Đã thêm
+- **Phòng Kỷ Luật (Discipline Room Demo)**:
+  - Bản demo chức năng đột phá giúp người dùng rèn luyện sự tập trung tối đa, mô phỏng không gian học tập/làm việc chung với AI Camera Coach.
+  - **Trải nghiệm 4 bước chuyên nghiệp**:
+    1. **Create Room**: Giao diện tạo phòng với các tùy chọn linh hoạt:
+       - Đặt tên mục tiêu/phiên làm việc.
+       - Lựa chọn chế độ tập trung (Study / Deep Work).
+       - Lựa chọn thời lượng (5 phút, 15 phút, 25 phút).
+    2. **Waiting Room**: Phòng chờ trước khi bắt đầu:
+       - Sinh mã mời (Invite Code) ngẫu nhiên 6 ký tự (VD: DR-8F2K).
+       - Hỗ trợ nút sao chép mã mời tiện lợi.
+       - Giả lập (Mock) partner tham gia phòng sau 3 giây để tăng tính tương tác.
+    3. **Active Session**: Trải nghiệm không gian làm việc tập trung:
+       - Hiển thị đồng hồ đếm ngược 3 giây trước khi bắt đầu phiên.
+       - Tích hợp yêu cầu quyền sử dụng Camera an toàn qua `navigator.mediaDevices.getUserMedia`.
+       - Preview camera trực tiếp với giao diện hiện đại.
+       - **Mock AI Camera Coach**: Khung mô phỏng phân tích trạng thái người dùng (Detecting, Focused, Away) mỗi 10 giây.
+       - Tính toán và cập nhật theo thời gian thực các chỉ số: Focus Score (%), Presence Score (%), Away Count.
+       - Hiển thị trạng thái giả lập của partner (Online / Focused).
+       - Nút kết thúc phiên an toàn, đảm bảo cleanup hoàn toàn luồng camera và các bộ đếm.
+    4. **Session Report**: Báo cáo sau phiên làm việc:
+       - Thống kê chi tiết thời gian, Focus Score, Presence Score, và số lần rời khỏi màn hình.
+       - **XP Earned**: Tự động tính toán điểm kinh nghiệm nhận được dựa trên Focus Score (Thưởng tối đa lên đến 180 XP cho người dùng đạt 90% Focus Score).
+       - **AI Coach Insight**: Nhận xét phản hồi thông minh mô phỏng dựa trên hiệu suất tập trung, giúp người dùng rút kinh nghiệm cho các phiên sau.
+  - **Kiến trúc Frontend Demo Cứng Cáp**:
+    - Xây dựng hoàn toàn bằng React Functional Components, sử dụng Hooks hiệu quả (`useRef`, `useEffect`, `useState`).
+    - Thiết kế UI/UX đồng nhất với toàn bộ hệ thống (dùng Tailwind CSS, Lucide Icons, CSS Variables của project).
+    - Tích hợp liền mạch vào hệ thống Routing hiện tại (Route `/discipline-room`), hiển thị trực tiếp trên Navigation Sidebar và Bottom Nav.
+    - Quản lý Cleanup vòng đời Component chặt chẽ, không rò rỉ bộ nhớ (Memory Leak) hoặc rò rỉ quyền truy cập Camera.
+
+### Kỹ thuật
+- **Frontend Components:**
+  - `src/pages/DisciplineRoomPage.tsx`: Chứa toàn bộ logic state máy trạng thái (State Machine) điều hướng luồng 4 bước của Discipline Room.
+  - Cập nhật `src/App.tsx`: Đăng ký Route `/discipline-room`.
+  - Cập nhật `src/components/Sidebar.tsx` và `src/components/BottomNav.tsx`: Bổ sung liên kết đến phòng kỷ luật.
+- **Tính năng mở rộng trong tương lai:**
+  - Prototype này là nền tảng vững chắc để tích hợp Socket.io (Realtime room), WebRTC (Gọi video peer-to-peer), và AI Face Detection model (TensorFlow.js / MediaPipe) trong các Sprint tiếp theo.
+
+## [Sprint 9] - 2026-06-10 (Friends Follow & Activity Feed)
+### Đã thêm
+- **Theo dõi bạn bè & Feed hoạt động (US-29)**:
+  - Trang `/friends` mới để tìm kiếm và theo dõi người dùng khác.
+  - Thanh tìm kiếm theo tên hoặc email với cơ chế debounce tối ưu.
+  - Hệ thống theo dõi 1 chiều (không cần duyệt).
+  - Khung "Bạn bè hôm nay" trên Dashboard hiển thị 5 hoạt động check-in mới nhất từ bạn bè.
+  - Toggle quyền riêng tư trong Settings để ẩn/hiện hoạt động cá nhân trên feed người khác.
+  - Hiển thị số lượng "Đang theo dõi" và "Người theo dõi" trong trang Settings.
+  - Cập nhật Sidebar và Bottom Nav để truy cập nhanh trang Bạn bè.
+  - Optimistic updates cho các hành động theo dõi/hủy theo dõi.
+
+### Kỹ thuật
+- **Prisma Schema:** Thêm model `Follow` và trường `show_activity_in_feed` vào model `User`.
+- **API Endpoints:**
+  - `GET /api/friends/search`: Tìm kiếm người dùng.
+  - `POST /api/friends/follow`: Theo dõi người dùng.
+  - `DELETE /api/friends/follow`: Hủy theo dõi người dùng.
+  - `GET /api/friends/feed`: Lấy feed hoạt động của bạn bè.
+  - `GET /api/friends/stats`: Lấy số lượng follow.
+  - `PATCH /api/friends/privacy`: Cập nhật thiết lập quyền riêng tư.
+- **Frontend:**
+  - `src/pages/FriendsPage.tsx`: Trang quản lý bạn bè.
+  - `src/components/friends/`: Các component search, card và follow button.
+  - `src/components/dashboard/FriendsTodayCard.tsx`: Card feed hoạt động trên Dashboard.
+  - Cập nhật `authStore` để quản lý trạng thái quyền riêng tư.
+
+## [Sprint 9] - 2026-06-10 (Group Invite & Member Management)
+### Đã thêm
+* **Mời thành viên qua Link (Group Invite Link):**
+  - Cho phép người tạo nhóm (Admin) tạo link mời duy nhất để chia sẻ cho bạn bè.
+  - Mã mời (Invite Code) ngẫu nhiên 8 ký tự, đảm bảo tính duy nhất.
+  - Link mời có hiệu lực trong **7 ngày**. Link cũ tự động vô hiệu khi admin tạo link mới.
+  - Tích hợp nút **📋 Sao chép** (Clipboard API) và **📤 Chia sẻ** (Web Share API) giúp gửi link nhanh chóng.
+* **Luồng Tham gia nhóm (Join Flow):**
+  - Trang tham gia nhóm chuyên dụng: `/join/{invite_code}`.
+  - Hiển thị thông tin nhóm (Tên, số lượng thành viên) trước khi xác nhận tham gia.
+  - Tự động xử lý luồng đăng nhập: Nếu chưa đăng nhập, user được chuyển hướng tới Login và tự động quay lại trang Join sau khi thành công.
+  - Kiểm tra điều kiện tham gia: Link còn hạn, nhóm chưa đầy, user chưa phải là thành viên.
+* **Giới hạn số lượng thành viên:**
+  - Thiết lập giới hạn tối đa **20 thành viên/nhóm**.
+  - Tự động vô hiệu hóa link mời và chặn tham gia khi nhóm đã đạt giới hạn.
+  - Thông báo rõ ràng "Nhóm đã đầy" trên giao diện Join Page.
+* **Quản lý thành viên (Member Management):**
+  - Tích hợp **GroupInvitePanel** vào trang chi tiết nhóm dành riêng cho Admin.
+  - Đảm bảo tính năng xóa thành viên hiện có vẫn hoạt động ổn định và không bị ảnh hưởng bởi luồng mời mới.
+
+### Kỹ thuật
+* **Prisma Schema:** Cập nhật model `HabitGroup` thêm `invite_code`, `invite_expires_at`, và `max_members`.
+* **API Endpoints:**
+  - `POST /api/groups/:groupId/invite`: Tạo mã mời mới.
+  - `GET /api/groups/invite/:inviteCode`: Lấy thông tin nhóm từ mã mời.
+  - `POST /api/groups/join/:inviteCode`: Tham gia nhóm qua mã mời.
+* **Frontend:**
+  - `src/pages/JoinGroupPage.tsx`: Trang join công khai.
+  - `src/components/groups/GroupInvitePanel.tsx`: Panel quản lý mời thành viên cho Admin.
+  - Cập nhật `authStore` và `LoginPage` để hỗ trợ redirect sau login (`?redirect=...`).
+
+## [Sprint 9] - 2026-06-10 (Groups Page UI Refactor)
+### Cải tiến
+* **Tối ưu hóa không gian hiển thị (Compact UI):** Refactor toàn bộ giao diện trang Nhóm thói quen để khắc phục tình trạng giao diện bị phình to, giúp người dùng bao quát thông tin tốt hơn.
+* **Bố cục tổng thể (Layout Optimization):**
+  - Giảm chiều rộng tối đa (`max-width`) của trang và header từ 1500px xuống 1400px.
+  - Thu hẹp thanh bên (sidebar) từ 430px xuống còn 380px.
+  - Giảm các khoảng cách (`gap`) và lề (`padding`) trên toàn bộ trang.
+* **Thành phần giao diện (Component Refinement):**
+  - **GroupCard:** Thu nhỏ biểu tượng, font chữ tiêu đề (13px) và nội dung. Compact lại khối thông tin mục tiêu chung.
+  - **MemberRow:** Thu nhỏ Avatar, đơn giản hóa bảng chỉ số (Tiến độ, Chuỗi, Trạng thái) và thanh progress bar (độ dày 1.5px).
+  - **Chi tiết nhóm (Active Group View):** Thu gọn các khối thống kê (Đã đạt, Tiến độ TB), tối ưu lại header và khu vực bảng xếp hạng.
+  - **Modal tạo nhóm:** Giảm chiều rộng (`max-width-2xl`), thu nhỏ các ô nhập liệu và khu vực preview.
+* **Hệ thống thảo luận (Chat UI Refactor):**
+  - Giảm chiều cao khung chat từ 500px xuống 400px.
+  - Thu nhỏ Avatar thành viên (8x8), bong bóng chat và các biểu tượng cảm xúc (reactions).
+  - Tối ưu font chữ tin nhắn (11px) để phù hợp với giao diện tinh gọn mới.
+
+## [Sprint 9] - 2026-06-10 (Group Comments & Chat)
+### Đã thêm
+* **Bình luận & Chat nhóm (Group Chat):** Tích hợp hệ thống thảo luận trực tiếp trong từng nhóm thói quen để các thành viên có thể động viên và giữ trách nhiệm cho nhau.
+* **Hiển thị tin nhắn:** Hiển thị tối đa 30 tin nhắn gần nhất với đầy đủ thông tin: Avatar (2 ký tự tên), tên người gửi, nội dung tin nhắn và thời gian gửi tương đối (vừa xong, 5 phút trước...).
+* **Phản ứng Emoji (Reactions):** Hỗ trợ 5 emoji phản ứng nhanh (🔥 💪 👏 ❤️ 😂) cho mỗi tin nhắn. Người dùng có thể toggle reaction và xem số lượng phản ứng của cả nhóm.
+* **Gửi tin nhắn thông minh:** Hỗ trợ gửi tin bằng nút "Gửi" hoặc phím "Enter" (Shift+Enter để xuống dòng). Giới hạn nội dung tối đa 200 ký tự.
+* **Cập nhật tức thì (Optimistic UI):** Áp dụng kỹ thuật optimistic update giúp tin nhắn và reaction xuất hiện ngay lập tức trên giao diện trước khi có phản hồi từ server.
+* **Quyền quản trị & Moderation:** 
+  - Người tạo nhóm (Owner) có quyền xóa bất kỳ tin nhắn nào trong nhóm.
+  - Thành viên thường có thể xóa tin nhắn của chính mình.
+  - Chặn các hành động xóa trái phép từ phía API.
+* **Quản lý thành viên (Member Management):**
+  - Người tạo nhóm (Owner/Admin) có quyền xóa thành viên khỏi nhóm.
+  - Khi xóa thành viên, hệ thống tự động xóa mục tiêu thói quen và chuỗi streak liên quan của người đó trong nhóm.
+  - Tích hợp nút xóa (`person_remove`) trực quan ngay trên bảng xếp hạng thành viên dành cho Admin.
+  - Có thông báo xác nhận trước khi thực hiện hành động xóa để tránh nhầm lẫn.
+* **Thông báo đẩy (Push Notifications):**
+  - Tự động gửi push notification đến tất cả thành viên trong nhóm khi có tin nhắn mới (loại trừ người gửi).
+  - **Giới hạn chống spam:** Mỗi người dùng chỉ nhận tối đa 3 thông báo chat nhóm mỗi ngày để tránh làm phiền.
+  - Hệ thống log thông báo (`GroupChatNotificationLog`) để kiểm soát hạn ngạch hàng ngày.
+* **Giao diện tối ưu:**
+  - Thiết kế card chat đồng bộ với phong cách Glassmorphism của ứng dụng.
+  - Tự động cuộn xuống tin nhắn mới nhất.
+  - Tối ưu hiển thị trên Mobile, xử lý vùng an toàn (safe areas) và bàn phím ảo.
+  - Hỗ trợ đầy đủ Light Mode và Dark Mode.
+  - Đa ngôn ngữ (Tiếng Việt & Tiếng Anh).
+
+### Kỹ thuật
+* **Prisma Schema:** Thêm model `GroupMessage`, `MessageReaction` và `GroupChatNotificationLog`.
+* **API Endpoints:**
+  - `GET /api/groups/:groupId/messages`
+  - `POST /api/groups/:groupId/messages`
+  - `POST /api/groups/:groupId/messages/:messageId/reactions`
+  - `DELETE /api/groups/:groupId/messages/:messageId`
+  - `DELETE /api/groups/:id/members/:userId`: Endpoint xóa thành viên khỏi nhóm.
+* **Real-time Refresh:** Tự động làm mới danh sách tin nhắn mỗi 30 giây để đảm bảo tính cập nhật.
+
+## [Sprint 8] - 2026-06-10 (Pomodoro Timer Integration)
+### Đã thêm
+* **Hẹn giờ Pomodoro (Pomodoro Timer):** Tích hợp bộ hẹn giờ Pomodoro trực tiếp vào ứng dụng để tăng cường sự tập trung.
+* **Tùy chỉnh thời gian Pomodoro (Configurable Durations):** Cho phép người dùng tự setup thời gian Tập trung, Nghỉ ngắn và Nghỉ dài thay vì cố định như trước.
+* **Cài đặt Pomodoro trong Settings:** Bổ sung khu vực cấu hình thời gian Pomodoro trong trang Cài đặt.
+* **Cài đặt nhanh trên Widget:** Thêm biểu tượng răng cưa trên Pomodoro Widget để điều chỉnh nhanh thời gian mà không cần rời khỏi Dashboard.
+* **Pomodoro Floating Widget:** Widget nổi cố định ở góc màn hình, hiển thị tên mục tiêu, chế độ (Tập trung, Nghỉ ngắn, Nghỉ dài) và đồng hồ đếm ngược. Hỗ trợ Pause, Resume, Stop và thu nhỏ (minimize).
+* **Nút Pomodoro trên GoalCard:** Thêm nút khởi chạy Pomodoro cho từng mục tiêu đang hoạt động. Có cảnh báo xác nhận khi chuyển đổi giữa các mục tiêu.
+* **Chu kỳ Pomodoro chuẩn:** 25 phút Tập trung -> 5 phút Nghỉ ngắn (lặp lại 4 lần) -> 15 phút Nghỉ dài.
+* **Ghi nhận tiến độ thông minh:** Sau mỗi phiên tập trung 25 phút, hệ thống tự động hỏi người dùng có muốn ghi nhận (log) tiến độ cho mục tiêu đó không.
+* **Âm thanh thông báo nâng cao:** Nâng cấp âm thanh kết thúc chu kỳ thành chuỗi "Ding-Dong" (2 nốt) êm ái và rõ ràng hơn bằng Web Audio API.
+* **Thông báo hệ thống (Browser Notifications):** Tích hợp thông báo đẩy trên trình duyệt khi kết thúc phiên Tập trung hoặc Nghỉ ngơi, giúp người dùng nhận biết ngay cả khi đang ở tab khác hoặc ứng dụng khác.
+* **Thống kê Pomodoro trên Dashboard:** Hiển thị số phiên Pomodoro đã hoàn thành trong ngày ngay trên Dashboard.
+* **Đa ngôn ngữ:** Hỗ trợ đầy đủ tiếng Việt và tiếng Anh cho giao diện và nội dung thông báo Pomodoro.
+
+### Cải tiến
+* **Timer chính xác:** Sử dụng thuật toán dựa trên timestamp (`Date.now()`) để loại bỏ tình trạng sai lệch thời gian (drift) sau nhiều chu kỳ.
+* **Lưu trữ bền vững:** Thống kê Pomodoro được lưu trữ cục bộ qua `localStorage` (Zustand persist), đảm bảo không mất dữ liệu khi refresh trang.
+* **Giao diện Responsive:** Widget được tối ưu hiển thị trên cả Mobile và Desktop, hỗ trợ Light Mode và Dark Mode.
+
+## [Sprint 8] - 2026-06-10 (Archive & Bulk Actions)
+### Đã thêm
+* **Lưu trữ mục tiêu (Archive):** Thêm khả năng lưu trữ các mục tiêu cũ. Mục tiêu được lưu trữ sẽ biến mất khỏi Dashboard và các tính toán thống kê nhưng vẫn giữ nguyên log cũ trong database.
+* **Tab "Đã lưu trữ":** Bổ sung tab riêng biệt trên trang Quản lý Mục Tiêu (`/goals`) để xem và khôi phục các mục tiêu đã lưu trữ.
+* **Thao tác hàng loạt (Bulk Actions):** Kích hoạt chế độ "Chọn nhiều" để người dùng thực hiện Lưu trữ, Tạm dừng, Khôi phục, hoặc Xóa hàng loạt mục tiêu chỉ với 1 click.
+* **Floating Action Bar (FAB):** Thanh công cụ trượt lên thông minh khi đang trong chế độ chọn nhiều, tích hợp các action thao tác hàng loạt.
+* **Bulk Delete Modal:** Thêm modal xác nhận liệt kê các mục tiêu sắp bị xóa để chống rủi ro thao tác nhầm.
+
+### Cải tiến
+* **Schema Database:** Thêm trường `is_archived` (Boolean) và `archived_at` (DateTime) vào model `Goal`.
+* **API Hiệu suất cao:** Thêm các endpoint `PUT /bulk/archive`, `PUT /bulk/pause`, `POST /bulk/delete` để cập nhật đồng thời nhiều bản ghi.
+* **Vá lỗi tự động Reset (`syncAndResetGoalProgress`):** Hàm reset chu kỳ giờ đây tôn trọng và bảo vệ trạng thái "paused" của mục tiêu, không tự động kích hoạt lại các thói quen đang bị đóng băng.
+
+## [Sprint 8] - 2026-06-10 (Trend Comparison - Realtime Daily Summary)
+### Đã thêm
+* **Trend Comparison trên Stats Dashboard:** Thêm widget so sánh xu hướng hiệu suất thói quen theo ngày, tuần và tháng ngay sau Bento Grid.
+* **API thống kê xu hướng:** Thêm endpoint `GET /api/stats/trend` hỗ trợ `period=day|week|month` và `goalId` tùy chọn để lọc theo từng mục tiêu.
+* **Chế độ xem tất cả mục tiêu:** Thêm 2 chế độ hiển thị khi chọn `Tất cả mục tiêu`: `Tổng thể` để xem biểu đồ chung và `Chi tiết` để xem từng mục tiêu theo hàng ngang.
+* **Tổng kết theo ngày:** Thêm bảng `Hôm qua` và `Hôm nay` hiển thị số mục tiêu đã đạt target và chưa đạt target.
+* **Gợi ý cải thiện theo ngày:** Thêm khối gợi ý dựa trên các mục tiêu hôm qua/hôm nay chưa đạt target.
+
+### Cải tiến
+* **Dữ liệu realtime và thực tế hơn:** API đọc trực tiếp từ `GoalLog`, chống cache bằng `Cache-Control: no-store` và tính toán lại theo dữ liệu hiện tại.
+* **So sánh tuần theo tuần lịch:** Chế độ tuần dùng tuần lịch Monday-Sunday và so sánh với tuần lịch liền trước, không còn dùng cách lấy hôm nay trừ 7 ngày.
+* **Logic bảng Hôm qua/Hôm nay chính xác hơn:** Bảng ngày không còn tính goal là hoàn thành chỉ vì có ít nhất 1 log; hiện tại goal chỉ được tính `Đã đạt` khi số log trong ngày lớn hơn hoặc bằng `target_count`.
+* **Hiển thị tiếng Việt có dấu:** Chuẩn hóa text trong widget sang tiếng Việt, bao gồm `Tổng thể`, `Chi tiết`, `Kỳ trước`, `Hiện tại`, `Đã đạt`, `Chưa đạt`.
+* **UX khi lọc mục tiêu:** Khi chọn một mục tiêu cụ thể, widget hiển thị rõ tên mục tiêu đang lọc; khi xem tất cả mục tiêu, widget ghi rõ đang xem tổng thể hay chi tiết.
+* **Thứ tự so sánh trực quan hơn:** `Kỳ trước` hiển thị bên trái, `Hiện tại` hiển thị bên phải trong biểu đồ và thẻ chi tiết.
+
+## [Sprint 8] - 2026-06-10 (Trend Comparison & Goal Comparison)
+### Thêm mới & Cải tiến (Added & Improved)
+* **Widget Trend Comparison (So sánh xu hướng):** Thêm component `TrendComparison` trong `src/components/stats/` sử dụng `recharts` để vẽ biểu đồ cột đôi (Grouped Bar Chart). Tích hợp trực tiếp vào màn hình `Stats Dashboard` ngay bên dưới khối Bento Grid.
+* **So sánh hiệu suất đa khung hình:** Hỗ trợ so sánh hiệ2u suất thói quen theo 3 mốc thời gian: `Ngày vs Ngày`, `Tuần này vs Tuần trước`, và `Tháng này vs Tháng trước`. Hiển thị tỷ lệ phần trăm thay đổi (tăng/giảm) trực quan bằng màu sắc (xanh/đỏ) trong chế độ so sánh Tháng.
+* **Bộ lọc và Hiển thị chi tiết:** Cung cấp bộ lọc dropdown cho phép người dùng xem dữ liệu theo "Tất cả mục tiêu" hoặc chọn một mục tiêu cụ thể. Tích hợp Custom Tooltip hiển thị chi tiết tên mốc thời gian, giá trị kỳ hiện tại, giá trị kỳ trước và tên mục tiêu.
+* **API Endpoint Trend Comparison:** Thêm mới route `GET /api/stats/trend` trong `src/routes/stats.ts`. Hỗ trợ các query parameter `period` (`day`, `week`, `month`) và `goalId` (tùy chọn).
+* **Xử lý Logic Backend:** Xây dựng logic trong `statsController.ts` tính toán tổng hiện tại, kỳ trước, tỷ lệ phần trăm thay đổi và format dữ liệu phù hợp với `recharts`.
+
 ## [Đã hoàn thành] - Sprint 8 - Hoàn thiện nhắc hẹn trong app và gỡ thông báo thử - 2026-06-09 (GMT+7)
 
 ### Đã thêm & cải tiến

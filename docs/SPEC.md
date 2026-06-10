@@ -104,6 +104,17 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
         * Popup Menu hành động (Tạm dừng/Kích hoạt lại, Chỉnh sửa, Xóa) cho từng thẻ mục tiêu. Khi tạm dừng (Paused), thẻ mục tiêu sẽ giảm độ mờ (`opacity-60`) và chuyển sang trạng thái tạm dừng, cho phép người dùng kích hoạt lại bất cứ lúc nào.
     * **Vòng tròn tổng quan (Overall Progress Ring):** Vòng tròn tiến độ lớn tự động tính toán và hiển thị Tỷ lệ hoàn thành trung bình của tất cả các mục tiêu đang hoạt động, kèm các thành tích/danh hiệu (Elite Strategist) để gia tăng động lực.
 
+#### US-23: Lưu trữ mục tiêu & Thao tác hàng loạt (Archive & Bulk Actions)
+* **Độ ưu tiên:** High
+* **Story Point:** 5.0
+* **Tiêu chí chấp nhận (AC):**
+    * **Lưu trữ đơn lẻ:** Menu tùy chọn của mỗi mục tiêu có thêm nút "Lưu trữ". Khi chọn, hệ thống cập nhật trường `is_archived` thành `true`. Mục tiêu sau khi lưu trữ sẽ giữ nguyên toàn bộ lịch sử tiến độ trong Database nhưng tự động biến mất khỏi Dashboard và các chỉ số thống kê tổng hợp.
+    * **Hệ thống Tabs trên Goals Page:** Tách không gian hiển thị thành Tab "Đang hoạt động" và Tab "Đã lưu trữ" (hiển thị mục tiêu mờ kèm icon đóng gói). Cho phép khôi phục mục tiêu lưu trữ trở lại hoạt động bình thường.
+    * **Chế độ Chọn nhiều (Selection Mode):** Cung cấp công tắc để bật tắt chế độ chọn nhiều mục tiêu cùng lúc bằng Checkbox.
+    * **Thanh công cụ nổi (Floating Action Bar):** Hiển thị thanh tác vụ dính dưới đáy màn hình khi có ít nhất 1 mục tiêu được chọn, tích hợp các hành động hàng loạt: Archive, Pause, Delete.
+    * **Xóa an toàn (Bulk Delete Modal):** Khi thực hiện thao tác xóa nhiều mục tiêu, bắt buộc hiển thị Modal cảnh báo liệt kê danh sách tên các mục tiêu sắp xóa để yêu cầu xác nhận cuối cùng.
+    * **Tối ưu Backend API:** Cung cấp các Endpoint xử lý mảng ID mục tiêu đồng thời (`bulk/archive`, `bulk/pause`, `bulk/delete`) để giảm tải giao tiếp mạng thay vì gọi vòng lặp update lẻ tẻ.
+
 ### 📦 Module 4: Settings & Appearance Customization (Sprint 4 — 6.0 SP)
 
 #### US-07: Quản lý hồ sơ và Cấu hình cá nhân
@@ -168,6 +179,34 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * **AC-5:** Nếu mục tiêu đã được hoàn thành trước giờ nhắc → không gửi thông báo cho goal đó.
     * **AC-6:** Nhắc chung 21h loại trừ các goal đã cài đặt `reminder_time` riêng (dù goal đó đã xong hay chưa).
 
+#### US-22: So sánh xu hướng hiệu suất thói quen (Trend Comparison)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 4.0
+* **Mục tiêu:** Người dùng có thể so sánh hiệu suất thói quen theo ngày, tuần và tháng để biết mình đang tiến bộ hay giảm hiệu suất.
+* **Tiêu chí chấp nhận (AC):**
+    * **AC-1:** Trang Stats hiển thị widget **So sánh xu hướng** ngay sau Bento Grid.
+    * **AC-2:** Widget hỗ trợ biểu đồ cột đôi so sánh `Kỳ trước` và `Hiện tại`.
+    * **AC-3:** Có toggle `Ngày`, `Tuần`, `Tháng`; dữ liệu cập nhật khi đổi chế độ.
+    * **AC-4:** Chế độ tuần dùng tuần lịch Monday-Sunday và so sánh với tuần lịch liền trước.
+    * **AC-5:** Chế độ tháng hiển thị phần trăm thay đổi, màu xanh khi tăng và màu đỏ khi giảm.
+    * **AC-6:** Có dropdown lọc theo `Tất cả mục tiêu` hoặc từng mục tiêu cụ thể của user.
+    * **AC-7:** Khi chọn `Tất cả mục tiêu`, có 2 chế độ: `Tổng thể` để xem biểu đồ chung và `Chi tiết` để xem từng mục tiêu theo hàng ngang.
+    * **AC-8:** Bảng `Hôm qua` và `Hôm nay` hiển thị số mục tiêu `Đã đạt` và `Chưa đạt` theo `target_count`, không chỉ dựa vào việc có log hay chưa.
+    * **AC-9:** Tooltip biểu đồ hiển thị mốc thời gian, giá trị kỳ trước, giá trị hiện tại và tên mục tiêu nếu đang lọc theo goal cụ thể.
+    * **AC-10:** API `GET /api/stats/trend` trả về dữ liệu realtime từ `GoalLog`, hỗ trợ query `period=day|week|month` và `goalId?: string`.
+
+#### US-24: Hẹn giờ Pomodoro (Pomodoro Timer Integration)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 5.0
+* **Tiêu chí chấp nhận (AC):**
+    * **Entry Point:** Thêm nút **"⏱ Pomodoro"** trên `GoalCard` cho mục tiêu đang active. Nếu có phiên đang chạy cho goal khác, yêu cầu xác nhận trước khi chuyển.
+    * **Timer Widget:** Hiển thị floating widget cố định ở góc dưới bên phải. Hiển thị tên goal, trạng thái (Focus/Break), đồng hồ đếm ngược `MM:SS` và các nút điều khiển (Pause, Resume, Stop, Minimize).
+    * **Chu kỳ Pomodoro:** 25m Focus -> 5m Short Break (lặp lại 4 lần) -> 15m Long Break. Reset chu kỳ sau Long Break.
+    * **Đồng hồ chống drift:** Tính toán thời gian dựa trên timestamp (`Date.now()`) để đảm bảo chính xác tuyệt đối.
+    * **Thông báo & Log:** Phát âm thanh "ding" khi hết giờ. Sau phiên Focus, hiển thị prompt hỏi người dùng có muốn ghi nhận (log) tiến độ cho goal đó không.
+    * **Thống kê Pomodoro:** Lưu số phiên Focus hoàn thành trong ngày vào `localStorage` (Zustand persist). Dashboard hiển thị số lượng 🍅 hoàn thành trong ngày hiện tại.
+    * **Responsive & Theme:** Widget hiển thị tốt trên cả Light/Dark Mode và thu nhỏ thông minh trên Mobile (≤ 768px).
+
 ---
 
 ### 📦 Module 6: Accountability Partners & Social Sharing (Sprint 6 — 8.0 SP)
@@ -193,6 +232,36 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
         * **Download PNG:** Tải trực tiếp ảnh từ Canvas về thiết bị.
         * **Web Share API:** Chia sẻ file ảnh hoặc link thành tích trực tiếp lên các ứng dụng trên thiết bị di động/máy tính hỗ trợ.
         * **Social Share Intent:** Cung cấp link chia sẻ trực tiếp đi kèm thông điệp soạn sẵn lên Twitter và Facebook.
+
+#### US-26: Bình luận & Chat nhóm (Group Chat)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 8.0
+* **Mục tiêu:** Cho phép thành viên trong nhóm gửi tin nhắn, phản ứng emoji và nhận thông báo để tăng tinh thần đồng đội.
+* **Tiêu chí chấp nhận (AC):**
+    * **Vị trí:** Section "💬 Bình luận nhóm" nằm dưới Leaderboard trong trang chi tiết nhóm. Chỉ hiển thị cho thành viên nhóm.
+    * **Hiển thị tin nhắn:** Tối đa 30 tin nhắn gần nhất. Mỗi tin nhắn có Avatar rút gọn (2 ký tự), tên người gửi, nội dung (max 200 ký tự) và timestamp tương đối.
+    * **Gửi tin nhắn:** Hỗ trợ nút "Gửi" và phím "Enter". Sử dụng Optimistic Update để hiển thị tức thì.
+    * **Phản ứng Emoji:** Hỗ trợ 5 emoji: 🔥 💪 👏 ❤️ 😂. Click để toggle reaction, hiển thị số đếm bên cạnh emoji.
+    * **Quyền hạn (Moderation):** 
+        - Admin/Owner nhóm có quyền xóa bất kỳ tin nhắn nào.
+        - Thành viên chỉ được xóa tin nhắn của chính mình.
+        - API enforce quyền xóa ở backend.
+    * **Push Notification:** 
+        - Gửi thông báo cho tất cả thành viên (trừ người gửi) khi có tin nhắn mới.
+        - Giới hạn tối đa 3 thông báo nhóm mỗi ngày cho mỗi user để tránh spam.
+    * **Giao diện:** Hỗ trợ Light/Dark Mode, Responsive (không bị bàn phím ảo che khuất trên mobile).
+
+#### US-29: Theo dõi bạn bè & Feed hoạt động (Friends Follow & Activity Feed)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 5.0
+* **Mục tiêu:** Cho phép người dùng kết nối, theo dõi bạn bè và xem các hoạt động rèn luyện gần đây của họ để tạo động lực.
+* **Tiêu chí chấp nhận (AC):**
+    * **Tìm kiếm bạn bè:** Trang `/friends` cho phép tìm kiếm người dùng khác theo Tên hoặc Email. Kết quả hiển thị Avatar, Level và Streak cao nhất.
+    * **Hệ thống Follow 1 chiều:** Người dùng có thể nhấn "Theo dõi" để kết nối với người khác mà không cần sự đồng ý. Có thể "Hủy theo dõi" bất kỳ lúc nào.
+    * **Dashboard Activity Feed:** Khung "Bạn bè hôm nay" trên Dashboard hiển thị tối đa 5 hoạt động check-in mới nhất từ những người đang theo dõi.
+    * **Quyền riêng tư:** Người dùng có thể bật/tắt tùy chọn "Hiển thị hoạt động trong Feed bạn bè" trong phần Cài đặt. Nếu tắt, hoạt động của họ sẽ không xuất hiện trên feed của người khác.
+    * **Thống kê Follow:** Hiển thị số lượng "Đang theo dõi" và "Người theo dõi" trong trang Cài đặt hoặc Hồ sơ.
+    * **Hiệu năng & UX:** Tìm kiếm có cơ chế debounce để tránh quá tải API. Các hành động follow/unfollow sử dụng Optimistic Update để phản hồi tức thì.
 
 ---
 
@@ -252,6 +321,22 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
 * `authStore` phải parse `localStorage.user` an toàn. Nếu JSON hỏng, xóa session cục bộ và đưa người dùng về login.
 * Service worker không được cache/intercept app shell ở `localhost`, tránh lỗi trắng trang khi dev.
 * Database schema phải đồng bộ với Prisma schema trước khi test login/freeze.
+
+### Discipline Room (Phòng Kỷ Luật)
+* **Mục tiêu:** Cung cấp trải nghiệm tập trung cao độ thông qua mô phỏng phòng làm việc ảo có AI Camera Coach giám sát.
+* **Luồng sử dụng:**
+  - **Create Room:** Người dùng nhập mục tiêu, chọn chế độ (Study/Deep Work), và thời gian phiên.
+  - **Waiting Room:** Hiển thị mã mời và giả lập partner tham gia sau 3 giây.
+  - **Active Session:** 
+    - Đếm ngược 3 giây trước khi bắt đầu.
+    - Xin quyền Camera, stream video trực tiếp.
+    - Randomize trạng thái AI Coach mỗi 10 giây (Focused, Away).
+    - Cập nhật Focus Score và Presence Score thời gian thực.
+  - **Session Report:** Thống kê sau phiên, quy đổi Focus Score thành XP Earned và cung cấp Insight.
+* **API / Component liên quan:**
+  - Component: `src/pages/DisciplineRoomPage.tsx`
+  - Routes: Đăng ký `/discipline-room` trong `App.tsx`.
+* **Mở rộng tương lai:** Có thể tích hợp WebRTC và MediaPipe (Face Detection) thật thay cho giả lập.
 
 ### Thông tin còn thiếu / cần hoàn thiện
 * Chưa có migration file chính thức cho Streak Freeze trong `prisma/migrations`.

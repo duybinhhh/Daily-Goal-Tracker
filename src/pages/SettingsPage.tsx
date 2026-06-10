@@ -3,8 +3,11 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
+import { usePomodoroStore } from "../store/pomodoroStore";
 import { useTranslation } from "../i18n";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
+import { getFriendStats } from "../services/friends";
+import { FriendStats } from "../types";
 import {
   getActiveSubscription,
   subscribeToPush,
@@ -13,14 +16,17 @@ import {
 
 export function SettingsPage() {
   const { t } = useTranslation();
-  const { user, updateProfile, deleteAccount, logout, loading, error, clearError } = useAuthStore();
+  const { user, updateProfile, updatePrivacy, deleteAccount, logout, loading, error, clearError } = useAuthStore();
   const { goals, fetchGoals, isOffline } = useGoalStore();
+  const { settings: pomodoroSettings, updateSettings: updatePomodoroSettings } = usePomodoroStore();
   const navigate = useNavigate();
 
   // Local settings states (saved to localStorage for client preferences, or server for profile)
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
   const [timezone, setTimezone] = useState(user?.timezone || "UTC");
+  const [showActivityInFeed, setShowActivityInFeed] = useState(user?.show_activity_in_feed ?? true);
+  const [friendStats, setFriendStats] = useState<FriendStats>({ followingCount: 0, followersCount: 0 });
 
   const [streakNotify, setStreakNotify] = useState(() => {
     return localStorage.getItem("setting_streakNotify") !== "false";
@@ -61,6 +67,16 @@ export function SettingsPage() {
       }
     }
     loadSubscriptionStatus();
+
+    async function loadFriendStats() {
+      try {
+        const stats = await getFriendStats();
+        setFriendStats(stats);
+      } catch (err) {
+        console.error("Failed to load friend stats:", err);
+      }
+    }
+    loadFriendStats();
   }, []);
 
   const handleActiveRemindersChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -261,10 +277,20 @@ export function SettingsPage() {
                   <div>
                     <h3 className="text-xl font-bold text-on-surface">{user?.name || "User"}</h3>
                     <p className="text-sm text-on-surface-variant">{user?.email || "No Email"}</p>
-                    <span className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-secondary/15 text-secondary text-[10px] font-bold rounded-full uppercase tracking-wider">
-                      <span className="material-symbols-outlined ms-filled text-[12px]">local_fire_department</span>
-                      {t("dashboard.streakBadge")}: {bestStreak} {t("common.days")}
-                    </span>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-secondary/15 text-secondary text-[10px] font-bold rounded-full uppercase tracking-wider">
+                        <span className="material-symbols-outlined ms-filled text-[12px]">local_fire_department</span>
+                        {t("dashboard.streakBadge")}: {bestStreak} {t("common.days")}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/15 text-primary text-[10px] font-bold rounded-full uppercase tracking-wider">
+                        <span className="material-symbols-outlined ms-filled text-[12px]">group</span>
+                        Đang theo dõi: {friendStats.followingCount}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-500/15 text-indigo-400 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                        <span className="material-symbols-outlined ms-filled text-[12px]">person_check</span>
+                        Người theo dõi: {friendStats.followersCount}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -449,22 +475,28 @@ export function SettingsPage() {
                 <div className="h-[1px] bg-white/5"></div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-on-surface">{t("settings.activeReminders")}</p>
-                    <p className="text-[11px] text-on-surface-variant">{t("settings.activeRemindersDesc")}</p>
+                    <p className="text-sm font-semibold text-on-surface">Hiển thị hoạt động trong Feed bạn bè</p>
+                    <p className="text-[11px] text-on-surface-variant">Cho phép bạn bè thấy hoạt động check-in của bạn</p>
                   </div>
                   <div>
                     <input
                       type="checkbox"
-                      id="active-reminders"
+                      id="privacy-feed"
                       className="hidden switch-checkbox"
-                      checked={activeReminders}
-                      disabled={subscribing}
-                      onChange={handleActiveRemindersChange}
+                      checked={showActivityInFeed}
+                      onChange={async (e) => {
+                        const checked = e.target.checked;
+                        setShowActivityInFeed(checked);
+                        try {
+                          await updatePrivacy(checked);
+                        } catch (err) {
+                          setShowActivityInFeed(!checked);
+                        }
+                      }}
                     />
                     <label
-                      htmlFor="active-reminders"
+                      htmlFor="privacy-feed"
                       className="switch-label relative inline-block w-12 h-6 bg-white/10 rounded-full cursor-pointer transition-colors duration-300"
-                      style={{ opacity: subscribing ? 0.6 : 1 }}
                     >
                       <span className="switch-dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-md"></span>
                     </label>
@@ -585,6 +617,41 @@ export function SettingsPage() {
                   <p className="text-[11px] text-on-surface-variant">{t("settings.languageDesc")}</p>
                 </div>
                 <LanguageSwitcher />
+              </div>
+            </section>
+
+            {/* Pomodoro Section */}
+            <section className="glass-card p-6 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-error/10 rounded-xl text-error">
+                  <span className="material-symbols-outlined text-[22px]">timer</span>
+                </div>
+                <h3 className="font-bold text-lg text-on-surface">{t("pomodoro.settingsTitle")}</h3>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-on-surface">{t("pomodoro.focusDuration")}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    className="w-20 bg-surface-container-low border border-white/5 rounded-xl px-3 py-1.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-all"
+                    value={pomodoroSettings.focusDuration}
+                    onChange={(e) => updatePomodoroSettings({ focusDuration: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
+                <div className="h-[1px] bg-white/5"></div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-on-surface">{t("pomodoro.shortBreakDuration")}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    className="w-20 bg-surface-container-low border border-white/5 rounded-xl px-3 py-1.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-all"
+                    value={pomodoroSettings.shortBreakDuration}
+                    onChange={(e) => updatePomodoroSettings({ shortBreakDuration: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
               </div>
             </section>
 

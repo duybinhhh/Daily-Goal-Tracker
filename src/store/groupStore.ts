@@ -42,6 +42,9 @@ export interface HabitGroupDetail {
   created_at: string;
   isJoined: boolean;
   members: GroupMemberProgress[];
+  invite_code?: string | null;
+  invite_expires_at?: string | null;
+  max_members?: number;
 }
 
 interface GroupState {
@@ -61,8 +64,12 @@ interface GroupState {
   }) => Promise<void>;
   joinGroup: (id: string) => Promise<void>;
   leaveGroup: (id: string) => Promise<void>;
+  removeMember: (groupId: string, userId: string) => Promise<void>;
   deleteGroup: (id: string) => Promise<void>;
   clearError: () => void;
+  createInviteCode: (groupId: string) => Promise<{ inviteCode: string; expiresAt: string }>;
+  getGroupByInviteCode: (inviteCode: string) => Promise<{ status: "valid" | "expired" | "full" | "invalid"; group?: any; message?: string }>;
+  joinGroupByInviteCode: (inviteCode: string) => Promise<{ success: boolean; groupId: string; alreadyMember?: boolean; message?: string }>;
 }
 
 export const useGroupStore = create<GroupState>((set, get) => ({
@@ -149,6 +156,19 @@ export const useGroupStore = create<GroupState>((set, get) => ({
     }
   },
 
+  removeMember: async (groupId: string, userId: string) => {
+    set({ loading: true, error: null });
+    try {
+      await api.delete(`/api/groups/${groupId}/members/${userId}`);
+      set({ loading: false });
+      await get().fetchGroupById(groupId);
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to remove member.";
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
   deleteGroup: async (id: string) => {
     set({ loading: true, error: null });
     try {
@@ -157,6 +177,61 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       await get().fetchGroups();
     } catch (error: any) {
       const msg = error.response?.data?.message || "Failed to delete habit group.";
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  createInviteCode: async (groupId: string) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.post(`/api/groups/${groupId}/invite`);
+      const { inviteCode, expiresAt } = response.data;
+      set({ loading: false });
+      // Refresh group details to get new invite info
+      await get().fetchGroupById(groupId);
+      return { inviteCode, expiresAt };
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to generate invite link.";
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  getGroupByInviteCode: async (inviteCode: string) => {
+    try {
+      const response = await api.get(`/api/groups/invite/${inviteCode}`);
+      return response.data;
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Link mời không hợp lệ.";
+      throw new Error(msg);
+    }
+  },
+
+  joinGroupByInviteCode: async (inviteCode: string) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.post(`/api/groups/join/${inviteCode}`);
+      set({ loading: false });
+      
+      if (response.data.groupId) {
+        await get().fetchGroupById(response.data.groupId);
+        await get().fetchGroups();
+        
+        // Award XP
+        try {
+          const { useXPStore } = await import("./xpStore");
+          const { XP_RULES } = await import("../lib/xpSystem");
+          const { awardXP } = useXPStore.getState();
+          awardXP(XP_RULES.JOIN_GROUP, "join_group").catch(() => {});
+        } catch (xpErr) {
+          console.warn("[XP] Award trigger failed:", xpErr);
+        }
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to join group.";
       set({ error: msg, loading: false });
       throw new Error(msg);
     }
