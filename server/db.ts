@@ -90,6 +90,40 @@ function mapGroupMessage(m: any) {
   };
 }
 
+function mapDisciplineRoom(r: any) {
+  if (!r) return null;
+  return {
+    ...r,
+    started_at: r.started_at ? r.started_at.toISOString() : null,
+    ended_at: r.ended_at ? r.ended_at.toISOString() : null,
+    created_at: r.created_at.toISOString(),
+    updated_at: r.updated_at.toISOString(),
+    participants: r.participants ? r.participants.map(mapRoomParticipant) : [],
+  };
+}
+
+function mapRoomParticipant(p: any) {
+  if (!p) return null;
+  return {
+    ...p,
+    joined_at: p.joined_at.toISOString(),
+    left_at: p.left_at ? p.left_at.toISOString() : null,
+    user: p.user ? {
+      id: p.user.id,
+      name: p.user.name,
+      email: p.user.email,
+    } : null,
+  };
+}
+
+function mapSessionReport(r: any) {
+  if (!r) return null;
+  return {
+    ...r,
+    created_at: r.created_at.toISOString(),
+  };
+}
+
 type StreakFreezeRecord = ReturnType<typeof mapFreeze>;
 
 class PrismaDB {
@@ -765,6 +799,73 @@ class PrismaDB {
       return await prisma.groupChatNotificationLog.create({
         data: { user_id, group_id }
       });
+    }
+  };
+
+  public disciplineRooms = {
+    findUnique: async (id: string) => {
+      const room = await prisma.disciplineRoom.findUnique({
+        where: { id },
+        include: { participants: { include: { user: true } } }
+      });
+      return mapDisciplineRoom(room);
+    },
+    findByInviteCode: async (inviteCode: string) => {
+      const room = await prisma.disciplineRoom.findUnique({
+        where: { invite_code: inviteCode },
+        include: { participants: { include: { user: true } } }
+      });
+      return mapDisciplineRoom(room);
+    },
+    create: async (data: { title: string; mode: string; duration_minutes: number; invite_code: string; creator_id: string; status: string }) => {
+      const created = await prisma.disciplineRoom.create({ data });
+      return mapDisciplineRoom(created);
+    },
+    update: async (id: string, data: { status?: string; started_at?: string; ended_at?: string }) => {
+      const prismaData: any = { ...data };
+      if (data.started_at) prismaData.started_at = new Date(data.started_at);
+      if (data.ended_at) prismaData.ended_at = new Date(data.ended_at);
+      const updated = await prisma.disciplineRoom.update({
+        where: { id },
+        data: prismaData,
+      });
+      return mapDisciplineRoom(updated);
+    }
+  };
+
+  public roomParticipants = {
+    findManyByRoomId: async (roomId: string) => {
+      const participants = await prisma.roomParticipant.findMany({
+        where: { room_id: roomId },
+        include: { user: true }
+      });
+      return participants.map(mapRoomParticipant);
+    },
+    create: async (data: { room_id: string; user_id: string; role: string }) => {
+      const created = await prisma.roomParticipant.create({ data });
+      return mapRoomParticipant(created);
+    },
+    updateByRoomAndUser: async (roomId: string, userId: string, data: { left_at?: string; final_focus_score?: number; xp_earned?: number }) => {
+      const prismaData: any = { ...data };
+      if (data.left_at) prismaData.left_at = new Date(data.left_at);
+      const updated = await prisma.roomParticipant.update({
+        where: { room_id_user_id: { room_id: roomId, user_id: userId } },
+        data: prismaData,
+      });
+      return mapRoomParticipant(updated);
+    }
+  };
+
+  public sessionReports = {
+    create: async (data: { room_id: string; user_id: string; duration_seconds: number; presence_score: number; focus_score: number; away_count: number; xp_earned: number; ai_insight: string }) => {
+      const created = await prisma.sessionReport.create({ data });
+      return mapSessionReport(created);
+    },
+    findByRoomAndUser: async (roomId: string, userId: string) => {
+      const report = await prisma.sessionReport.findFirst({
+        where: { room_id: roomId, user_id: userId }
+      });
+      return mapSessionReport(report);
     }
   };
 }

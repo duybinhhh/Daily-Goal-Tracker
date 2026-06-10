@@ -322,21 +322,29 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
 * Service worker không được cache/intercept app shell ở `localhost`, tránh lỗi trắng trang khi dev.
 * Database schema phải đồng bộ với Prisma schema trước khi test login/freeze.
 
-### Discipline Room (Phòng Kỷ Luật)
-* **Mục tiêu:** Cung cấp trải nghiệm tập trung cao độ thông qua mô phỏng phòng làm việc ảo có AI Camera Coach giám sát.
+### Discipline Room (Phòng Kỷ Luật) - AI Camera Coach
+* **Mục tiêu:** Cung cấp trải nghiệm tập trung cao độ thông qua mô phỏng phòng làm việc ảo có AI Camera Coach giám sát bằng công nghệ nhận diện khuôn mặt thời gian thực.
+* **Công nghệ AI:** Tích hợp **MediaPipe Tasks Vision (Face Detector)** chạy trực tiếp trên Browser (WASM).
 * **Luồng sử dụng:**
-  - **Create Room:** Người dùng nhập mục tiêu, chọn chế độ (Study/Deep Work), và thời gian phiên.
+  - **Create Room:** Người dùng nhập mục tiêu, chọn chế độ (Study/Deep Work), và thời gian phiên. Hệ thống tự động tải model AI (Pre-load).
   - **Waiting Room:** Hiển thị mã mời và giả lập partner tham gia sau 3 giây.
   - **Active Session:** 
     - Đếm ngược 3 giây trước khi bắt đầu.
     - Xin quyền Camera, stream video trực tiếp.
-    - Randomize trạng thái AI Coach mỗi 10 giây (Focused, Away).
-    - Cập nhật Focus Score và Presence Score thời gian thực.
-  - **Session Report:** Thống kê sau phiên, quy đổi Focus Score thành XP Earned và cung cấp Insight.
-* **API / Component liên quan:**
-  - Component: `src/pages/DisciplineRoomPage.tsx`
-  - Routes: Đăng ký `/discipline-room` trong `App.tsx`.
-* **Mở rộng tương lai:** Có thể tích hợp WebRTC và MediaPipe (Face Detection) thật thay cho giả lập.
+    - **Real AI Detection Loop**: Chạy detection mỗi 1000ms.
+    - **Phân tích trạng thái**: 
+        - `Focused`: Phát hiện có khuôn mặt.
+        - `Away`: Không phát hiện khuôn mặt liên tục trong 5 giây.
+    - **Hệ thống Chỉ số (Metrics)**:
+        - `Presence Score`: (Số giây phát hiện mặt / Tổng số giây session) * 100.
+        - `Away Count`: Số lần chuyển từ Focused sang Away.
+        - `Focus Score`: max(0, Presence Score - Away Count * 5).
+  - **Session Report:** Thống kê sau phiên, quy đổi Focus Score thành XP Earned và cung cấp Insight từ AI Coach.
+* **Đặc điểm Kỹ thuật:**
+  - Chạy 100% Client-side: Video không được gửi lên server, đảm bảo quyền riêng tư tuyệt đối.
+  - Xử lý cleanup: Tự động giải phóng Camera và AI detector khi kết thúc phiên hoặc rời trang.
+  - Xử lý lỗi: Thông báo rõ ràng khi trình duyệt không hỗ trợ camera hoặc bị từ chối quyền.
+* **Component liên quan:** `src/pages/DisciplineRoomPage.tsx`.
 
 ### Thông tin còn thiếu / cần hoàn thiện
 * Chưa có migration file chính thức cho Streak Freeze trong `prisma/migrations`.

@@ -33,6 +33,64 @@ model User {
   
   following     Follow[] @relation("UserFollowing")
   followers     Follow[] @relation("UserFollowers")
+
+  created_discipline_rooms DisciplineRoom[] @relation("RoomCreator")
+  room_memberships         RoomParticipant[]
+  session_reports          SessionReport[]
+}
+
+model DisciplineRoom {
+  id               String            @id @default(uuid())
+  title            String
+  mode             String            // STUDY, DEEP_WORK
+  duration_minutes Int               @default(15)
+  status           String            @default("WAITING") // WAITING, ACTIVE, COMPLETED, CANCELLED
+  invite_code      String            @unique
+  creator_id       String
+  creator          User              @relation("RoomCreator", fields: [creator_id], references: [id], onDelete: Cascade)
+  started_at       DateTime?
+  ended_at         DateTime?
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+  participants     RoomParticipant[]
+  reports          SessionReport[]
+
+  @@index([creator_id])
+}
+
+model RoomParticipant {
+  id                String         @id @default(uuid())
+  room_id           String
+  room              DisciplineRoom @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user_id           String
+  user              User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role              String         @default("PARTNER") // CREATOR, PARTNER
+  joined_at         DateTime       @default(now())
+  left_at           DateTime?
+  final_focus_score Int?
+  xp_earned         Int?
+
+  @@unique([room_id, user_id])
+  @@index([room_id])
+  @@index([user_id])
+}
+
+model SessionReport {
+  id               String         @id @default(uuid())
+  room_id          String
+  room             DisciplineRoom @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user_id          String
+  user             User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  duration_seconds Int
+  presence_score   Int
+  focus_score      Int
+  away_count       Int
+  xp_earned        Int
+  ai_insight       String?
+  created_at       DateTime       @default(now())
+
+  @@index([room_id])
+  @@index([user_id])
 }
 
 model Follow {

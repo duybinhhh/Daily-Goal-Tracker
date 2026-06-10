@@ -4,44 +4,334 @@
 
 # Changelog
 
-## [Sprint 10] - 2026-06-10 (Discipline Room Demo - Breakthrough Feature)
-### Đã thêm
-- **Phòng Kỷ Luật (Discipline Room Demo)**:
-  - Chức năng giúp người dùng rèn luyện sự tập trung tối đa, mô phỏng không gian học tập/làm việc chung với AI Camera Coach.
-  - **Trải nghiệm 4 bước chuyên nghiệp**:
-    1. **Create Room**: Giao diện tạo phòng với các tùy chọn linh hoạt:
-       - Đặt tên mục tiêu/phiên làm việc.
-       - Lựa chọn chế độ tập trung (Study / Deep Work).
-       - Lựa chọn thời lượng (5 phút, 15 phút, 25 phút).
-    2. **Waiting Room**: Phòng chờ trước khi bắt đầu:
-       - Sinh mã mời (Invite Code) ngẫu nhiên 6 ký tự (VD: DR-8F2K).
-       - Hỗ trợ nút sao chép mã mời tiện lợi.
-       - Giả lập (Mock) partner tham gia phòng sau 3 giây để tăng tính tương tác.
-    3. **Active Session**: Trải nghiệm không gian làm việc tập trung:
-       - Hiển thị đồng hồ đếm ngược 3 giây trước khi bắt đầu phiên.
-       - Tích hợp yêu cầu quyền sử dụng Camera an toàn qua `navigator.mediaDevices.getUserMedia`.
-       - Preview camera trực tiếp với giao diện hiện đại.
-       - **Mock AI Camera Coach**: Khung mô phỏng phân tích trạng thái người dùng (Detecting, Focused, Away) mỗi 10 giây.
-       - Tính toán và cập nhật theo thời gian thực các chỉ số: Focus Score (%), Presence Score (%), Away Count.
-       - Hiển thị trạng thái giả lập của partner (Online / Focused).
-       - Nút kết thúc phiên an toàn, đảm bảo cleanup hoàn toàn luồng camera và các bộ đếm.
-    4. **Session Report**: Báo cáo sau phiên làm việc:
-       - Thống kê chi tiết thời gian, Focus Score, Presence Score, và số lần rời khỏi màn hình.
-       - **XP Earned**: Tự động tính toán điểm kinh nghiệm nhận được dựa trên Focus Score (Thưởng tối đa lên đến 180 XP cho người dùng đạt 90% Focus Score).
-       - **AI Coach Insight**: Nhận xét phản hồi thông minh mô phỏng dựa trên hiệu suất tập trung, giúp người dùng rút kinh nghiệm cho các phiên sau.
-  - **Kiến trúc Frontend Demo Cứng Cáp**:
-    - Xây dựng hoàn toàn bằng React Functional Components, sử dụng Hooks hiệu quả (`useRef`, `useEffect`, `useState`).
-    - Thiết kế UI/UX đồng nhất với toàn bộ hệ thống (dùng Tailwind CSS, Lucide Icons, CSS Variables của project).
-    - Tích hợp liền mạch vào hệ thống Routing hiện tại (Route `/discipline-room`), hiển thị trực tiếp trên Navigation Sidebar và Bottom Nav.
-    - Quản lý Cleanup vòng đời Component chặt chẽ, không rò rỉ bộ nhớ (Memory Leak) hoặc rò rỉ quyền truy cập Camera.
+## [Sprint 10] - 2026-06-10
 
-### Kỹ thuật
-- **Frontend Components:**
-  - `src/pages/DisciplineRoomPage.tsx`: Chứa toàn bộ logic state máy trạng thái (State Machine) điều hướng luồng 4 bước của Discipline Room.
-  - Cập nhật `src/App.tsx`: Đăng ký Route `/discipline-room`.
-  - Cập nhật `src/components/Sidebar.tsx` và `src/components/BottomNav.tsx`: Bổ sung liên kết đến phòng kỷ luật.
-- **Tính năng mở rộng trong tương lai:**
-  - Prototype này là nền tảng vững chắc để tích hợp Socket.io (Realtime room), WebRTC (Gọi video peer-to-peer), và AI Face Detection model (TensorFlow.js / MediaPipe) trong các Sprint tiếp theo.
+### Discipline Room — Full-stack Integration & AI Camera Breakthrough
+
+---
+
+## Đã thêm
+
+### Discipline Room — Phòng Kỷ Luật phiên bản Full-stack
+
+* Nâng cấp **Discipline Room** từ bản demo local thành một tính năng có dữ liệu thật, API thật và được tích hợp trực tiếp vào hệ thống **Daily Goal Tracker**.
+* Người dùng có thể tạo phòng kỷ luật, mời partner bằng mã phòng, bắt đầu phiên tập trung, theo dõi trạng thái trong phiên và nhận báo cáo sau khi hoàn thành.
+* Discipline Room giúp sản phẩm không chỉ dừng lại ở việc tạo mục tiêu, tick hoàn thành, streak và XP, mà mở rộng thành trải nghiệm **cam kết tập trung có AI hỗ trợ giám sát và phản hồi**.
+* Tính năng này tạo điểm khác biệt lớn cho sản phẩm bằng cách kết hợp giữa:
+
+  * Goal Tracking
+  * Accountability Partner
+  * Gamification
+  * AI Camera Coach
+  * Session Report sau phiên
+
+---
+
+### AI Camera Coach — Nhận diện trạng thái tập trung bằng camera
+
+* Tích hợp **AI Camera Coach** vào phiên Discipline Room để phân tích trạng thái hiện diện và mức độ tập trung của người dùng trong quá trình thực hiện mục tiêu.
+* Hệ thống sử dụng **camera face detection chạy trực tiếp trên trình duyệt** để nhận diện trạng thái cơ bản của người dùng, ví dụ:
+
+  * `Focused`: người dùng đang hiện diện trước camera và duy trì phiên tập trung.
+  * `Away`: người dùng rời khỏi khung hình hoặc không còn được camera phát hiện trong một khoảng thời gian.
+* Chức năng này đóng vai trò như một **người giám sát kỷ luật ảo**, giúp phiên tập trung không còn chỉ dựa vào việc người dùng tự báo cáo, mà có thêm dữ liệu thực tế để đánh giá quá trình thực hiện.
+* AI Camera Coach giúp hệ thống tính toán các chỉ số quan trọng như:
+
+  * **Presence Score**: tỷ lệ thời gian người dùng xuất hiện trước camera.
+  * **Focus Score**: điểm tập trung tổng hợp dựa trên mức độ hiện diện và số lần bị gián đoạn.
+  * **Away Count**: số lần người dùng rời khỏi camera trong phiên.
+* Các chỉ số này được sử dụng để tạo **Session Report** sau phiên, giúp người dùng hiểu rõ hơn về mức độ tập trung của mình thay vì chỉ biết “đã hoàn thành” hay “chưa hoàn thành”.
+* Lợi ích chính của AI Camera Coach:
+
+  * Tăng tính cam kết khi người dùng tham gia phiên tập trung.
+  * Giảm tình trạng rời bàn hoặc bỏ dở giữa phiên.
+  * Giúp người dùng nghiêm túc hơn khi thực hiện mục tiêu.
+  * Tạo cảm giác có accountability giống như đang học/làm việc cùng một người giám sát.
+  * Làm cho sản phẩm khác biệt hơn so với các ứng dụng goal tracker thông thường.
+* Để đảm bảo quyền riêng tư, toàn bộ quá trình nhận diện camera được xử lý **local trên trình duyệt**:
+
+  * Không lưu video.
+  * Không lưu ảnh.
+  * Không gửi camera frame lên server.
+  * Backend chỉ nhận các dữ liệu thống kê tổng hợp như `Presence Score`, `Focus Score` và `Away Count`.
+
+---
+
+### Luồng phòng kỷ luật hoàn chỉnh
+
+* Bổ sung flow đầy đủ cho Discipline Room:
+
+  * Tạo phòng.
+  * Sinh mã mời.
+  * Partner tham gia phòng.
+  * Creator bắt đầu phiên.
+  * Camera AI theo dõi trạng thái tập trung.
+  * Gửi heartbeat để đồng bộ trạng thái phiên.
+  * Kết thúc phiên.
+  * Lưu báo cáo sau phiên.
+* Người dùng có thể tạo Discipline Room với:
+
+  * Tên phiên.
+  * Chế độ tập trung.
+  * Thời lượng phiên.
+* Hệ thống tự động sinh **mã mời 6 ký tự độc nhất** để partner có thể tham gia phòng.
+* Phiên bản MVP hiện tại hỗ trợ tối đa **2 người trong một phòng**, gồm:
+
+  * Creator
+  * Partner
+* Partner có thể tham gia phòng thông qua invite code.
+* Creator có thể bắt đầu phiên sau khi phòng được tạo.
+* Partner được tự động điều hướng vào phiên khi creator bắt đầu.
+* Sau khi phiên kết thúc, hệ thống hiển thị báo cáo gồm:
+
+  * Duration
+  * Presence Score
+  * Focus Score
+  * Away Count
+  * XP Earned
+  * AI Coach Insight
+
+---
+
+### Hệ thống API mới cho Discipline Room
+
+* Thêm bộ API mới để hỗ trợ toàn bộ luồng Discipline Room:
+
+| Method | Endpoint                             | Mô tả                                                    |
+| ------ | ------------------------------------ | -------------------------------------------------------- |
+| `POST` | `/api/discipline-room/create`        | Tạo phòng mới và sinh invite code độc nhất               |
+| `POST` | `/api/discipline-room/join`          | Tham gia phòng bằng mã mời                               |
+| `GET`  | `/api/discipline-room/:id`           | Lấy thông tin phòng, trạng thái và danh sách participant |
+| `POST` | `/api/discipline-room/:id/start`     | Bắt đầu phiên tập trung                                  |
+| `POST` | `/api/discipline-room/:id/heartbeat` | Gửi trạng thái phiên định kỳ                             |
+| `POST` | `/api/discipline-room/:id/end`       | Kết thúc phiên, tính XP và lưu báo cáo                   |
+| `GET`  | `/api/discipline-room/:id/report`    | Lấy báo cáo sau phiên                                    |
+
+* Các API được thiết kế để phục vụ đầy đủ flow:
+
+  * Create Room
+  * Join Room
+  * Start Session
+  * Active Session Heartbeat
+  * End Session
+  * Session Report
+
+---
+
+### Tích hợp XP thật
+
+* Kết nối Discipline Room với hệ thống XP hiện có của người dùng.
+* XP không còn là dữ liệu mock mà được tính và cập nhật thật sau khi người dùng hoàn thành phiên.
+* XP được tính dựa trên **Focus Score** sau phiên.
+* Người dùng có thể nhận tối đa **180 XP** nếu hoàn thành phiên với mức tập trung cao.
+* Sau khi nhận XP, hệ thống tự động cập nhật:
+
+  * Tổng XP của user.
+  * Level hiện tại của user.
+  * Tiến trình phát triển của user trong hệ thống gamification.
+* Việc tích hợp XP thật giúp Discipline Room trở thành một phần có giá trị trong vòng lặp động lực của sản phẩm:
+
+  * Tham gia phiên.
+  * Duy trì tập trung.
+  * Nhận XP.
+  * Tăng level.
+  * Có động lực tiếp tục sử dụng.
+
+---
+
+### Session Report lưu trữ bền vững
+
+* Thêm khả năng lưu trữ báo cáo phiên làm việc vào database thông qua model `SessionReport`.
+* Mỗi phiên sau khi kết thúc sẽ có một báo cáo riêng, giúp người dùng có thể xem lại hiệu suất tập trung của mình.
+* Báo cáo bao gồm:
+
+  * Thời lượng phiên.
+  * Presence Score.
+  * Focus Score.
+  * Away Count.
+  * XP Earned.
+  * AI Coach Insight.
+* AI Coach Insight được xử lý ở backend dựa trên dữ liệu hiệu suất thực tế của phiên.
+* Session Report giúp người dùng không chỉ biết mình có hoàn thành phiên hay không, mà còn hiểu được chất lượng của phiên tập trung.
+
+---
+
+### AI Coach Insight
+
+* Bổ sung AI Coach Insight sau mỗi phiên Discipline Room.
+* Insight được tạo dựa trên các chỉ số như:
+
+  * Focus Score
+  * Presence Score
+  * Away Count
+  * XP Earned
+* AI Coach Insight giúp người dùng nhận được phản hồi sau phiên, ví dụ:
+
+  * Khen khi duy trì tập trung tốt.
+  * Nhắc nhở khi rời khỏi camera nhiều lần.
+  * Gợi ý cải thiện cho phiên tiếp theo.
+* Chức năng này giúp Discipline Room có cảm giác giống một **AI Accountability Coach**, không chỉ ghi nhận dữ liệu mà còn đưa ra phản hồi có ý nghĩa.
+
+---
+
+### Cải tiến UI/UX
+
+* Thêm giao diện tạo Discipline Room trực quan và dễ sử dụng.
+* Thêm giao diện nhập invite code để partner tham gia phòng.
+* Cải thiện màn hình Waiting Room để hiển thị:
+
+  * Tên phòng.
+  * Invite code.
+  * Trạng thái partner.
+  * Trạng thái chờ bắt đầu phiên.
+* Cải thiện màn hình Active Session với:
+
+  * Camera preview.
+  * Timer.
+  * AI status.
+  * Presence Score.
+  * Focus Score.
+  * Away Count.
+  * Partner/session status.
+* Cải thiện Session Report để hiển thị kết quả rõ ràng sau phiên.
+* Bổ sung loading state cho các thao tác:
+
+  * Tạo phòng.
+  * Tham gia phòng.
+  * Bắt đầu phiên.
+  * Gửi heartbeat.
+  * Kết thúc phiên.
+* Bổ sung error handling khi thao tác API thất bại.
+* Thêm thông báo quyền riêng tư cho camera để người dùng hiểu rõ dữ liệu camera được xử lý như thế nào.
+
+---
+
+## Kỹ thuật
+
+### Database
+
+* Thêm các model mới trong Prisma để hỗ trợ Discipline Room:
+
+| Model             | Vai trò                            |
+| ----------------- | ---------------------------------- |
+| `DisciplineRoom`  | Lưu thông tin phòng kỷ luật        |
+| `RoomParticipant` | Lưu thông tin người tham gia phòng |
+| `SessionReport`   | Lưu báo cáo sau phiên              |
+
+* Các model mới giúp hệ thống lưu trữ:
+
+  * Thông tin phòng.
+  * Creator.
+  * Partner.
+  * Invite code.
+  * Trạng thái phòng.
+  * Thời gian bắt đầu/kết thúc.
+  * Kết quả phiên.
+  * XP nhận được.
+  * AI Coach Insight.
+
+---
+
+### Backend
+
+* Triển khai `disciplineRoomController.ts` để xử lý toàn bộ logic nghiệp vụ của Discipline Room.
+* Mở rộng `PrismaDB` wrapper trong `server/db.ts` để hỗ trợ các thao tác phức tạp liên quan đến room, participant và session report.
+* Đăng ký route mới cho Discipline Room trong hệ thống Express.
+* Bổ sung các kiểm tra quan trọng:
+
+  * Chỉ user đã đăng nhập mới được tạo/tham gia phòng.
+  * Phòng chỉ cho phép join khi đang ở trạng thái `WAITING`.
+  * Mỗi phòng MVP chỉ hỗ trợ tối đa 2 participant.
+  * Invite code phải độc nhất.
+  * Creator là người có quyền bắt đầu phiên.
+  * Backend không nhận hoặc lưu ảnh/video từ camera.
+* API end session đảm nhiệm:
+
+  * Nhận dữ liệu thống kê từ frontend.
+  * Tính XP.
+  * Cập nhật XP/level cho user.
+  * Lưu Session Report.
+  * Trả về kết quả để frontend hiển thị.
+
+---
+
+### Frontend
+
+* Thay thế dữ liệu mock bằng API thật cho các luồng chính:
+
+  * Create Room
+  * Join Room
+  * Start Session
+  * Heartbeat
+  * End Session
+  * Session Report
+* Tích hợp cơ chế heartbeat/polling để đồng bộ trạng thái phiên giữa creator và partner.
+* Giữ AI Face Detection chạy local trên browser.
+* Frontend chỉ gửi các dữ liệu thống kê tổng hợp lên server:
+
+  * `Presence Score`
+  * `Focus Score`
+  * `Away Count`
+  * `Status`
+* Bổ sung loading state và error state cho các thao tác quan trọng.
+* Tăng độ ổn định khi chuyển giữa các màn hình:
+
+  * Create Room
+  * Waiting Room
+  * Active Session
+  * Session Report
+
+---
+
+### Bảo mật và quyền riêng tư
+
+* Camera AI được thiết kế theo hướng privacy-first.
+* Hệ thống không lưu trữ dữ liệu nhạy cảm từ camera.
+* Các nguyên tắc đã áp dụng:
+
+  * Không lưu video.
+  * Không lưu ảnh.
+  * Không gửi camera frame lên server.
+  * Không nhận diện danh tính khuôn mặt.
+  * Không dùng camera để xác thực danh tính người dùng.
+  * Chỉ xử lý face detection local trên browser.
+  * Backend chỉ nhận dữ liệu thống kê tổng hợp.
+* Cách làm này giúp giảm rủi ro quyền riêng tư nhưng vẫn giữ được giá trị cốt lõi của AI Camera Coach.
+
+---
+
+## Giá trị nổi bật
+
+* Discipline Room giúp Daily Goal Tracker trở nên khác biệt so với các app quản lý mục tiêu thông thường.
+* Tính năng này biến trải nghiệm theo dõi mục tiêu từ dạng thụ động sang dạng chủ động:
+
+  * Không chỉ tick hoàn thành.
+  * Không chỉ xem streak.
+  * Không chỉ nhận XP.
+  * Mà còn có phiên tập trung được AI hỗ trợ theo dõi.
+* AI Camera Coach giúp người dùng có thêm cảm giác trách nhiệm trong quá trình thực hiện mục tiêu.
+* Session Report giúp người dùng nhìn lại chất lượng phiên làm việc thay vì chỉ biết kết quả cuối cùng.
+* XP thật và level thật giúp tăng động lực quay lại sử dụng sản phẩm.
+* Kiến trúc hiện tại đã sẵn sàng để phát triển tiếp các chức năng nâng cao như:
+
+  * Socket.io realtime.
+  * Partner status realtime.
+  * AI Coach API thật.
+  * Activity history.
+  * Focus analytics.
+  * Camera AI nâng cao theo từng mode.
+
+---
+
+## Ghi chú
+
+* Phiên bản hiện tại đã chuyển Discipline Room từ demo local sang tính năng full-stack cơ bản.
+* Camera AI vẫn được xử lý local trên trình duyệt để đảm bảo quyền riêng tư.
+* Cơ chế đồng bộ hiện tại sử dụng polling/heartbeat.
+* Socket.io realtime có thể được triển khai ở phase tiếp theo để đồng bộ trạng thái partner mượt hơn.
+* AI Coach Insight hiện được xử lý dựa trên logic backend, chưa tích hợp AI API nâng cao.
+* Camera AI hiện mới tập trung vào nhận diện trạng thái cơ bản như `Focused/Away`; các trạng thái nâng cao như `Reading/Writing`, `Looking Away`, `Head Down`, `Low Confidence` có thể được phát triển ở sprint sau.
+
 
 ## [Sprint 9] - 2026-06-10 (Friends Follow & Activity Feed)
 ### Đã thêm
