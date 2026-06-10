@@ -15,6 +15,7 @@ import TimelinePage from "./pages/TimelinePage";
 import FriendsPage from "./pages/FriendsPage";
 import GoalsPage from "./pages/GoalsPage";
 import GroupsPage from "./pages/GroupsPage";
+import { DisciplineRoomPage } from "./pages/DisciplineRoomPage";
 import { QuickCheckInPage } from "./pages/QuickCheckInPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import JoinGroupPage from "./pages/JoinGroupPage";
@@ -219,6 +220,7 @@ function AppLayout() {
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/quick-checkin" element={<QuickCheckInPage />} />
+          <Route path="/discipline-room" element={<DisciplineRoomPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

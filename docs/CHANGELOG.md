@@ -4,6 +4,45 @@
 
 # Changelog
 
+## [Sprint 10] - 2026-06-10 (Discipline Room Demo - Breakthrough Feature)
+### Đã thêm
+- **Phòng Kỷ Luật (Discipline Room Demo)**:
+  - Bản demo chức năng đột phá giúp người dùng rèn luyện sự tập trung tối đa, mô phỏng không gian học tập/làm việc chung với AI Camera Coach.
+  - **Trải nghiệm 4 bước chuyên nghiệp**:
+    1. **Create Room**: Giao diện tạo phòng với các tùy chọn linh hoạt:
+       - Đặt tên mục tiêu/phiên làm việc.
+       - Lựa chọn chế độ tập trung (Study / Deep Work).
+       - Lựa chọn thời lượng (5 phút, 15 phút, 25 phút).
+    2. **Waiting Room**: Phòng chờ trước khi bắt đầu:
+       - Sinh mã mời (Invite Code) ngẫu nhiên 6 ký tự (VD: DR-8F2K).
+       - Hỗ trợ nút sao chép mã mời tiện lợi.
+       - Giả lập (Mock) partner tham gia phòng sau 3 giây để tăng tính tương tác.
+    3. **Active Session**: Trải nghiệm không gian làm việc tập trung:
+       - Hiển thị đồng hồ đếm ngược 3 giây trước khi bắt đầu phiên.
+       - Tích hợp yêu cầu quyền sử dụng Camera an toàn qua `navigator.mediaDevices.getUserMedia`.
+       - Preview camera trực tiếp với giao diện hiện đại.
+       - **Mock AI Camera Coach**: Khung mô phỏng phân tích trạng thái người dùng (Detecting, Focused, Away) mỗi 10 giây.
+       - Tính toán và cập nhật theo thời gian thực các chỉ số: Focus Score (%), Presence Score (%), Away Count.
+       - Hiển thị trạng thái giả lập của partner (Online / Focused).
+       - Nút kết thúc phiên an toàn, đảm bảo cleanup hoàn toàn luồng camera và các bộ đếm.
+    4. **Session Report**: Báo cáo sau phiên làm việc:
+       - Thống kê chi tiết thời gian, Focus Score, Presence Score, và số lần rời khỏi màn hình.
+       - **XP Earned**: Tự động tính toán điểm kinh nghiệm nhận được dựa trên Focus Score (Thưởng tối đa lên đến 180 XP cho người dùng đạt 90% Focus Score).
+       - **AI Coach Insight**: Nhận xét phản hồi thông minh mô phỏng dựa trên hiệu suất tập trung, giúp người dùng rút kinh nghiệm cho các phiên sau.
+  - **Kiến trúc Frontend Demo Cứng Cáp**:
+    - Xây dựng hoàn toàn bằng React Functional Components, sử dụng Hooks hiệu quả (`useRef`, `useEffect`, `useState`).
+    - Thiết kế UI/UX đồng nhất với toàn bộ hệ thống (dùng Tailwind CSS, Lucide Icons, CSS Variables của project).
+    - Tích hợp liền mạch vào hệ thống Routing hiện tại (Route `/discipline-room`), hiển thị trực tiếp trên Navigation Sidebar và Bottom Nav.
+    - Quản lý Cleanup vòng đời Component chặt chẽ, không rò rỉ bộ nhớ (Memory Leak) hoặc rò rỉ quyền truy cập Camera.
+
+### Kỹ thuật
+- **Frontend Components:**
+  - `src/pages/DisciplineRoomPage.tsx`: Chứa toàn bộ logic state máy trạng thái (State Machine) điều hướng luồng 4 bước của Discipline Room.
+  - Cập nhật `src/App.tsx`: Đăng ký Route `/discipline-room`.
+  - Cập nhật `src/components/Sidebar.tsx` và `src/components/BottomNav.tsx`: Bổ sung liên kết đến phòng kỷ luật.
+- **Tính năng mở rộng trong tương lai:**
+  - Prototype này là nền tảng vững chắc để tích hợp Socket.io (Realtime room), WebRTC (Gọi video peer-to-peer), và AI Face Detection model (TensorFlow.js / MediaPipe) trong các Sprint tiếp theo.
+
 ## [Sprint 9] - 2026-06-10 (Friends Follow & Activity Feed)
 ### Đã thêm
 - **Theo dõi bạn bè & Feed hoạt động (US-29)**:

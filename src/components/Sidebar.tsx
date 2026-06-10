@@ -154,6 +154,7 @@ export default function Sidebar() {
         <NavItem to="/goals" icon="checklist" label={t("nav.goals")} />
         <NavItem to="/timeline" icon="timeline" label={t("nav.timeline")} />
         <NavItem to="/groups" icon="group" label={t("nav.habitGroups")} />
+        <NavItem to="/discipline-room" icon="video_camera_front" label="Phòng Kỷ Luật" />
         <NavItem to="/friends" icon="people" label="Bạn bè" />
         <button
           type="button"

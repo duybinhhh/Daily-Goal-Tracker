@@ -322,6 +322,22 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
 * Service worker không được cache/intercept app shell ở `localhost`, tránh lỗi trắng trang khi dev.
 * Database schema phải đồng bộ với Prisma schema trước khi test login/freeze.
 
+### Discipline Room (Phòng Kỷ Luật)
+* **Mục tiêu:** Cung cấp trải nghiệm tập trung cao độ thông qua mô phỏng phòng làm việc ảo có AI Camera Coach giám sát.
+* **Luồng sử dụng:**
+  - **Create Room:** Người dùng nhập mục tiêu, chọn chế độ (Study/Deep Work), và thời gian phiên.
+  - **Waiting Room:** Hiển thị mã mời và giả lập partner tham gia sau 3 giây.
+  - **Active Session:** 
+    - Đếm ngược 3 giây trước khi bắt đầu.
+    - Xin quyền Camera, stream video trực tiếp.
+    - Randomize trạng thái AI Coach mỗi 10 giây (Focused, Away).
+    - Cập nhật Focus Score và Presence Score thời gian thực.
+  - **Session Report:** Thống kê sau phiên, quy đổi Focus Score thành XP Earned và cung cấp Insight.
+* **API / Component liên quan:**
+  - Component: `src/pages/DisciplineRoomPage.tsx`
+  - Routes: Đăng ký `/discipline-room` trong `App.tsx`.
+* **Mở rộng tương lai:** Có thể tích hợp WebRTC và MediaPipe (Face Detection) thật thay cho giả lập.
+
 ### Thông tin còn thiếu / cần hoàn thiện
 * Chưa có migration file chính thức cho Streak Freeze trong `prisma/migrations`.
 * Backend `/api/freeze/activate` chưa enforce giờ mở tính năng; hiện điều kiện giờ chủ yếu nằm ở UI.
