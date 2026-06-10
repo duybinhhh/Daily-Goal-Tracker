@@ -101,7 +101,9 @@ export const syncAndResetGoalProgress = async (goal: any, timezone: string) => {
   
   const correctCount = currentCycleLogs.length;
   const isCompleted = correctCount >= goal.target_count;
-  const correctStatus = isCompleted ? "completed" : "active";
+  
+  // If the goal is paused, don't auto-activate it. Only toggle between active and completed.
+  const correctStatus = goal.status === "paused" ? "paused" : (isCompleted ? "completed" : "active");
   
   if (goal.current_count !== correctCount || goal.status !== correctStatus) {
     const updated = await db.goals.update(goal.id, {
@@ -239,7 +241,7 @@ export const updateGoal = async (req: AuthenticatedRequest, res: Response, next:
       throw new AppError("Goal not found or access denied.", 404);
     }
 
-    const { title, description, category, target_count, current_count, frequency, status, due_date, reminder_time } = req.body;
+    const { title, description, category, target_count, current_count, frequency, status, is_archived, due_date, reminder_time } = req.body;
 
     const updates: any = {};
     if (title !== undefined) updates.title = title;
@@ -247,6 +249,10 @@ export const updateGoal = async (req: AuthenticatedRequest, res: Response, next:
     if (category !== undefined) updates.category = category;
     if (frequency !== undefined) updates.frequency = frequency;
     if (status !== undefined) updates.status = status;
+    if (is_archived !== undefined) {
+      updates.is_archived = is_archived;
+      updates.archived_at = is_archived ? new Date().toISOString() : null;
+    }
     if (due_date !== undefined) updates.due_date = due_date;
     if (reminder_time !== undefined) {
       if (reminder_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(reminder_time)) {
@@ -596,6 +602,69 @@ export const deleteLog = async (req: AuthenticatedRequest, res: Response, next: 
         streak: updatedStreak || { current_streak: 0, longest_streak: 0, last_completed_at: null },
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const bulkArchiveGoals = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+
+    const { goalIds } = req.body;
+    if (!Array.isArray(goalIds)) throw new AppError("Invalid payload.", 400);
+
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const ownedIds = new Set(userGoals.map(g => g.id));
+    const validIds = goalIds.filter(id => ownedIds.has(id));
+
+    // Prisma updateMany isn't directly exposed in the local db wrapper perfectly for array of IDs.
+    // We will do parallel updates using the existing update method.
+    const archivedAt = new Date().toISOString();
+    await Promise.all(validIds.map(id => db.goals.update(id, { is_archived: true, archived_at: archivedAt })));
+
+    res.status(200).json({ success: true, message: "Goals archived successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const bulkPauseGoals = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+
+    const { goalIds } = req.body;
+    if (!Array.isArray(goalIds)) throw new AppError("Invalid payload.", 400);
+
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const ownedIds = new Set(userGoals.map(g => g.id));
+    const validIds = goalIds.filter(id => ownedIds.has(id));
+
+    await Promise.all(validIds.map(id => db.goals.update(id, { status: "paused" })));
+
+    res.status(200).json({ success: true, message: "Goals paused successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const bulkDeleteGoals = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+
+    const { goalIds } = req.body;
+    if (!Array.isArray(goalIds)) throw new AppError("Invalid payload.", 400);
+
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const ownedIds = new Set(userGoals.map(g => g.id));
+    const validIds = goalIds.filter(id => ownedIds.has(id));
+
+    await Promise.all(validIds.map(id => db.goals.delete(id)));
+
+    res.status(200).json({ success: true, message: "Goals deleted successfully." });
   } catch (error) {
     next(error);
   }

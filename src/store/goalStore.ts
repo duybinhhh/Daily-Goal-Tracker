@@ -122,6 +122,11 @@ interface GoalState {
   }) => Promise<void>;
   updateGoal: (id: string, goalData: Partial<Goal>) => Promise<void>;
   deleteGoal: (id: string) => Promise<void>;
+  archiveGoal: (id: string) => Promise<void>;
+  restoreGoal: (id: string) => Promise<void>;
+  bulkArchiveGoals: (ids: string[]) => Promise<void>;
+  bulkPauseGoals: (ids: string[]) => Promise<void>;
+  bulkDeleteGoals: (ids: string[]) => Promise<void>;
   completeGoalProgress: (id: string, note?: string) => Promise<CompleteGoalResponse>;
   deleteLogProgress: (logId: string, goalId?: string) => Promise<void>;
 }
@@ -378,6 +383,88 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       await api.delete(`/api/goals/${id}`);
       set((state) => ({
         goals: state.goals.filter((g) => g.id !== id),
+        loading: false,
+      }));
+      get().fetchStats();
+    } catch (error: any) {
+      const msg = sanitizeApiError(error);
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  archiveGoal: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.put(`/api/goals/${id}`, { is_archived: true });
+      const updatedGoal = response.data.goal;
+      set((state) => ({
+        goals: state.goals.map((g) => (g.id === id ? { ...g, ...updatedGoal } : g)),
+        loading: false,
+      }));
+      get().fetchStats();
+    } catch (error: any) {
+      const msg = sanitizeApiError(error);
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  restoreGoal: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await api.put(`/api/goals/${id}`, { is_archived: false });
+      const updatedGoal = response.data.goal;
+      set((state) => ({
+        goals: state.goals.map((g) => (g.id === id ? { ...g, ...updatedGoal } : g)),
+        loading: false,
+      }));
+      get().fetchStats();
+    } catch (error: any) {
+      const msg = sanitizeApiError(error);
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  bulkArchiveGoals: async (ids) => {
+    set({ loading: true, error: null });
+    try {
+      await api.put(`/api/goals/bulk/archive`, { goalIds: ids });
+      set((state) => ({
+        goals: state.goals.map((g) => (ids.includes(g.id) ? { ...g, is_archived: true, archived_at: new Date().toISOString() } : g)),
+        loading: false,
+      }));
+      get().fetchStats();
+    } catch (error: any) {
+      const msg = sanitizeApiError(error);
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  bulkPauseGoals: async (ids) => {
+    set({ loading: true, error: null });
+    try {
+      await api.put(`/api/goals/bulk/pause`, { goalIds: ids });
+      set((state) => ({
+        goals: state.goals.map((g) => (ids.includes(g.id) ? { ...g, status: "paused" } : g)),
+        loading: false,
+      }));
+      get().fetchStats();
+    } catch (error: any) {
+      const msg = sanitizeApiError(error);
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  bulkDeleteGoals: async (ids) => {
+    set({ loading: true, error: null });
+    try {
+      await api.post(`/api/goals/bulk/delete`, { goalIds: ids });
+      set((state) => ({
+        goals: state.goals.filter((g) => !ids.includes(g.id)),
         loading: false,
       }));
       get().fetchStats();

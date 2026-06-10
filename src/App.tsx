@@ -156,6 +156,8 @@ export default function App() {
   );
 }
 
+import { PomodoroWidget } from "./components/pomodoro/PomodoroWidget";
+
 function AppLayout() {
   const [isAICoachOpen, setIsAICoachOpen] = React.useState(false);
 
@@ -163,6 +165,19 @@ function AppLayout() {
     const handleOpenAICoach = () => setIsAICoachOpen(true);
     window.addEventListener("open-ai-coach", handleOpenAICoach);
     return () => window.removeEventListener("open-ai-coach", handleOpenAICoach);
+  }, []);
+
+  React.useEffect(() => {
+    const handleOpenCheckIn = (e: any) => {
+      // In this project, check-in is handled in DashboardPage via handleLogProgress
+      // or we can redirect to a specific check-in page if goalId is provided
+      // For simplicity, let's see if we can trigger the note input on the Dashboard
+      // or just navigate to the dashboard with a search param.
+      // Another option: navigate to /quick-checkin
+      window.location.hash = `#/quick-checkin?goalId=${e.detail}`;
+    };
+    window.addEventListener("open-check-in", handleOpenCheckIn);
+    return () => window.removeEventListener("open-check-in", handleOpenCheckIn);
   }, []);
 
   return (
@@ -208,6 +223,8 @@ function AppLayout() {
       <InAppReminderCenter />
 
       <AICoachDrawer isOpen={isAICoachOpen} onClose={() => setIsAICoachOpen(false)} />
+
+      <PomodoroWidget />
     </div>
   );
 }

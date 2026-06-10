@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
+import { usePomodoroStore } from "../store/pomodoroStore";
 import { useTranslation } from "../i18n";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import {
@@ -15,6 +16,7 @@ export function SettingsPage() {
   const { t } = useTranslation();
   const { user, updateProfile, deleteAccount, logout, loading, error, clearError } = useAuthStore();
   const { goals, fetchGoals, isOffline } = useGoalStore();
+  const { settings: pomodoroSettings, updateSettings: updatePomodoroSettings } = usePomodoroStore();
   const navigate = useNavigate();
 
   // Local settings states (saved to localStorage for client preferences, or server for profile)
@@ -585,6 +587,41 @@ export function SettingsPage() {
                   <p className="text-[11px] text-on-surface-variant">{t("settings.languageDesc")}</p>
                 </div>
                 <LanguageSwitcher />
+              </div>
+            </section>
+
+            {/* Pomodoro Section */}
+            <section className="glass-card p-6 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-error/10 rounded-xl text-error">
+                  <span className="material-symbols-outlined text-[22px]">timer</span>
+                </div>
+                <h3 className="font-bold text-lg text-on-surface">{t("pomodoro.settingsTitle")}</h3>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-on-surface">{t("pomodoro.focusDuration")}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    className="w-20 bg-surface-container-low border border-white/5 rounded-xl px-3 py-1.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-all"
+                    value={pomodoroSettings.focusDuration}
+                    onChange={(e) => updatePomodoroSettings({ focusDuration: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
+                <div className="h-[1px] bg-white/5"></div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-on-surface">{t("pomodoro.shortBreakDuration")}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    className="w-20 bg-surface-container-low border border-white/5 rounded-xl px-3 py-1.5 text-xs text-on-surface outline-none focus:border-primary/50 transition-all"
+                    value={pomodoroSettings.shortBreakDuration}
+                    onChange={(e) => updatePomodoroSettings({ shortBreakDuration: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
               </div>
             </section>
 

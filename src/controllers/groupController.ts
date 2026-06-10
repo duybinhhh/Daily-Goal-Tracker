@@ -273,6 +273,54 @@ export const leaveGroup = async (req: AuthenticatedRequest, res: Response, next:
   }
 };
 
+// Remove a member from a group (Admin only)
+export const removeMember = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { id, userId: targetUserId } = req.params;
+
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+
+    if (group.creator_id !== userId) {
+      throw new AppError("Only the group creator can remove members.", 403);
+    }
+
+    if (targetUserId === userId) {
+      throw new AppError("You cannot remove yourself. Use 'Leave Group' instead.", 400);
+    }
+
+    const isMember = group.members.some((m: any) => m.user_id === targetUserId);
+    if (!isMember) {
+      throw new AppError("User is not a member of this group.", 400);
+    }
+
+    // 1. Delete membership
+    await db.groupMembers.delete({
+      group_id: group.id,
+      user_id: targetUserId,
+    });
+
+    // 2. Delete personal goal and streaks
+    const goals = await db.goals.findMany();
+    const groupGoal = goals.find((g: any) => g.group_id === group.id && g.user_id === targetUserId);
+    if (groupGoal) {
+      await db.goals.delete(groupGoal.id);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Member successfully removed from the group.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Delete a group
 export const deleteGroup = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {

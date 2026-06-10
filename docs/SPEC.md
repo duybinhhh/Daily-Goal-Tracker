@@ -104,6 +104,17 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
         * Popup Menu hành động (Tạm dừng/Kích hoạt lại, Chỉnh sửa, Xóa) cho từng thẻ mục tiêu. Khi tạm dừng (Paused), thẻ mục tiêu sẽ giảm độ mờ (`opacity-60`) và chuyển sang trạng thái tạm dừng, cho phép người dùng kích hoạt lại bất cứ lúc nào.
     * **Vòng tròn tổng quan (Overall Progress Ring):** Vòng tròn tiến độ lớn tự động tính toán và hiển thị Tỷ lệ hoàn thành trung bình của tất cả các mục tiêu đang hoạt động, kèm các thành tích/danh hiệu (Elite Strategist) để gia tăng động lực.
 
+#### US-23: Lưu trữ mục tiêu & Thao tác hàng loạt (Archive & Bulk Actions)
+* **Độ ưu tiên:** High
+* **Story Point:** 5.0
+* **Tiêu chí chấp nhận (AC):**
+    * **Lưu trữ đơn lẻ:** Menu tùy chọn của mỗi mục tiêu có thêm nút "Lưu trữ". Khi chọn, hệ thống cập nhật trường `is_archived` thành `true`. Mục tiêu sau khi lưu trữ sẽ giữ nguyên toàn bộ lịch sử tiến độ trong Database nhưng tự động biến mất khỏi Dashboard và các chỉ số thống kê tổng hợp.
+    * **Hệ thống Tabs trên Goals Page:** Tách không gian hiển thị thành Tab "Đang hoạt động" và Tab "Đã lưu trữ" (hiển thị mục tiêu mờ kèm icon đóng gói). Cho phép khôi phục mục tiêu lưu trữ trở lại hoạt động bình thường.
+    * **Chế độ Chọn nhiều (Selection Mode):** Cung cấp công tắc để bật tắt chế độ chọn nhiều mục tiêu cùng lúc bằng Checkbox.
+    * **Thanh công cụ nổi (Floating Action Bar):** Hiển thị thanh tác vụ dính dưới đáy màn hình khi có ít nhất 1 mục tiêu được chọn, tích hợp các hành động hàng loạt: Archive, Pause, Delete.
+    * **Xóa an toàn (Bulk Delete Modal):** Khi thực hiện thao tác xóa nhiều mục tiêu, bắt buộc hiển thị Modal cảnh báo liệt kê danh sách tên các mục tiêu sắp xóa để yêu cầu xác nhận cuối cùng.
+    * **Tối ưu Backend API:** Cung cấp các Endpoint xử lý mảng ID mục tiêu đồng thời (`bulk/archive`, `bulk/pause`, `bulk/delete`) để giảm tải giao tiếp mạng thay vì gọi vòng lặp update lẻ tẻ.
+
 ### 📦 Module 4: Settings & Appearance Customization (Sprint 4 — 6.0 SP)
 
 #### US-07: Quản lý hồ sơ và Cấu hình cá nhân
@@ -184,6 +195,18 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
     * **AC-9:** Tooltip biểu đồ hiển thị mốc thời gian, giá trị kỳ trước, giá trị hiện tại và tên mục tiêu nếu đang lọc theo goal cụ thể.
     * **AC-10:** API `GET /api/stats/trend` trả về dữ liệu realtime từ `GoalLog`, hỗ trợ query `period=day|week|month` và `goalId?: string`.
 
+#### US-24: Hẹn giờ Pomodoro (Pomodoro Timer Integration)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 5.0
+* **Tiêu chí chấp nhận (AC):**
+    * **Entry Point:** Thêm nút **"⏱ Pomodoro"** trên `GoalCard` cho mục tiêu đang active. Nếu có phiên đang chạy cho goal khác, yêu cầu xác nhận trước khi chuyển.
+    * **Timer Widget:** Hiển thị floating widget cố định ở góc dưới bên phải. Hiển thị tên goal, trạng thái (Focus/Break), đồng hồ đếm ngược `MM:SS` và các nút điều khiển (Pause, Resume, Stop, Minimize).
+    * **Chu kỳ Pomodoro:** 25m Focus -> 5m Short Break (lặp lại 4 lần) -> 15m Long Break. Reset chu kỳ sau Long Break.
+    * **Đồng hồ chống drift:** Tính toán thời gian dựa trên timestamp (`Date.now()`) để đảm bảo chính xác tuyệt đối.
+    * **Thông báo & Log:** Phát âm thanh "ding" khi hết giờ. Sau phiên Focus, hiển thị prompt hỏi người dùng có muốn ghi nhận (log) tiến độ cho goal đó không.
+    * **Thống kê Pomodoro:** Lưu số phiên Focus hoàn thành trong ngày vào `localStorage` (Zustand persist). Dashboard hiển thị số lượng 🍅 hoàn thành trong ngày hiện tại.
+    * **Responsive & Theme:** Widget hiển thị tốt trên cả Light/Dark Mode và thu nhỏ thông minh trên Mobile (≤ 768px).
+
 ---
 
 ### 📦 Module 6: Accountability Partners & Social Sharing (Sprint 6 — 8.0 SP)
@@ -209,6 +232,24 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
         * **Download PNG:** Tải trực tiếp ảnh từ Canvas về thiết bị.
         * **Web Share API:** Chia sẻ file ảnh hoặc link thành tích trực tiếp lên các ứng dụng trên thiết bị di động/máy tính hỗ trợ.
         * **Social Share Intent:** Cung cấp link chia sẻ trực tiếp đi kèm thông điệp soạn sẵn lên Twitter và Facebook.
+
+#### US-26: Bình luận & Chat nhóm (Group Chat)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 8.0
+* **Mục tiêu:** Cho phép thành viên trong nhóm gửi tin nhắn, phản ứng emoji và nhận thông báo để tăng tinh thần đồng đội.
+* **Tiêu chí chấp nhận (AC):**
+    * **Vị trí:** Section "💬 Bình luận nhóm" nằm dưới Leaderboard trong trang chi tiết nhóm. Chỉ hiển thị cho thành viên nhóm.
+    * **Hiển thị tin nhắn:** Tối đa 30 tin nhắn gần nhất. Mỗi tin nhắn có Avatar rút gọn (2 ký tự), tên người gửi, nội dung (max 200 ký tự) và timestamp tương đối.
+    * **Gửi tin nhắn:** Hỗ trợ nút "Gửi" và phím "Enter". Sử dụng Optimistic Update để hiển thị tức thì.
+    * **Phản ứng Emoji:** Hỗ trợ 5 emoji: 🔥 💪 👏 ❤️ 😂. Click để toggle reaction, hiển thị số đếm bên cạnh emoji.
+    * **Quyền hạn (Moderation):** 
+        - Admin/Owner nhóm có quyền xóa bất kỳ tin nhắn nào.
+        - Thành viên chỉ được xóa tin nhắn của chính mình.
+        - API enforce quyền xóa ở backend.
+    * **Push Notification:** 
+        - Gửi thông báo cho tất cả thành viên (trừ người gửi) khi có tin nhắn mới.
+        - Giới hạn tối đa 3 thông báo nhóm mỗi ngày cho mỗi user để tránh spam.
+    * **Giao diện:** Hỗ trợ Light/Dark Mode, Responsive (không bị bàn phím ảo che khuất trên mobile).
 
 ---
 

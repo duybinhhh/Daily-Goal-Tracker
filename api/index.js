@@ -72,6 +72,20 @@ function mapFreeze(f) {
     created_at: f.created_at.toISOString()
   };
 }
+function mapGroupMessage(m) {
+  if (!m) return null;
+  return {
+    ...m,
+    created_at: m.created_at.toISOString(),
+    updated_at: m.updated_at.toISOString(),
+    sender: m.sender ? {
+      id: m.sender.id,
+      name: m.sender.name,
+      avatarInitials: m.sender.name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2)
+    } : null,
+    reactions: m.reactions || []
+  };
+}
 var PrismaDB = class {
   constructor() {
     // Users Operations
@@ -156,6 +170,9 @@ var PrismaDB = class {
         const prismaUpdate = { ...updateData };
         if (updateData.due_date !== void 0) {
           prismaUpdate.due_date = updateData.due_date ? new Date(updateData.due_date) : null;
+        }
+        if (updateData.archived_at !== void 0) {
+          prismaUpdate.archived_at = updateData.archived_at ? new Date(updateData.archived_at) : null;
         }
         if (updateData.reminder_time !== void 0) {
           prismaUpdate.reminder_time = updateData.reminder_time || null;
@@ -423,6 +440,115 @@ var PrismaDB = class {
           }
         });
         return deleted;
+      }
+    };
+    this.groupMessages = {
+      findMany: async (where, take = 30) => {
+        const messages = await prisma.groupMessage.findMany({
+          where: { group_id: where.group_id },
+          include: {
+            sender: true,
+            reactions: {
+              include: {
+                user: true
+              }
+            }
+          },
+          orderBy: { created_at: "desc" },
+          take
+        });
+        return messages.reverse().map(mapGroupMessage);
+      },
+      findUnique: async (id) => {
+        const msg = await prisma.groupMessage.findUnique({
+          where: { id },
+          include: {
+            sender: true,
+            reactions: true
+          }
+        });
+        return mapGroupMessage(msg);
+      },
+      create: async (data) => {
+        const created = await prisma.groupMessage.create({
+          data: {
+            group_id: data.group_id,
+            sender_id: data.sender_id,
+            content: data.content
+          },
+          include: {
+            sender: true,
+            reactions: true
+          }
+        });
+        return mapGroupMessage(created);
+      },
+      delete: async (id) => {
+        return await prisma.groupMessage.delete({ where: { id } });
+      }
+    };
+    this.messageReactions = {
+      findUnique: async (where) => {
+        return await prisma.messageReaction.findUnique({
+          where: {
+            message_id_user_id_emoji: {
+              message_id: where.message_id,
+              user_id: where.user_id,
+              emoji: where.emoji
+            }
+          }
+        });
+      },
+      create: async (data) => {
+        return await prisma.messageReaction.create({
+          data: {
+            message_id: data.message_id,
+            user_id: data.user_id,
+            emoji: data.emoji
+          }
+        });
+      },
+      delete: async (id) => {
+        return await prisma.messageReaction.delete({ where: { id } });
+      },
+      toggle: async (message_id, user_id, emoji) => {
+        const existing = await prisma.messageReaction.findUnique({
+          where: {
+            message_id_user_id_emoji: {
+              message_id,
+              user_id,
+              emoji
+            }
+          }
+        });
+        if (existing) {
+          await prisma.messageReaction.delete({ where: { id: existing.id } });
+          return { action: "removed" };
+        } else {
+          await prisma.messageReaction.create({
+            data: { message_id, user_id, emoji }
+          });
+          return { action: "added" };
+        }
+      }
+    };
+    this.groupChatNotificationLogs = {
+      countToday: async (user_id) => {
+        const today = /* @__PURE__ */ new Date();
+        today.setHours(0, 0, 0, 0);
+        return await prisma.groupChatNotificationLog.count({
+          where: {
+            user_id,
+            created_at: {
+              gte: today
+            }
+          }
+        });
+      },
+      create: async (user_id, group_id) => {
+        return await prisma.groupChatNotificationLog.create({
+          data: { user_id, group_id }
+        });
       }
     };
   }
@@ -849,7 +975,7 @@ var syncAndResetGoalProgress = async (goal, timezone) => {
   });
   const correctCount = currentCycleLogs.length;
   const isCompleted = correctCount >= goal.target_count;
-  const correctStatus = isCompleted ? "completed" : "active";
+  const correctStatus = goal.status === "paused" ? "paused" : isCompleted ? "completed" : "active";
   if (goal.current_count !== correctCount || goal.status !== correctStatus) {
     const updated = await db.goals.update(goal.id, {
       current_count: correctCount,
@@ -959,13 +1085,17 @@ var updateGoal = async (req, res, next) => {
     if (!goal || goal.user_id !== userId) {
       throw new AppError("Goal not found or access denied.", 404);
     }
-    const { title, description, category, target_count, current_count, frequency, status, due_date, reminder_time } = req.body;
+    const { title, description, category, target_count, current_count, frequency, status, is_archived, due_date, reminder_time } = req.body;
     const updates = {};
     if (title !== void 0) updates.title = title;
     if (description !== void 0) updates.description = description;
     if (category !== void 0) updates.category = category;
     if (frequency !== void 0) updates.frequency = frequency;
     if (status !== void 0) updates.status = status;
+    if (is_archived !== void 0) {
+      updates.is_archived = is_archived;
+      updates.archived_at = is_archived ? (/* @__PURE__ */ new Date()).toISOString() : null;
+    }
     if (due_date !== void 0) updates.due_date = due_date;
     if (reminder_time !== void 0) {
       if (reminder_time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(reminder_time)) {
@@ -1241,12 +1371,61 @@ var deleteLog = async (req, res, next) => {
     next(error);
   }
 };
+var bulkArchiveGoals = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { goalIds } = req.body;
+    if (!Array.isArray(goalIds)) throw new AppError("Invalid payload.", 400);
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const ownedIds = new Set(userGoals.map((g) => g.id));
+    const validIds = goalIds.filter((id) => ownedIds.has(id));
+    const archivedAt = (/* @__PURE__ */ new Date()).toISOString();
+    await Promise.all(validIds.map((id) => db.goals.update(id, { is_archived: true, archived_at: archivedAt })));
+    res.status(200).json({ success: true, message: "Goals archived successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
+var bulkPauseGoals = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { goalIds } = req.body;
+    if (!Array.isArray(goalIds)) throw new AppError("Invalid payload.", 400);
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const ownedIds = new Set(userGoals.map((g) => g.id));
+    const validIds = goalIds.filter((id) => ownedIds.has(id));
+    await Promise.all(validIds.map((id) => db.goals.update(id, { status: "paused" })));
+    res.status(200).json({ success: true, message: "Goals paused successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
+var bulkDeleteGoals = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { goalIds } = req.body;
+    if (!Array.isArray(goalIds)) throw new AppError("Invalid payload.", 400);
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const ownedIds = new Set(userGoals.map((g) => g.id));
+    const validIds = goalIds.filter((id) => ownedIds.has(id));
+    await Promise.all(validIds.map((id) => db.goals.delete(id)));
+    res.status(200).json({ success: true, message: "Goals deleted successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // src/routes/goals.ts
 var router2 = Router2();
 router2.use(authMiddleware);
 router2.get("/", getGoals);
 router2.post("/", createGoal);
+router2.put("/bulk/archive", bulkArchiveGoals);
+router2.put("/bulk/pause", bulkPauseGoals);
+router2.post("/bulk/delete", bulkDeleteGoals);
 router2.get("/:id", getGoalById);
 router2.put("/:id", updateGoal);
 router2.delete("/:id", deleteGoal);
@@ -1390,7 +1569,8 @@ var getTrendComparison = async (req, res, next) => {
     }
     const user = await db.users.findUnique({ id: userId });
     const timezone = user?.timezone || "UTC";
-    const userGoals = await db.goals.findMany({ user_id: userId });
+    const rawUserGoals = await db.goals.findMany({ user_id: userId });
+    const userGoals = rawUserGoals.filter((g) => !g.is_archived);
     const selectedGoal = goalId ? userGoals.find((goal) => goal.id === goalId) : null;
     if (goalId && !selectedGoal) {
       throw new AppError("Goal not found.", 404);
@@ -1838,6 +2018,42 @@ var leaveGroup = async (req, res, next) => {
     next(error);
   }
 };
+var removeMember = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { id, userId: targetUserId } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+    if (group.creator_id !== userId) {
+      throw new AppError("Only the group creator can remove members.", 403);
+    }
+    if (targetUserId === userId) {
+      throw new AppError("You cannot remove yourself. Use 'Leave Group' instead.", 400);
+    }
+    const isMember = group.members.some((m) => m.user_id === targetUserId);
+    if (!isMember) {
+      throw new AppError("User is not a member of this group.", 400);
+    }
+    await db.groupMembers.delete({
+      group_id: group.id,
+      user_id: targetUserId
+    });
+    const goals = await db.goals.findMany();
+    const groupGoal = goals.find((g) => g.group_id === group.id && g.user_id === targetUserId);
+    if (groupGoal) {
+      await db.goals.delete(groupGoal.id);
+    }
+    res.status(200).json({
+      success: true,
+      message: "Member successfully removed from the group."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 var deleteGroup = async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -1860,6 +2076,198 @@ var deleteGroup = async (req, res, next) => {
   }
 };
 
+// src/controllers/groupChatController.ts
+import webpush from "web-push";
+var getGroupMessages = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { groupId } = req.params;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    const membership = await db.groupMembers.findMany({ group_id: groupId, user_id: userId });
+    if (membership.length === 0) {
+      throw new AppError("You are not a member of this group.", 403);
+    }
+    const group = await db.groups.findUnique({ id: groupId });
+    if (!group) throw new AppError("Group not found.", 404);
+    const messages = await db.groupMessages.findMany({ group_id: groupId });
+    const formattedMessages = messages.map((msg) => {
+      const reactionCounts = {
+        "\u{1F525}": 0,
+        "\u{1F4AA}": 0,
+        "\u{1F44F}": 0,
+        "\u2764\uFE0F": 0,
+        "\u{1F602}": 0
+      };
+      const myReactions = [];
+      msg.reactions.forEach((r) => {
+        if (reactionCounts[r.emoji] !== void 0) {
+          reactionCounts[r.emoji]++;
+          if (r.user_id === userId) {
+            myReactions.push(r.emoji);
+          }
+        }
+      });
+      return {
+        id: msg.id,
+        groupId: msg.group_id,
+        senderId: msg.sender_id,
+        senderName: msg.sender?.name,
+        senderAvatarInitials: msg.sender?.avatarInitials,
+        content: msg.content,
+        createdAt: msg.created_at,
+        canDelete: userId === msg.sender_id || userId === group.creator_id,
+        reactions: reactionCounts,
+        myReactions
+      };
+    });
+    res.status(200).json({
+      success: true,
+      messages: formattedMessages
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var sendGroupMessage = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { groupId } = req.params;
+    const { content } = req.body;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    if (!content || content.trim().length === 0) {
+      throw new AppError("Message content cannot be empty.", 400);
+    }
+    if (content.trim().length > 200) {
+      throw new AppError("Message content cannot exceed 200 characters.", 400);
+    }
+    const membership = await db.groupMembers.findMany({ group_id: groupId, user_id: userId });
+    if (membership.length === 0) {
+      throw new AppError("You are not a member of this group.", 403);
+    }
+    const group = await db.groups.findUnique({ id: groupId });
+    if (!group) throw new AppError("Group not found.", 404);
+    const message = await db.groupMessages.create({
+      group_id: groupId,
+      sender_id: userId,
+      content: content.trim()
+    });
+    res.status(201).json({
+      success: true,
+      message: {
+        ...message,
+        reactions: { "\u{1F525}": 0, "\u{1F4AA}": 0, "\u{1F44F}": 0, "\u2764\uFE0F": 0, "\u{1F602}": 0 },
+        myReactions: [],
+        canDelete: true,
+        senderName: req.user?.name,
+        senderAvatarInitials: message.sender?.avatarInitials
+      }
+    });
+    sendGroupChatNotifications(groupId, userId, content.trim(), group.name, req.user?.name || "Someone").catch((err) => {
+      console.error("[Push Notification] Error sending group chat notifications:", err);
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var toggleReaction = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { groupId, messageId } = req.params;
+    const { emoji } = req.body;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    const allowedEmojis = ["\u{1F525}", "\u{1F4AA}", "\u{1F44F}", "\u2764\uFE0F", "\u{1F602}"];
+    if (!allowedEmojis.includes(emoji)) {
+      throw new AppError("Invalid emoji reaction.", 400);
+    }
+    const membership = await db.groupMembers.findMany({ group_id: groupId, user_id: userId });
+    if (membership.length === 0) {
+      throw new AppError("You are not a member of this group.", 403);
+    }
+    await db.messageReactions.toggle(messageId, userId, emoji);
+    const message = await db.groupMessages.findUnique(messageId);
+    if (!message) throw new AppError("Message not found.", 404);
+    const reactionCounts = {
+      "\u{1F525}": 0,
+      "\u{1F4AA}": 0,
+      "\u{1F44F}": 0,
+      "\u2764\uFE0F": 0,
+      "\u{1F602}": 0
+    };
+    const myReactions = [];
+    message.reactions.forEach((r) => {
+      if (reactionCounts[r.emoji] !== void 0) {
+        reactionCounts[r.emoji]++;
+        if (r.user_id === userId) {
+          myReactions.push(r.emoji);
+        }
+      }
+    });
+    res.status(200).json({
+      success: true,
+      reactions: reactionCounts,
+      myReactions
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var deleteMessage = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { groupId, messageId } = req.params;
+    if (!userId) throw new AppError("Unauthorized.", 401);
+    const message = await db.groupMessages.findUnique(messageId);
+    if (!message) throw new AppError("Message not found.", 404);
+    const group = await db.groups.findUnique({ id: groupId });
+    if (!group) throw new AppError("Group not found.", 404);
+    const canDelete = userId === message.sender_id || userId === group.creator_id;
+    if (!canDelete) {
+      throw new AppError("You do not have permission to delete this message.", 403);
+    }
+    await db.groupMessages.delete(messageId);
+    res.status(200).json({
+      success: true,
+      message: "Message deleted successfully."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+async function sendGroupChatNotifications(groupId, senderId, content, groupName, senderName) {
+  try {
+    const group = await db.groups.findUnique({ id: groupId });
+    if (!group) return;
+    const members = group.members.filter((m) => m.user_id !== senderId && m.user.push_subscription);
+    const truncatedContent = content.length > 50 ? content.substring(0, 47) + "..." : content;
+    const payload = JSON.stringify({
+      title: `Tin nh\u1EAFn m\u1EDBi trong nh\xF3m ${groupName}`,
+      body: `${senderName}: ${truncatedContent}`,
+      icon: "/icon.png",
+      badge: "/icon.png",
+      data: { url: `/#/groups?id=${groupId}` }
+    });
+    for (const member of members) {
+      const countToday = await db.groupChatNotificationLogs.countToday(member.user_id);
+      if (countToday >= 3) {
+        console.log(`[Push Notification] User ${member.user_id} reached daily limit for group chat notifications.`);
+        continue;
+      }
+      try {
+        const subscription = JSON.parse(member.user.push_subscription);
+        await webpush.sendNotification(subscription, payload);
+        await db.groupChatNotificationLogs.create(member.user_id, groupId);
+      } catch (pushErr) {
+        console.error(`[Push Notification] Failed for user ${member.user_id}:`, pushErr.message);
+        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
+          await db.users.update(member.user_id, { push_subscription: null });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[Push Notification] sendGroupChatNotifications failed:", err);
+  }
+}
+
 // src/routes/groups.ts
 var router4 = Router4();
 router4.use(authMiddleware);
@@ -1868,7 +2276,12 @@ router4.post("/", createGroup);
 router4.get("/:id", getGroupById);
 router4.post("/:id/join", joinGroup);
 router4.post("/:id/leave", leaveGroup);
+router4.delete("/:id/members/:userId", removeMember);
 router4.delete("/:id", deleteGroup);
+router4.get("/:groupId/messages", getGroupMessages);
+router4.post("/:groupId/messages", sendGroupMessage);
+router4.post("/:groupId/messages/:messageId/reactions", toggleReaction);
+router4.delete("/:groupId/messages/:messageId", deleteMessage);
 var groups_default = router4;
 
 // src/routes/ai.ts

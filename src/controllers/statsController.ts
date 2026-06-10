@@ -173,7 +173,8 @@ export const getTrendComparison = async (req: AuthenticatedRequest, res: Respons
 
     const user = await db.users.findUnique({ id: userId });
     const timezone = user?.timezone || "UTC";
-    const userGoals = await db.goals.findMany({ user_id: userId });
+    const rawUserGoals = await db.goals.findMany({ user_id: userId });
+    const userGoals = rawUserGoals.filter(g => !g.is_archived);
     const selectedGoal = goalId ? userGoals.find((goal) => goal.id === goalId) : null;
 
     if (goalId && !selectedGoal) {

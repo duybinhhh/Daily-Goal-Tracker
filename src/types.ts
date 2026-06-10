@@ -54,6 +54,8 @@ export interface Goal {
   current_count: number;
   frequency: string; // daily, weekly, monthly
   status: string; // active, paused, completed
+  is_archived?: boolean;
+  archived_at?: string | null;
   due_date: string | null;
   created_at: string;
   updated_at: string;

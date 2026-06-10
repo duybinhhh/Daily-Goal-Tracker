@@ -12,8 +12,10 @@ Chào mừng bạn đến với **Momentum**, hệ thống theo dõi và quản 
 5. [Trục Thời Gian Hoạt Động (Activity Timeline)](#5-trục-thời-gian-hoạt-động-activity-timeline)
 6. [Cấu Hình & Cài Đặt (Settings) & Nhắc nhở chủ động](#6-cấu-hình--cài-đặt-settings)
 7. [Đồng Đội Giám Sát (Habit Groups)](#7-đồng-đội-giám-sát-habit-groups)
-8. [Chia Sẻ Thành Tích Một Chạm (Social Sharing)](#8-chia-sẻ-thành-tích-một-chạm-social-sharing)
-9. [Các Câu Hỏi Thường Gặp (FAQs)](#9-các-câu-hỏi-thường-gặp-faqs)
+8. [Bình luận & Chat nhóm (Group Chat)](#8-bình-luận--chat-nhóm-group-chat)
+9. [Chia Sẻ Thành Tích Một Chạm (Social Sharing)](#9-chia-sẻ-thành-tích-một-chạm-social-sharing)
+10. [Hẹn Giờ Pomodoro (Pomodoro Timer)](#10-hẹn-giờ-pomodoro-pomodoro-timer)
+11. [Các Câu Hỏi Thường Gặp (FAQs)](#11-các-câu-hỏi-thường-gặp-faqs)
 
 ---
 
@@ -73,7 +75,9 @@ Khi bạn thực hiện check-in thói quen và đạt chỉ tiêu mục tiêu t
 
 ## 3. Quản Lý Danh Sách Mục Tiêu (My Goals)
 
-Trang Quản lý mục tiêu (`/goals`) được thiết kế dưới dạng lưới bento tối tân hiển thị tất cả các thói quen của bạn.
+Trang Quản lý mục tiêu (`/goals`) được thiết kế dưới dạng lưới bento tối tân hiển thị tất cả các thói quen của bạn. Trang được chia làm hai Tab chính:
+- **Đang hoạt động:** Chứa các mục tiêu bạn đang thực hiện hoặc tạm dừng.
+- **Đã lưu trữ:** Chứa các mục tiêu cũ bạn không còn theo dõi nhưng muốn giữ lại lịch sử.
 
 ### 3.1. Tạo Thói Quen Mới (`/new-goal`)
 Click vào nút **Add Goal** trên header để mở giao diện tạo thói quen. Bạn có thể thiết lập:
@@ -86,7 +90,17 @@ Click vào nút **Add Goal** trên header để mở giao diện tạo thói que
   - `Quantity` (Định lượng): Thiết lập mục tiêu theo số lượng cụ thể trong ngày (ví dụ: 8 cốc, 10 km). Bạn cần điền thêm đơn vị (**Unit**) và chỉ tiêu cần đạt (**Target Count**).
 - **Priority (Độ ưu tiên)**: Low (Thấp), Medium (Trung bình), High (Cao). Thói quen độ ưu tiên cao sẽ có viền sáng động nổi bật.
 
-### 3.2. Tìm Kiếm, Lọc & Sắp Xếp Nâng Cao
+### 3.2. Lưu Trữ & Thao Tác Hàng Loạt (Bulk Actions) [NEW]
+Để giúp không gian làm việc gọn gàng hơn, bạn có thể sử dụng tính năng thao tác hàng loạt:
+- **Lưu trữ đơn lẻ:** Nhấn vào dấu 3 chấm trên một Goal Card bất kỳ và chọn **"Lưu trữ"**. Mục tiêu sẽ được chuyển sang Tab "Đã lưu trữ" và ngừng hiển thị ở các thống kê. Để lấy lại, vào Tab "Đã lưu trữ" và chọn **"Khôi phục"**.
+- **Chế độ Chọn nhiều:** Bấm nút **"Chọn nhiều"** trên thanh bộ lọc. Các thẻ mục tiêu sẽ hiển thị Checkbox.
+- **Thanh công cụ nổi (FAB):** Khi chọn 1 hoặc nhiều mục tiêu, một thanh công cụ sẽ trượt lên từ đáy màn hình cho phép bạn:
+  - Lưu trữ hàng loạt (Archive)
+  - Tạm dừng hàng loạt (Pause)
+  - Khôi phục hàng loạt (Restore - nếu ở tab Đã lưu trữ)
+  - Xóa hàng loạt (Delete - sẽ có bảng Modal yêu cầu bạn xác nhận lần cuối tên các mục tiêu sẽ bị xóa).
+
+### 3.3. Tìm Kiếm, Lọc & Sắp Xếp Nâng Cao
 Tại trang `/goals`, bạn có các công cụ mạnh mẽ:
 - **Tìm kiếm**: Gõ từ khóa để lọc nhanh tiêu đề thói quen.
 - **Lọc theo trạng thái**: Click các nút lựa chọn để xem danh sách mục tiêu `All` (Tất cả), `Active` (Đang hoạt động), hoặc `Paused` (Đang tạm dừng).
@@ -95,11 +109,12 @@ Tại trang `/goals`, bạn có các công cụ mạnh mẽ:
   - `Recent`: Sắp xếp theo thói quen được tạo hoặc cập nhật gần nhất.
   - `Streak`: Sắp xếp theo thứ tự chuỗi ngày hoàn thành liên tục từ cao xuống thấp.
 
-### 3.3. Hiển thị thông tin trên Goal Card
+### 3.4. Hiển thị thông tin trên Goal Card
 - **Badge Nhắc nhở**: Nếu thói quen có cài đặt giờ nhắc riêng, một biểu tượng chuông 🔔 kèm giờ sẽ hiển thị ngay dưới tên thói quen để bạn dễ dàng theo dõi lịch trình.
 - **Menu Hành Động Nhanh**: Mỗi thẻ mục tiêu có một nút menu hành động nhanh (biểu tượng 3 chấm hoặc tùy chọn góc phải):
   - **Tạm dừng/Kích hoạt lại (Pause/Resume)**: Giúp bạn đóng băng thói quen khi đi du lịch hoặc nghỉ ngơi mà không làm mất lịch sử cũ hay ảnh hưởng đến thống kê ngày hiện tại.
   - **Chỉnh sửa (Edit)**: Thay đổi tiêu đề, chỉ tiêu, danh mục thói quen bất kỳ lúc nào.
+  - **Lưu trữ (Archive)**: Đưa thói quen vào thùng lưu trữ, loại bỏ khỏi radar hệ thống nhưng giữ nguyên lịch sử.
   - **Xóa (Delete)**: Gỡ bỏ thói quen khỏi hệ thống vĩnh viễn (sẽ xóa toàn bộ lịch sử check-in liên quan).
 
 ---
@@ -191,7 +206,7 @@ Tính năng **Đồng đội giám sát (Habit Groups)** giúp bạn không còn
 *   **Liên kết Dashboard cá nhân:**
     *   Khi bạn tạo hoặc tham gia một nhóm, hệ thống sẽ tự động sinh ra một thói quen tương ứng hiển thị trực tiếp trên Dashboard cá nhân của bạn, được đánh dấu bằng nhãn `👥 Group Habit`.
     *   Bạn có thể check-in tiến trình này ngay trên Dashboard chính hoặc check-in trực tiếp từ bảng xếp hạng của nhóm.
-*   **Bảng xếp hạng nhóm (Leaderboard):**
+*   **Leaderboard Real-time:**
     *   Trang chi tiết của nhóm hiển thị trực quan danh sách các thành viên cùng tiến trình check-in hôm nay của từng người (ví dụ: `1/1 Completed` hoặc `0/2 Active`).
     *   Chuỗi ngày Streak hiện tại của từng thành viên cũng được hiển thị kèm biểu tượng lửa 🔥.
 *   **Rời và xóa nhóm:**
@@ -200,7 +215,31 @@ Tính năng **Đồng đội giám sát (Habit Groups)** giúp bạn không còn
 
 ---
 
-## 8. Chia Sẻ Thành Tích Một Chạm (Social Sharing)
+## 8. Bình luận & Chat nhóm (Group Chat) [NEW]
+
+Tính năng **Bình luận nhóm** giúp các thành viên trao đổi, động viên và giữ trách nhiệm cho nhau ngay trong giao diện nhóm.
+
+*   **Vị trí:** Section chat nằm ngay dưới Leaderboard trong trang chi tiết nhóm. Chỉ những người đã gia nhập nhóm mới có thể xem và gửi tin nhắn.
+*   **Gửi tin nhắn:**
+    *   Nhập nội dung vào ô chat ở cuối danh sách (tối đa 200 ký tự).
+    *   Nhấn nút **Gửi** hoặc phím **Enter** để gửi nhanh. Dùng **Shift + Enter** nếu muốn xuống dòng.
+    *   Hệ thống sử dụng **Optimistic Update**, tin nhắn của bạn sẽ xuất hiện ngay lập tức mà không cần chờ server phản hồi.
+*   **Phản ứng bằng Emoji (Reactions):**
+    *   Mỗi tin nhắn có 5 emoji phản ứng nhanh: 🔥 💪 👏 ❤️ 😂.
+    *   Nhấn vào emoji để bày tỏ cảm xúc. Nhấn lại lần nữa để gỡ bỏ.
+    *   Số đếm bên cạnh emoji cho biết tổng số thành viên đã thả reaction đó.
+*   **Quản lý tin nhắn (Moderation):**
+    *   **Người tạo nhóm (Admin):** Có quyền xóa bất kỳ tin nhắn nào không phù hợp trong nhóm của mình.
+    *   **Thành viên:** Chỉ có quyền xóa tin nhắn do chính mình gửi.
+    *   Khi xóa, tin nhắn sẽ biến mất khỏi danh sách của tất cả mọi người.
+*   **Thông báo đẩy (Push Notifications):**
+    *   Khi có tin nhắn mới, các thành viên khác trong nhóm sẽ nhận được thông báo đẩy trên thiết bị (nếu đã bật Active Reminders).
+    *   Để tránh làm phiền, hệ thống giới hạn mỗi người dùng chỉ nhận tối đa **3 thông báo chat nhóm mỗi ngày**.
+
+---
+
+## 9. Chia Sẻ Thành Tích Một Chạm (Social Sharing)
+
 
 Momentum cung cấp tính năng **Social Sharing** cao cấp cho phép bạn khoe thành quả rèn luyện của mình với bạn bè chỉ với một click chuột:
 
@@ -285,6 +324,36 @@ const showFreezeButton =
 API liên quan:
 - `GET /api/freeze/tokens`: xem số token còn lại trong tháng.
 - `POST /api/freeze/activate`: dùng 1 token để bảo vệ streak cho goal.
+- `GET /api/freeze/dates?goal_id=...`: xem danh sách ngày đã đóng băng của goal.
+
+Lỗi thường gặp khi test:
+- Không thấy nút: chưa tới giờ mở tính năng, goal chưa có streak, hoặc goal đã hoàn thành hôm nay.
+- Báo hết token: tài khoản đã dùng đủ 3 token trong tháng.
+- Bấm lại cùng ngày không được: mỗi goal chỉ được đóng băng một lần cho một ngày.
+- Lỗi database operation: kiểm tra DB đã có cột `User.last_freeze_reminder_date`, bảng `StreakFreeze`, bảng `FreezeToken`.
+
+### AI Coach
+AI Coach dùng Gemini API ở phía backend. Nếu giao diện trả fallback như "Mình đang gặp chút khó khăn khi kết nối AI", cần kiểm tra:
+- `.env` có `GEMINI_API_KEY`.
+- Key Gemini còn quota.
+- Backend đã restart sau khi đổi `.env`.
+- Route `/api/ai/chat` và `/api/ai/report` đã được đăng ký trong Express.
+
+Trường hợp key hợp lệ nhưng Gemini trả `429 RESOURCE_EXHAUSTED`, đây là lỗi quota của Google/Gemini, không phải lỗi giao diện chat.
+
+### Khi web bị trắng trang hoặc treo ở localhost
+Các nguyên nhân đã gặp:
+- `localStorage.user` bị hỏng JSON làm app crash ngay khi khởi động.
+- Service worker cache bản JS/app shell cũ ở `localhost`.
+- Database schema chưa đồng bộ với Prisma schema.
+
+Cách xử lý nhanh:
+1. Bấm `Ctrl + F5` để hard refresh.
+2. Nếu vẫn trắng, clear site data cho `localhost:3000`.
+3. Restart dev server bằng `npm run dev`.
+4. Kiểm tra backend trả HTML ở `http://localhost:3000/login#/login`.
+5. Nếu login báo lỗi database, kiểm tra migration/schema DB.
+l.
 - `GET /api/freeze/dates?goal_id=...`: xem danh sách ngày đã đóng băng của goal.
 
 Lỗi thường gặp khi test:

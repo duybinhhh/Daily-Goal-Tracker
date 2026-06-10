@@ -74,6 +74,21 @@ function mapFreeze(f: any) {
   };
 }
 
+function mapGroupMessage(m: any) {
+  if (!m) return null;
+  return {
+    ...m,
+    created_at: m.created_at.toISOString(),
+    updated_at: m.updated_at.toISOString(),
+    sender: m.sender ? {
+      id: m.sender.id,
+      name: m.sender.name,
+      avatarInitials: m.sender.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().substring(0, 2)
+    } : null,
+    reactions: m.reactions || [],
+  };
+}
+
 type StreakFreezeRecord = ReturnType<typeof mapFreeze>;
 
 class PrismaDB {
@@ -187,12 +202,17 @@ class PrismaDB {
       current_count?: number;
       frequency?: string;
       status?: string;
+      is_archived?: boolean;
+      archived_at?: string | null;
       due_date?: string | null;
       reminder_time?: string | null;
     }) => {
       const prismaUpdate: any = { ...updateData };
       if (updateData.due_date !== undefined) {
         prismaUpdate.due_date = updateData.due_date ? new Date(updateData.due_date) : null;
+      }
+      if (updateData.archived_at !== undefined) {
+        prismaUpdate.archived_at = updateData.archived_at ? new Date(updateData.archived_at) : null;
       }
       if (updateData.reminder_time !== undefined) {
         prismaUpdate.reminder_time = updateData.reminder_time || null;
@@ -479,6 +499,120 @@ class PrismaDB {
         }
       });
       return deleted;
+    }
+  };
+
+  public groupMessages = {
+    findMany: async (where: { group_id: string }, take: number = 30) => {
+      const messages = await prisma.groupMessage.findMany({
+        where: { group_id: where.group_id },
+        include: {
+          sender: true,
+          reactions: {
+            include: {
+              user: true
+            }
+          }
+        },
+        orderBy: { created_at: "desc" },
+        take
+      });
+      // Reverse to get chronological order for chat
+      return messages.reverse().map(mapGroupMessage);
+    },
+    findUnique: async (id: string) => {
+      const msg = await prisma.groupMessage.findUnique({
+        where: { id },
+        include: {
+          sender: true,
+          reactions: true
+        }
+      });
+      return mapGroupMessage(msg);
+    },
+    create: async (data: { group_id: string; sender_id: string; content: string }) => {
+      const created = await prisma.groupMessage.create({
+        data: {
+          group_id: data.group_id,
+          sender_id: data.sender_id,
+          content: data.content,
+        },
+        include: {
+          sender: true,
+          reactions: true
+        }
+      });
+      return mapGroupMessage(created);
+    },
+    delete: async (id: string) => {
+      return await prisma.groupMessage.delete({ where: { id } });
+    }
+  };
+
+  public messageReactions = {
+    findUnique: async (where: { message_id: string; user_id: string; emoji: string }) => {
+      return await prisma.messageReaction.findUnique({
+        where: {
+          message_id_user_id_emoji: {
+            message_id: where.message_id,
+            user_id: where.user_id,
+            emoji: where.emoji
+          }
+        }
+      });
+    },
+    create: async (data: { message_id: string; user_id: string; emoji: string }) => {
+      return await prisma.messageReaction.create({
+        data: {
+          message_id: data.message_id,
+          user_id: data.user_id,
+          emoji: data.emoji,
+        }
+      });
+    },
+    delete: async (id: string) => {
+      return await prisma.messageReaction.delete({ where: { id } });
+    },
+    toggle: async (message_id: string, user_id: string, emoji: string) => {
+      const existing = await prisma.messageReaction.findUnique({
+        where: {
+          message_id_user_id_emoji: {
+            message_id,
+            user_id,
+            emoji
+          }
+        }
+      });
+
+      if (existing) {
+        await prisma.messageReaction.delete({ where: { id: existing.id } });
+        return { action: "removed" };
+      } else {
+        await prisma.messageReaction.create({
+          data: { message_id, user_id, emoji }
+        });
+        return { action: "added" };
+      }
+    }
+  };
+
+  public groupChatNotificationLogs = {
+    countToday: async (user_id: string) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return await prisma.groupChatNotificationLog.count({
+        where: {
+          user_id,
+          created_at: {
+            gte: today
+          }
+        }
+      });
+    },
+    create: async (user_id: string, group_id: string) => {
+      return await prisma.groupChatNotificationLog.create({
+        data: { user_id, group_id }
+      });
     }
   };
 }

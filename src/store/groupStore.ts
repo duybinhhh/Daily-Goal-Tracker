@@ -61,6 +61,7 @@ interface GroupState {
   }) => Promise<void>;
   joinGroup: (id: string) => Promise<void>;
   leaveGroup: (id: string) => Promise<void>;
+  removeMember: (groupId: string, userId: string) => Promise<void>;
   deleteGroup: (id: string) => Promise<void>;
   clearError: () => void;
 }
@@ -144,6 +145,19 @@ export const useGroupStore = create<GroupState>((set, get) => ({
       await get().fetchGroups();
     } catch (error: any) {
       const msg = error.response?.data?.message || "Failed to leave habit group.";
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  removeMember: async (groupId: string, userId: string) => {
+    set({ loading: true, error: null });
+    try {
+      await api.delete(`/api/groups/${groupId}/members/${userId}`);
+      set({ loading: false });
+      await get().fetchGroupById(groupId);
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to remove member.";
       set({ error: msg, loading: false });
       throw new Error(msg);
     }
