@@ -237,7 +237,24 @@ export const vi = {
     },
     noMilestonesFound: 'Không tìm thấy cột mốc nào phù hợp với tìm kiếm.',
     loadingDesc: 'Đang tải dữ liệu phân tích hiệu suất...',
+    trendComparison: 'So sánh xu hướng nâng cao',
+    day: 'Ngày vs Ngày',
+    week: 'Tuần vs Tuần',
+    month: 'Tháng vs Tháng',
+    allGoals: 'Tất cả mục tiêu',
+    currentPeriod: 'Hiện tại',
+    previousPeriod: 'Kỳ trước',
+    growth: 'Tăng',
+    drop: 'Giảm',
+    noChange: 'Không đổi',
+    checkinCount: 'check-in',
+    noTrendData: 'Không có dữ liệu xu hướng cho mục tiêu này.',
+    dailySummary: 'Tổng kết hàng ngày',
+    checkedIn: 'Đã check-in',
+    notCheckedIn: 'Chưa check-in',
+    improvementAdvice: 'Gợi ý cải thiện',
   },
+
 
   // ── Timeline ──
   timeline: {

@@ -7,6 +7,7 @@ import api from "../services/api";
 import { ShareModal } from "../components/ShareModal";
 import { useTranslation } from "../i18n";
 import { getLevelFromXP, getLevelProgress, getXPToNextLevel, LEVELS, XP_RULES } from "../lib/xpSystem";
+import { TrendComparison } from "../components/stats/TrendComparison";
 
 export const Stats: React.FC = () => {
   const { t, language } = useTranslation();
@@ -233,20 +234,22 @@ export const Stats: React.FC = () => {
 
   // 3. Overall Completion rate last-month comparison calculation
   const completionTrend = useMemo(() => {
-    if (history.length < 60) return { percent: 12, isUp: true }; // default mockup fallback
+    if (history.length === 0) return { percent: 0, isUp: true };
+    const half = Math.floor(history.length / 2);
+    if (half === 0) return { percent: 0, isUp: true };
     
-    const last30 = history.slice(-30);
-    const prev30 = history.slice(-60, -30);
+    const lastPart = history.slice(-half);
+    const prevPart = history.slice(-2 * half, -half);
     
-    const sumLast30 = last30.reduce((acc, day) => acc + day.count, 0);
-    const sumPrev30 = prev30.reduce((acc, day) => acc + day.count, 0);
+    const sumLast = lastPart.reduce((acc, day) => acc + day.count, 0);
+    const sumPrev = prevPart.reduce((acc, day) => acc + day.count, 0);
     
-    if (sumPrev30 === 0) {
-      return { percent: sumLast30 > 0 ? 100 : 0, isUp: true };
+    if (sumPrev === 0) {
+      return { percent: sumLast > 0 ? 100 : 0, isUp: true };
     }
     
-    const diff = sumLast30 - sumPrev30;
-    const percent = Math.round((diff / sumPrev30) * 100);
+    const diff = sumLast - sumPrev;
+    const percent = Math.round((diff / sumPrev) * 100);
     return {
       percent: Math.abs(percent),
       isUp: percent >= 0
@@ -291,7 +294,7 @@ export const Stats: React.FC = () => {
       
       trendData.push({
         weekLabel: t("stats.weekLabel", { num: weeksCount - w }),
-        percentage: percentage || 15 + (9 - w) * 8, // fallback curve if empty
+        percentage: percentage,
         count: completionsSum
       });
     }
@@ -300,7 +303,7 @@ export const Stats: React.FC = () => {
 
   // 6. Conic gradient calculation for Goal Distribution Donut Chart
   const distributionData = useMemo(() => {
-    const entries = Object.values(categoryStats).filter(c => c.count > 0 || c.completedCount > 0);
+    const entries = Object.values(categoryStats).filter(c => c.count > 0);
     const total = entries.reduce((acc, c) => acc + c.count, 0);
     
     const colors = [
@@ -314,7 +317,7 @@ export const Stats: React.FC = () => {
 
     let currentAngle = 0;
     const sectors = entries.map((entry, index) => {
-      const percentage = total > 0 ? Math.round((entry.count / total) * 100) : index === 0 ? 45 : index === 1 ? 30 : 25; // fallback
+      const percentage = total > 0 ? Math.round((entry.count / total) * 100) : 0;
       const color = colors[index % colors.length];
       const start = currentAngle;
       currentAngle += percentage;
@@ -327,13 +330,12 @@ export const Stats: React.FC = () => {
       };
     });
 
-    const displayTotal = total || 287; // fallback mockup
-    return { sectors, total: displayTotal };
+    return { sectors, total };
   }, [categoryStats]);
 
   const conicGradientStyle = useMemo(() => {
-    if (distributionData.sectors.length === 0) {
-      return "conic-gradient(var(--color-primary) 0% 45%, var(--color-secondary) 45% 75%, var(--color-tertiary) 75% 100%)";
+    if (distributionData.sectors.length === 0 || distributionData.total === 0) {
+      return "conic-gradient(var(--color-surface-container-high) 0% 100%)";
     }
     const parts = distributionData.sectors.map(s => `${s.color} ${s.start}% ${s.end}%`);
     return `conic-gradient(${parts.join(", ")})`;
@@ -344,7 +346,7 @@ export const Stats: React.FC = () => {
     const list: { title: string; desc: string; icon: string; date: string; colorClass: string; iconColorClass: string }[] = [];
 
     // Milestone 1: High Global rate
-    const globalRate = stats?.overallCompletionRate || 87.4;
+    const globalRate = stats?.overallCompletionRate || 0;
     if (globalRate > 75) {
       list.push({
         title: t("stats.milestonesList.eliteTitle"),
@@ -357,7 +359,7 @@ export const Stats: React.FC = () => {
     }
 
     // Milestone 2: Streaks
-    const longestStreak = stats?.bestLongestStreak || 14;
+    const longestStreak = stats?.bestLongestStreak || 0;
     if (longestStreak > 0) {
       list.push({
         title: t("stats.milestonesList.streakTitle", { days: longestStreak }),
@@ -674,7 +676,7 @@ export const Stats: React.FC = () => {
           <div className="lg:col-span-4 glass-card p-6 rounded-2xl relative overflow-hidden group hover:border-white/20 transition-all">
             <div className="relative z-10">
               <p className="text-xs font-bold text-secondary mb-2 uppercase tracking-widest">{t("stats.globalCompletion")}</p>
-              <h3 className="text-4xl font-extrabold text-on-surface">{stats?.overallCompletionRate || 87.4}%</h3>
+              <h3 className="text-4xl font-extrabold text-on-surface">{stats?.overallCompletionRate || 0}%</h3>
               <div className="mt-4 flex items-center gap-2">
                 <span className={`material-symbols-outlined ${completionTrend.isUp ? 'text-secondary' : 'text-error'}`}>
                   {completionTrend.isUp ? 'trending_up' : 'trending_down'}
@@ -715,6 +717,9 @@ export const Stats: React.FC = () => {
             })}
           </div>
         </div>
+
+        {/* Trend Comparison Widget */}
+        <TrendComparison />
 
         {/* Activity Heatmap Section */}
         <section className="glass-card p-8 rounded-2xl mb-8">

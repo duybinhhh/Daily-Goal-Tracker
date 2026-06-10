@@ -3,6 +3,15 @@
 
 
 # Changelog
+
+## [Sprint 8] - 2026-06-10 (Trend Comparison & Goal Comparison)
+### Thêm mới & Cải tiến (Added & Improved)
+* **Widget Trend Comparison (So sánh xu hướng):** Thêm component `TrendComparison` trong `src/components/stats/` sử dụng `recharts` để vẽ biểu đồ cột đôi (Grouped Bar Chart). Tích hợp trực tiếp vào màn hình `Stats Dashboard` ngay bên dưới khối Bento Grid.
+* **So sánh hiệu suất đa khung hình:** Hỗ trợ so sánh hiệu suất thói quen theo 3 mốc thời gian: `Ngày vs Ngày`, `Tuần này vs Tuần trước`, và `Tháng này vs Tháng trước`. Hiển thị tỷ lệ phần trăm thay đổi (tăng/giảm) trực quan bằng màu sắc (xanh/đỏ) trong chế độ so sánh Tháng.
+* **Bộ lọc và Hiển thị chi tiết:** Cung cấp bộ lọc dropdown cho phép người dùng xem dữ liệu theo "Tất cả mục tiêu" hoặc chọn một mục tiêu cụ thể. Tích hợp Custom Tooltip hiển thị chi tiết tên mốc thời gian, giá trị kỳ hiện tại, giá trị kỳ trước và tên mục tiêu.
+* **API Endpoint Trend Comparison:** Thêm mới route `GET /api/stats/trend` trong `src/routes/stats.ts`. Hỗ trợ các query parameter `period` (`day`, `week`, `month`) và `goalId` (tùy chọn).
+* **Xử lý Logic Backend:** Xây dựng logic trong `statsController.ts` tính toán tổng hiện tại, kỳ trước, tỷ lệ phần trăm thay đổi và format dữ liệu phù hợp với `recharts`.
+
 ## [Đã hoàn thành] - Sprint 8 - Hoàn thiện nhắc hẹn trong app và gỡ thông báo thử - 2026-06-09 (GMT+7)
 
 ### Đã thêm & cải tiến

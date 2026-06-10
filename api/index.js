@@ -1265,6 +1265,27 @@ function getLogDedupeKey(log) {
     (log.note || "").trim()
   ].join("|");
 }
+var getLocalDateParts2 = (date, timezone) => {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parseInt(parts.find((p) => p.type === "year").value, 10);
+    const month = parseInt(parts.find((p) => p.type === "month").value, 10) - 1;
+    const day = parseInt(parts.find((p) => p.type === "day").value, 10);
+    return { year, month, day };
+  } catch (e) {
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth(),
+      day: date.getUTCDate()
+    };
+  }
+};
 var getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -1308,7 +1329,7 @@ var getHistory = async (req, res, next) => {
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
     const { from, to } = req.query;
-    const fromDate = from ? new Date(from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1e3);
+    const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3);
     const toDate = to ? new Date(to) : /* @__PURE__ */ new Date();
     fromDate.setHours(0, 0, 0, 0);
     toDate.setHours(23, 59, 59, 999);
@@ -1358,12 +1379,244 @@ var getHistory = async (req, res, next) => {
     next(error);
   }
 };
+var getTrendComparison = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const period = String(req.query.period || "");
+    const goalId = typeof req.query.goalId === "string" && req.query.goalId.trim() ? req.query.goalId.trim() : void 0;
+    if (!["day", "week", "month"].includes(period)) {
+      throw new AppError("Invalid period. Must be day, week, or month.", 400);
+    }
+    const user = await db.users.findUnique({ id: userId });
+    const timezone = user?.timezone || "UTC";
+    const userGoals = await db.goals.findMany({ user_id: userId });
+    const selectedGoal = goalId ? userGoals.find((goal) => goal.id === goalId) : null;
+    if (goalId && !selectedGoal) {
+      throw new AppError("Goal not found.", 404);
+    }
+    const allLogs = await db.logs.findMany({ user_id: userId });
+    const seenLogIds = /* @__PURE__ */ new Set();
+    const seenLogKeys = /* @__PURE__ */ new Set();
+    const uniqueAllLogs = allLogs.filter((log) => {
+      const key = getLogDedupeKey(log);
+      if (seenLogIds.has(log.id) || seenLogKeys.has(key)) {
+        return false;
+      }
+      seenLogIds.add(log.id);
+      seenLogKeys.add(key);
+      return true;
+    });
+    const uniqueLogs = uniqueAllLogs.filter((log) => !goalId || log.goal_id === goalId);
+    const formatDateStr = (year, month, day) => {
+      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    };
+    const getDateKey = (date) => {
+      const parts = getLocalDateParts2(date, timezone);
+      return formatDateStr(parts.year, parts.month, parts.day);
+    };
+    const addDays = (date, days) => {
+      const next2 = new Date(date);
+      next2.setDate(next2.getDate() + days);
+      return next2;
+    };
+    const sumByDateKeys = (dateKeys) => {
+      const dateSet = new Set(dateKeys);
+      return uniqueLogs.filter((log) => dateSet.has(getDateKey(new Date(log.completed_at)))).length;
+    };
+    const sumGoalByDateKeys = (targetGoalId, dateKeys) => {
+      const dateSet = new Set(dateKeys);
+      return uniqueAllLogs.filter((log) => {
+        return log.goal_id === targetGoalId && dateSet.has(getDateKey(new Date(log.completed_at)));
+      }).length;
+    };
+    const nowParts = getLocalDateParts2(/* @__PURE__ */ new Date(), timezone);
+    const localToday = new Date(nowParts.year, nowParts.month, nowParts.day);
+    const todayStr = formatDateStr(nowParts.year, nowParts.month, nowParts.day);
+    const yesterdayDate = addDays(localToday, -1);
+    const yesterdayStr = formatDateStr(yesterdayDate.getFullYear(), yesterdayDate.getMonth(), yesterdayDate.getDate());
+    let currentTotal = 0;
+    let previousTotal = 0;
+    let currentPeriodDateKeys = [];
+    let previousPeriodDateKeys = [];
+    let data = [];
+    let currentRangeLabel = "";
+    let previousRangeLabel = "";
+    if (period === "day") {
+      currentPeriodDateKeys = [todayStr];
+      previousPeriodDateKeys = [yesterdayStr];
+      currentTotal = sumByDateKeys([todayStr]);
+      previousTotal = sumByDateKeys([yesterdayStr]);
+      currentRangeLabel = todayStr;
+      previousRangeLabel = yesterdayStr;
+      data = [
+        {
+          label: "Today",
+          current: currentTotal,
+          previous: previousTotal,
+          currentPeriodLabel: todayStr,
+          previousPeriodLabel: yesterdayStr
+        }
+      ];
+    }
+    if (period === "week") {
+      const dayOfWeek = localToday.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const localMondayThisWeek = new Date(localToday);
+      localMondayThisWeek.setDate(localToday.getDate() + diffToMonday);
+      const thisWeekDays = [];
+      const lastWeekDays = [];
+      for (let i = 0; i < 7; i++) {
+        const dThis = new Date(localMondayThisWeek);
+        dThis.setDate(localMondayThisWeek.getDate() + i);
+        thisWeekDays.push(formatDateStr(dThis.getFullYear(), dThis.getMonth(), dThis.getDate()));
+        const dLast = new Date(localMondayThisWeek);
+        dLast.setDate(localMondayThisWeek.getDate() - 7 + i);
+        lastWeekDays.push(formatDateStr(dLast.getFullYear(), dLast.getMonth(), dLast.getDate()));
+      }
+      const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      currentPeriodDateKeys = thisWeekDays;
+      previousPeriodDateKeys = lastWeekDays;
+      currentRangeLabel = `${thisWeekDays[0]} - ${thisWeekDays[6]}`;
+      previousRangeLabel = `${lastWeekDays[0]} - ${lastWeekDays[6]}`;
+      data = labels.map((label, index) => {
+        const current = sumByDateKeys([thisWeekDays[index]]);
+        const previous = sumByDateKeys([lastWeekDays[index]]);
+        currentTotal += current;
+        previousTotal += previous;
+        return {
+          label,
+          current,
+          previous,
+          currentPeriodLabel: thisWeekDays[index],
+          previousPeriodLabel: lastWeekDays[index]
+        };
+      });
+    }
+    if (period === "month") {
+      const currentYear = nowParts.year;
+      const currentMonth = nowParts.month;
+      const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+      const prevYear = prevMonthDate.getFullYear();
+      const prevMonth = prevMonthDate.getMonth();
+      const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      const daysInPreviousMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
+      const bucketStarts = [1, 8, 15, 22, 29].filter((day) => day <= Math.max(daysInCurrentMonth, daysInPreviousMonth));
+      currentRangeLabel = formatDateStr(currentYear, currentMonth, 1) + " - " + formatDateStr(currentYear, currentMonth, daysInCurrentMonth);
+      previousRangeLabel = formatDateStr(prevYear, prevMonth, 1) + " - " + formatDateStr(prevYear, prevMonth, daysInPreviousMonth);
+      currentPeriodDateKeys = Array.from({ length: daysInCurrentMonth }, (_, index) => formatDateStr(currentYear, currentMonth, index + 1));
+      previousPeriodDateKeys = Array.from({ length: daysInPreviousMonth }, (_, index) => formatDateStr(prevYear, prevMonth, index + 1));
+      data = bucketStarts.map((startDay, index) => {
+        const endDay = Math.min(startDay + 6, Math.max(daysInCurrentMonth, daysInPreviousMonth));
+        const currentKeys = [];
+        const previousKeys = [];
+        for (let day = startDay; day <= endDay; day++) {
+          if (day <= daysInCurrentMonth) {
+            currentKeys.push(formatDateStr(currentYear, currentMonth, day));
+          }
+          if (day <= daysInPreviousMonth) {
+            previousKeys.push(formatDateStr(prevYear, prevMonth, day));
+          }
+        }
+        const current = sumByDateKeys(currentKeys);
+        const previous = sumByDateKeys(previousKeys);
+        currentTotal += current;
+        previousTotal += previous;
+        return {
+          label: `W${index + 1}`,
+          current,
+          previous,
+          currentPeriodLabel: `${currentKeys[0] || ""} - ${currentKeys[currentKeys.length - 1] || ""}`,
+          previousPeriodLabel: `${previousKeys[0] || ""} - ${previousKeys[previousKeys.length - 1] || ""}`
+        };
+      });
+    }
+    const getChangePercent = (current, previous) => {
+      if (previous > 0) {
+        return Math.round((current - previous) / previous * 100);
+      }
+      return current > 0 ? 100 : 0;
+    };
+    const changePercent = getChangePercent(currentTotal, previousTotal);
+    const summaryGoals = (goalId && selectedGoal ? [selectedGoal] : userGoals).filter((goal) => goal.status !== "paused");
+    const todayCheckedIn = [];
+    const todayNotCheckedIn = [];
+    const yesterdayCheckedIn = [];
+    const yesterdayNotCheckedIn = [];
+    summaryGoals.forEach((goal) => {
+      const goalLogs = uniqueAllLogs.filter((log) => log.goal_id === goal.id);
+      const hasTodayLog = goalLogs.some((log) => getDateKey(new Date(log.completed_at)) === todayStr);
+      const hasYesterdayLog = goalLogs.some((log) => getDateKey(new Date(log.completed_at)) === yesterdayStr);
+      if (hasTodayLog) {
+        todayCheckedIn.push(goal.title);
+      } else {
+        todayNotCheckedIn.push(goal.title);
+      }
+      if (hasYesterdayLog) {
+        yesterdayCheckedIn.push(goal.title);
+      } else {
+        yesterdayNotCheckedIn.push(goal.title);
+      }
+    });
+    const goalBreakdown = summaryGoals.map((goal) => {
+      const current = sumGoalByDateKeys(goal.id, currentPeriodDateKeys);
+      const previous = sumGoalByDateKeys(goal.id, previousPeriodDateKeys);
+      const todayCheckedIn2 = uniqueAllLogs.some((log) => log.goal_id === goal.id && getDateKey(new Date(log.completed_at)) === todayStr);
+      const yesterdayCheckedIn2 = uniqueAllLogs.some((log) => log.goal_id === goal.id && getDateKey(new Date(log.completed_at)) === yesterdayStr);
+      return {
+        goalId: goal.id,
+        title: goal.title,
+        category: goal.category,
+        status: goal.status,
+        current,
+        previous,
+        changePercent: getChangePercent(current, previous),
+        todayCheckedIn: todayCheckedIn2,
+        yesterdayCheckedIn: yesterdayCheckedIn2
+      };
+    });
+    res.setHeader("Cache-Control", "no-store");
+    res.status(200).json({
+      success: true,
+      period,
+      goalId: goalId || void 0,
+      goalTitle: selectedGoal?.title,
+      generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      currentRangeLabel,
+      previousRangeLabel,
+      currentTotal,
+      previousTotal,
+      changePercent,
+      data,
+      goalBreakdown,
+      dailySummary: {
+        today: {
+          checkedInCount: todayCheckedIn.length,
+          notCheckedInCount: todayNotCheckedIn.length,
+          checkedInGoals: todayCheckedIn,
+          notCheckedInGoals: todayNotCheckedIn,
+          date: todayStr
+        },
+        yesterday: {
+          checkedInCount: yesterdayCheckedIn.length,
+          notCheckedInCount: yesterdayNotCheckedIn.length,
+          checkedInGoals: yesterdayCheckedIn,
+          notCheckedInGoals: yesterdayNotCheckedIn,
+          date: yesterdayStr
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // src/routes/stats.ts
 var router3 = Router3();
 router3.use(authMiddleware);
 router3.get("/dashboard", getDashboardStats);
 router3.get("/history", getHistory);
+router3.get("/trend", getTrendComparison);
 var stats_default = router3;
 
 // src/routes/groups.ts

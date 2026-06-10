@@ -126,6 +126,9 @@ interface GoalState {
   deleteLogProgress: (logId: string, goalId?: string) => Promise<void>;
 }
 
+let lastHistoryFrom: string | undefined = undefined;
+let lastHistoryTo: string | undefined = undefined;
+
 export const useGoalStore = create<GoalState>((set, get) => ({
   goals: [],
   stats: null,
@@ -234,6 +237,12 @@ export const useGoalStore = create<GoalState>((set, get) => ({
   },
 
   fetchHistory: async (from, to) => {
+    if (from !== undefined) lastHistoryFrom = from;
+    if (to !== undefined) lastHistoryTo = to;
+
+    const activeFrom = from !== undefined ? from : lastHistoryFrom;
+    const activeTo = to !== undefined ? to : lastHistoryTo;
+
     const mergeHistoryPending = async (fetchedHistory: HistoryData[]) => {
       const pending = await getPendingQueue();
       const normalizedHistory = normalizeHistory(fetchedHistory);
@@ -305,8 +314,8 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
     try {
       const params: any = {};
-      if (from) params.from = from;
-      if (to) params.to = to;
+      if (activeFrom) params.from = activeFrom;
+      if (activeTo) params.to = activeTo;
       const response = await api.get("/api/stats/history", { params });
       
       const serverHistory = normalizeHistory(response.data.history);

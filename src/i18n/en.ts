@@ -237,7 +237,24 @@ export const en = {
     },
     noMilestonesFound: 'No milestones match your search query.',
     loadingDesc: 'Loading performance statistics analytics...',
+    trendComparison: 'Advanced Trend Comparison',
+    day: 'Day vs Day',
+    week: 'Week vs Week',
+    month: 'Month vs Month',
+    allGoals: 'All Goals',
+    currentPeriod: 'Current',
+    previousPeriod: 'Previous',
+    growth: 'Growth',
+    drop: 'Drop',
+    noChange: 'No change',
+    checkinCount: 'check-in(s)',
+    noTrendData: 'No trend data available for this goal.',
+    dailySummary: 'Daily Summary',
+    checkedIn: 'Checked-in',
+    notCheckedIn: 'Not checked-in',
+    improvementAdvice: 'Actionable Advice',
   },
+
 
   // ── Timeline ──
   timeline: {
