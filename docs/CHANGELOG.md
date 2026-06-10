@@ -7,7 +7,7 @@
 ## [Sprint 10] - 2026-06-10 (Discipline Room Demo - Breakthrough Feature)
 ### Đã thêm
 - **Phòng Kỷ Luật (Discipline Room Demo)**:
-  - Bản demo chức năng đột phá giúp người dùng rèn luyện sự tập trung tối đa, mô phỏng không gian học tập/làm việc chung với AI Camera Coach.
+  - Chức năng giúp người dùng rèn luyện sự tập trung tối đa, mô phỏng không gian học tập/làm việc chung với AI Camera Coach.
   - **Trải nghiệm 4 bước chuyên nghiệp**:
     1. **Create Room**: Giao diện tạo phòng với các tùy chọn linh hoạt:
        - Đặt tên mục tiêu/phiên làm việc.
