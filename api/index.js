@@ -87,6 +87,37 @@ function mapGroupMessage(m) {
     reactions: m.reactions || []
   };
 }
+function mapDisciplineRoom(r) {
+  if (!r) return null;
+  return {
+    ...r,
+    started_at: r.started_at ? r.started_at.toISOString() : null,
+    ended_at: r.ended_at ? r.ended_at.toISOString() : null,
+    created_at: r.created_at.toISOString(),
+    updated_at: r.updated_at.toISOString(),
+    participants: r.participants ? r.participants.map(mapRoomParticipant) : []
+  };
+}
+function mapRoomParticipant(p) {
+  if (!p) return null;
+  return {
+    ...p,
+    joined_at: p.joined_at.toISOString(),
+    left_at: p.left_at ? p.left_at.toISOString() : null,
+    user: p.user ? {
+      id: p.user.id,
+      name: p.user.name,
+      email: p.user.email
+    } : null
+  };
+}
+function mapSessionReport(r) {
+  if (!r) return null;
+  return {
+    ...r,
+    created_at: r.created_at.toISOString()
+  };
+}
 var PrismaDB = class {
   constructor() {
     // Users Operations
@@ -683,6 +714,70 @@ var PrismaDB = class {
         return await prisma.groupChatNotificationLog.create({
           data: { user_id, group_id }
         });
+      }
+    };
+    this.disciplineRooms = {
+      findUnique: async (id) => {
+        const room = await prisma.disciplineRoom.findUnique({
+          where: { id },
+          include: { participants: { include: { user: true } } }
+        });
+        return mapDisciplineRoom(room);
+      },
+      findByInviteCode: async (inviteCode) => {
+        const room = await prisma.disciplineRoom.findUnique({
+          where: { invite_code: inviteCode },
+          include: { participants: { include: { user: true } } }
+        });
+        return mapDisciplineRoom(room);
+      },
+      create: async (data) => {
+        const created = await prisma.disciplineRoom.create({ data });
+        return mapDisciplineRoom(created);
+      },
+      update: async (id, data) => {
+        const prismaData = { ...data };
+        if (data.started_at) prismaData.started_at = new Date(data.started_at);
+        if (data.ended_at) prismaData.ended_at = new Date(data.ended_at);
+        const updated = await prisma.disciplineRoom.update({
+          where: { id },
+          data: prismaData
+        });
+        return mapDisciplineRoom(updated);
+      }
+    };
+    this.roomParticipants = {
+      findManyByRoomId: async (roomId) => {
+        const participants = await prisma.roomParticipant.findMany({
+          where: { room_id: roomId },
+          include: { user: true }
+        });
+        return participants.map(mapRoomParticipant);
+      },
+      create: async (data) => {
+        const created = await prisma.roomParticipant.create({ data });
+        return mapRoomParticipant(created);
+      },
+      updateByRoomAndUser: async (roomId, userId, data) => {
+        const prismaData = { ...data };
+        if (data.left_at) prismaData.left_at = new Date(data.left_at);
+        const updated = await prisma.roomParticipant.update({
+          where: { room_id_user_id: { room_id: roomId, user_id: userId } },
+          data: prismaData
+        });
+        return mapRoomParticipant(updated);
+      }
+    };
+    this.sessionReports = {
+      create: async (data) => {
+        const created = await prisma.sessionReport.create({ data });
+        return mapSessionReport(created);
+      },
+      findByRoomAndUser: async (roomId, userId) => {
+        const report = await prisma.sessionReport.findFirst({
+          where: { room_id: roomId, user_id: userId }
+        });
+        return mapSessionReport(report);
       }
     };
   }
@@ -3007,6 +3102,198 @@ router8.use(authMiddleware);
 router8.post("/award", awardXP);
 var xp_default = router8;
 
+// src/routes/disciplineRoom.ts
+import { Router as Router9 } from "express";
+
+// src/controllers/disciplineRoomController.ts
+var getAIInsight = (focusScore) => {
+  if (focusScore >= 90) {
+    return "Tuy\u1EC7t v\u1EDDi! B\u1EA1n \u0111\xE3 duy tr\xEC s\u1EF1 t\u1EADp trung c\u1EF1c k\u1EF3 \u1EA5n t\u01B0\u1EE3ng trong su\u1ED1t phi\xEAn. Phong \u0111\u1ED9 \u0111\u1EC9nh cao!";
+  } else if (focusScore >= 70) {
+    return "Kh\xE1 \u1ED5n! B\u1EA1n c\xF3 m\u1ED9t v\xE0i l\u1EA7n m\u1EA5t t\u1EADp trung nh\u1ECF, nh\u01B0ng t\u1ED5ng th\u1EC3 v\u1EABn r\u1EA5t hi\u1EC7u qu\u1EA3. Ti\u1EBFp t\u1EE5c ph\xE1t huy nh\xE9!";
+  } else if (focusScore >= 50) {
+    return "Phi\xEAn l\xE0m vi\u1EC7c c\xF3 kh\xE1 nhi\u1EC1u xao nh\xE3ng. H\xE3y th\u1EED d\u1ECDn d\u1EB9p kh\xF4ng gian v\xE0 ch\u1ECDn phi\xEAn ng\u1EAFn h\u01A1n nh\xE9!";
+  } else {
+    return "M\u1EE9c \u0111\u1ED9 t\u1EADp trung kh\xE1 th\u1EA5p. \u0110\u1EEBng qu\xE1 kh\u1EAFt khe v\u1EDBi b\u1EA3n th\xE2n, h\xE3y ngh\u1EC9 ng\u01A1i m\u1ED9t ch\xFAt v\xE0 th\u1EED l\u1EA1i sau nh\xE9.";
+  }
+};
+var calculateXP = (focusScore) => {
+  if (focusScore >= 90) return 180;
+  if (focusScore >= 70) return 120;
+  if (focusScore >= 50) return 80;
+  return 30;
+};
+var createRoom = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { title, mode, durationMinutes } = req.body;
+    if (!title || !mode || !durationMinutes) {
+      throw new AppError("Title, mode, and duration are required.", 400);
+    }
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const room = await db.disciplineRooms.create({
+      title,
+      mode,
+      duration_minutes: durationMinutes,
+      invite_code: inviteCode,
+      creator_id: userId,
+      status: "WAITING"
+    });
+    await db.roomParticipants.create({
+      room_id: room.id,
+      user_id: userId,
+      role: "CREATOR"
+    });
+    res.status(201).json({ success: true, room });
+  } catch (error) {
+    next(error);
+  }
+};
+var joinRoom = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { inviteCode } = req.body;
+    if (!inviteCode) throw new AppError("Invite code is required.", 400);
+    const room = await db.disciplineRooms.findByInviteCode(inviteCode);
+    if (!room) throw new AppError("Room not found.", 404);
+    if (room.status !== "WAITING") {
+      throw new AppError("Room is no longer waiting for participants.", 400);
+    }
+    const participants = await db.roomParticipants.findManyByRoomId(room.id);
+    if (participants.length >= 2) {
+      throw new AppError("Room is full.", 400);
+    }
+    const alreadyIn = participants.find((p) => p.user_id === userId);
+    if (alreadyIn) {
+      res.status(200).json({ success: true, room });
+      return;
+    }
+    await db.roomParticipants.create({
+      room_id: room.id,
+      user_id: userId,
+      role: "PARTNER"
+    });
+    res.status(200).json({ success: true, room });
+  } catch (error) {
+    next(error);
+  }
+};
+var getRoom = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const room = await db.disciplineRooms.findUnique(id);
+    if (!room) throw new AppError("Room not found.", 404);
+    res.status(200).json({ success: true, room });
+  } catch (error) {
+    next(error);
+  }
+};
+var startRoom = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const room = await db.disciplineRooms.findUnique(id);
+    if (!room) throw new AppError("Room not found.", 404);
+    if (room.creator_id !== userId) {
+      throw new AppError("Only the creator can start the room.", 403);
+    }
+    const updatedRoom = await db.disciplineRooms.update(id, {
+      status: "ACTIVE",
+      started_at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    res.status(200).json({ success: true, room: updatedRoom });
+  } catch (error) {
+    next(error);
+  }
+};
+var heartbeat = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const room = await db.disciplineRooms.findUnique(id);
+    if (!room) throw new AppError("Room not found.", 404);
+    res.status(200).json({ success: true, status: room.status });
+  } catch (error) {
+    next(error);
+  }
+};
+var endRoom = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const { durationSeconds, presenceScore, focusScore, awayCount } = req.body;
+    const room = await db.disciplineRooms.findUnique(id);
+    if (!room) throw new AppError("Room not found.", 404);
+    const xpEarned = calculateXP(focusScore);
+    const aiInsight = getAIInsight(focusScore);
+    const report = await db.sessionReports.create({
+      room_id: id,
+      user_id: userId,
+      duration_seconds: durationSeconds,
+      presence_score: presenceScore,
+      focus_score: focusScore,
+      away_count: awayCount,
+      xp_earned: xpEarned,
+      ai_insight: aiInsight
+    });
+    await db.roomParticipants.updateByRoomAndUser(id, userId, {
+      left_at: (/* @__PURE__ */ new Date()).toISOString(),
+      final_focus_score: focusScore,
+      xp_earned: xpEarned
+    });
+    const user = await db.users.findUnique({ id: userId });
+    if (user) {
+      const currentXP = user.total_xp || 0;
+      const nextXP = currentXP + xpEarned;
+      const nextLevel = getLevelFromXP(nextXP).level;
+      await db.users.update(userId, {
+        total_xp: nextXP,
+        level: nextLevel
+      });
+    }
+    if (room.creator_id === userId) {
+      await db.disciplineRooms.update(id, {
+        status: "COMPLETED",
+        ended_at: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    }
+    res.status(200).json({ success: true, report });
+  } catch (error) {
+    next(error);
+  }
+};
+var getReport = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const report = await db.sessionReports.findByRoomAndUser(id, userId);
+    if (!report) throw new AppError("Report not found.", 404);
+    res.status(200).json({ success: true, report });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// src/routes/disciplineRoom.ts
+var router9 = Router9();
+router9.use(authMiddleware);
+router9.post("/create", createRoom);
+router9.post("/join", joinRoom);
+router9.get("/:id", getRoom);
+router9.post("/:id/start", startRoom);
+router9.post("/:id/heartbeat", heartbeat);
+router9.post("/:id/end", endRoom);
+router9.get("/:id/report", getReport);
+var disciplineRoom_default = router9;
+
 // src/express-app.ts
 var app = express();
 app.use(express.json());
@@ -3018,6 +3305,7 @@ app.use("/api/groups", groups_default);
 app.use("/api/ai", ai_default);
 app.use("/api/freeze", freeze_default);
 app.use("/api/xp", xp_default);
+app.use("/api/discipline-room", disciplineRoom_default);
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,

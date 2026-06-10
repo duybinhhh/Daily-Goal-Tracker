@@ -8,13 +8,15 @@ import groupRoutes from "./routes/groups";
 import aiRoutes from "./routes/ai";
 import freezeRoutes from "./routes/freeze";
 import xpRoutes from "./routes/xp";
+import disciplineRoomRoutes from "./routes/disciplineRoom";
 import { errorHandler } from "./middleware/errorHandler";
 import { db } from "../server/db";
 
 const app = express();
 
-// Global body parser
-app.use(express.json());
+// Global body parser — 2mb limit to handle base64 camera frame relay
+app.use(express.json({ limit: "2mb" }));
+
 
 // Backend REST API Endpoints registration
 app.use("/api/auth", authRoutes);
@@ -25,6 +27,7 @@ app.use("/api/groups", groupRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/freeze", freezeRoutes);
 app.use("/api/xp", xpRoutes);
+app.use("/api/discipline-room", disciplineRoomRoutes);
 
 
 // Database seed utility and simple API health endpoint
