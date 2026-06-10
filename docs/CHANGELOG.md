@@ -12,7 +12,7 @@
 
 ## Đã thêm
 
-### Discipline Room — Phòng Kỷ Luật phiên bản Full-stack
+### Discipline Room — Phòng Kỷ Luật
 
 * Nâng cấp **Discipline Room** từ bản demo local thành một tính năng có dữ liệu thật, API thật và được tích hợp trực tiếp vào hệ thống **Daily Goal Tracker**.
 * Người dùng có thể tạo phòng kỷ luật, mời partner bằng mã phòng, bắt đầu phiên tập trung, theo dõi trạng thái trong phiên và nhận báo cáo sau khi hoàn thành.
