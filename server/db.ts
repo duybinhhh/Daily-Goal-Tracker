@@ -177,6 +177,7 @@ class PrismaDB {
       frequency: string;
       due_date?: string | null;
       reminder_time?: string | null;
+      group_id?: string | null;
     }) => {
       const created = await prisma.goal.create({
         data: {
@@ -188,6 +189,7 @@ class PrismaDB {
           frequency: data.frequency,
           due_date: data.due_date ? new Date(data.due_date) : null,
           reminder_time: data.reminder_time || null,
+          group_id: data.group_id || null,
           current_count: 0,
           status: "active",
         },
@@ -206,6 +208,7 @@ class PrismaDB {
       archived_at?: string | null;
       due_date?: string | null;
       reminder_time?: string | null;
+      group_id?: string | null;
     }) => {
       const prismaUpdate: any = { ...updateData };
       if (updateData.due_date !== undefined) {
@@ -439,6 +442,20 @@ class PrismaDB {
       });
       return group;
     },
+    findByInviteCode: async (inviteCode: string) => {
+      const group = await prisma.habitGroup.findUnique({
+        where: { invite_code: inviteCode },
+        include: {
+          creator: true,
+          members: {
+            include: {
+              user: true
+            }
+          }
+        }
+      });
+      return group;
+    },
     create: async (data: {
       name: string;
       description?: string | null;
@@ -447,6 +464,7 @@ class PrismaDB {
       goal_category: string;
       goal_target_count: number;
       goal_frequency: string;
+      max_members?: number;
     }) => {
       const created = await prisma.habitGroup.create({
         data: {
@@ -457,9 +475,23 @@ class PrismaDB {
           goal_category: data.goal_category,
           goal_target_count: data.goal_target_count,
           goal_frequency: data.goal_frequency,
+          max_members: data.max_members ?? 20,
         },
       });
       return created;
+    },
+    update: async (id: string, data: {
+      name?: string;
+      description?: string | null;
+      invite_code?: string | null;
+      invite_expires_at?: Date | null;
+      max_members?: number;
+    }) => {
+      const updated = await prisma.habitGroup.update({
+        where: { id },
+        data,
+      });
+      return updated;
     },
     delete: async (id: string) => {
       const deleted = await prisma.habitGroup.delete({ where: { id } });

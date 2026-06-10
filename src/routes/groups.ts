@@ -9,6 +9,9 @@ import {
   leaveGroup,
   removeMember,
   deleteGroup,
+  createInviteCode,
+  getGroupByInviteCode,
+  joinGroupByInviteCode,
 } from "../controllers/groupController";
 import {
   getGroupMessages,
@@ -19,12 +22,17 @@ import {
 
 const router = Router();
 
-// Apply auth middleware globally on groups
+// Invite preview must stay public so users can open an invite before logging in.
+router.get("/invite/:inviteCode", getGroupByInviteCode);
+
+// Protected group actions
 router.use(authMiddleware as any);
 
 router.get("/", getGroups);
 router.post("/", createGroup);
+router.post("/join/:inviteCode", joinGroupByInviteCode);
 router.get("/:id", getGroupById);
+router.post("/:id/invite", createInviteCode);
 router.post("/:id/join", joinGroup);
 router.post("/:id/leave", leaveGroup);
 router.delete("/:id/members/:userId", removeMember);

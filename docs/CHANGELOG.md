@@ -4,6 +4,37 @@
 
 # Changelog
 
+## [Sprint 9] - 2026-06-10 (Group Invite & Member Management)
+### Đã thêm
+* **Mời thành viên qua Link (Group Invite Link):**
+  - Cho phép người tạo nhóm (Admin) tạo link mời duy nhất để chia sẻ cho bạn bè.
+  - Mã mời (Invite Code) ngẫu nhiên 8 ký tự, đảm bảo tính duy nhất.
+  - Link mời có hiệu lực trong **7 ngày**. Link cũ tự động vô hiệu khi admin tạo link mới.
+  - Tích hợp nút **📋 Sao chép** (Clipboard API) và **📤 Chia sẻ** (Web Share API) giúp gửi link nhanh chóng.
+* **Luồng Tham gia nhóm (Join Flow):**
+  - Trang tham gia nhóm chuyên dụng: `/join/{invite_code}`.
+  - Hiển thị thông tin nhóm (Tên, số lượng thành viên) trước khi xác nhận tham gia.
+  - Tự động xử lý luồng đăng nhập: Nếu chưa đăng nhập, user được chuyển hướng tới Login và tự động quay lại trang Join sau khi thành công.
+  - Kiểm tra điều kiện tham gia: Link còn hạn, nhóm chưa đầy, user chưa phải là thành viên.
+* **Giới hạn số lượng thành viên:**
+  - Thiết lập giới hạn tối đa **20 thành viên/nhóm**.
+  - Tự động vô hiệu hóa link mời và chặn tham gia khi nhóm đã đạt giới hạn.
+  - Thông báo rõ ràng "Nhóm đã đầy" trên giao diện Join Page.
+* **Quản lý thành viên (Member Management):**
+  - Tích hợp **GroupInvitePanel** vào trang chi tiết nhóm dành riêng cho Admin.
+  - Đảm bảo tính năng xóa thành viên hiện có vẫn hoạt động ổn định và không bị ảnh hưởng bởi luồng mời mới.
+
+### Kỹ thuật
+* **Prisma Schema:** Cập nhật model `HabitGroup` thêm `invite_code`, `invite_expires_at`, và `max_members`.
+* **API Endpoints:**
+  - `POST /api/groups/:groupId/invite`: Tạo mã mời mới.
+  - `GET /api/groups/invite/:inviteCode`: Lấy thông tin nhóm từ mã mời.
+  - `POST /api/groups/join/:inviteCode`: Tham gia nhóm qua mã mời.
+* **Frontend:**
+  - `src/pages/JoinGroupPage.tsx`: Trang join công khai.
+  - `src/components/groups/GroupInvitePanel.tsx`: Panel quản lý mời thành viên cho Admin.
+  - Cập nhật `authStore` và `LoginPage` để hỗ trợ redirect sau login (`?redirect=...`).
+
 ## [Sprint 9] - 2026-06-10 (Groups Page UI Refactor)
 ### Cải tiến
 * **Tối ưu hóa không gian hiển thị (Compact UI):** Refactor toàn bộ giao diện trang Nhóm thói quen để khắc phục tình trạng giao diện bị phình to, giúp người dùng bao quát thông tin tốt hơn.

@@ -127,6 +127,11 @@ model HabitGroup {
   goal_category     String
   goal_target_count Int                @default(1)
   goal_frequency    String             @default("daily")
+  
+  invite_code       String?            @unique
+  invite_expires_at DateTime?
+  max_members       Int                @default(20)
+
   created_at        DateTime           @default(now())
   updated_at        DateTime           @updatedAt
   members           HabitGroupMember[]

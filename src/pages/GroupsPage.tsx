@@ -1,6 +1,7 @@
 // src/pages/GroupsPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { GroupCommentsSection } from "../components/groups/GroupCommentsSection";
+import { GroupInvitePanel } from "../components/groups/GroupInvitePanel";
 import { ShareModal } from "../components/ShareModal";
 import { useAuthStore } from "../store/authStore";
 import { GroupMemberProgress, HabitGroup, useGroupStore } from "../store/groupStore";
@@ -542,6 +543,10 @@ export const GroupsPage: React.FC = () => {
                     <div className="h-full rounded-full bg-secondary" style={{ width: `${getCompletionRate(currentUserProgress.current_count, currentUserProgress.target_count)}%` }} />
                   </div>
                 </div>
+              )}
+
+              {activeGroup.isJoined && (activeGroup.creator_id === user?.id || activeGroup.invite_code) && (
+                <GroupInvitePanel group={activeGroup} canManageInvite={activeGroup.creator_id === user?.id} />
               )}
 
               <div className="flex-1">

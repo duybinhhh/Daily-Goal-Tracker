@@ -160,6 +160,7 @@ var PrismaDB = class {
             frequency: data.frequency,
             due_date: data.due_date ? new Date(data.due_date) : null,
             reminder_time: data.reminder_time || null,
+            group_id: data.group_id || null,
             current_count: 0,
             status: "active"
           }
@@ -389,6 +390,20 @@ var PrismaDB = class {
         });
         return group;
       },
+      findByInviteCode: async (inviteCode) => {
+        const group = await prisma.habitGroup.findUnique({
+          where: { invite_code: inviteCode },
+          include: {
+            creator: true,
+            members: {
+              include: {
+                user: true
+              }
+            }
+          }
+        });
+        return group;
+      },
       create: async (data) => {
         const created = await prisma.habitGroup.create({
           data: {
@@ -398,10 +413,18 @@ var PrismaDB = class {
             goal_title: data.goal_title,
             goal_category: data.goal_category,
             goal_target_count: data.goal_target_count,
-            goal_frequency: data.goal_frequency
+            goal_frequency: data.goal_frequency,
+            max_members: data.max_members ?? 20
           }
         });
         return created;
+      },
+      update: async (id, data) => {
+        const updated = await prisma.habitGroup.update({
+          where: { id },
+          data
+        });
+        return updated;
       },
       delete: async (id) => {
         const deleted = await prisma.habitGroup.delete({ where: { id } });
@@ -1826,6 +1849,9 @@ var getGroups = async (req, res, next) => {
       goal_target_count: group.goal_target_count,
       goal_frequency: group.goal_frequency,
       created_at: group.created_at,
+      invite_code: group.invite_code,
+      invite_expires_at: group.invite_expires_at,
+      max_members: group.max_members,
       memberCount: group.members.length,
       isJoined: group.members.some((m) => m.user_id === userId)
     }));
@@ -1869,9 +1895,9 @@ var createGroup = async (req, res, next) => {
       category: goal_category,
       target_count: targetCount,
       frequency: goal_frequency || "daily",
-      due_date: null
+      due_date: null,
+      group_id: group.id
     });
-    await db.goals.update(goal.id, { group_id: group.id });
     await db.streaks.create({
       user_id: userId,
       goal_id: goal.id
@@ -1940,10 +1966,151 @@ var getGroupById = async (req, res, next) => {
         goal_category: group.goal_category,
         goal_target_count: group.goal_target_count,
         goal_frequency: group.goal_frequency,
+        invite_code: group.invite_code,
+        invite_expires_at: group.invite_expires_at,
+        max_members: group.max_members,
         created_at: group.created_at,
         isJoined,
         members: membersProgress
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+function generateInviteCode(length = 8) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+var createInviteCode = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findUnique({ id });
+    if (!group) {
+      throw new AppError("Group not found.", 404);
+    }
+    if (group.creator_id !== userId) {
+      throw new AppError("Only the group creator can generate invite links.", 403);
+    }
+    if (group.members.length >= group.max_members) {
+      throw new AppError(`Nh\xF3m \u0111\xE3 \u0111\u1EE7 ${group.max_members} th\xE0nh vi\xEAn, kh\xF4ng th\u1EC3 t\u1EA1o link m\u1EDDi.`, 400);
+    }
+    let inviteCode = generateInviteCode();
+    let isUnique = false;
+    let attempts = 0;
+    while (!isUnique && attempts < 10) {
+      const existing = await db.groups.findByInviteCode(inviteCode);
+      if (!existing) {
+        isUnique = true;
+      } else {
+        inviteCode = generateInviteCode();
+        attempts++;
+      }
+    }
+    if (!isUnique) {
+      throw new AppError("Could not generate a unique invite code. Please try again.", 500);
+    }
+    const expiresAt = /* @__PURE__ */ new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+    await db.groups.update(id, {
+      invite_code: inviteCode,
+      invite_expires_at: expiresAt
+    });
+    res.status(200).json({
+      success: true,
+      inviteCode,
+      expiresAt: expiresAt.toISOString()
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var getGroupByInviteCode = async (req, res, next) => {
+  try {
+    const { inviteCode } = req.params;
+    const group = await db.groups.findByInviteCode(inviteCode);
+    if (!group) {
+      throw new AppError("Link m\u1EDDi kh\xF4ng h\u1EE3p l\u1EC7.", 404);
+    }
+    const now = /* @__PURE__ */ new Date();
+    if (group.invite_expires_at && new Date(group.invite_expires_at) < now) {
+      return res.status(200).json({
+        success: true,
+        status: "expired",
+        message: "Link m\u1EDDi \u0111\xE3 h\u1EBFt h\u1EA1n."
+      });
+    }
+    if (group.members.length >= group.max_members) {
+      return res.status(200).json({
+        success: true,
+        status: "full",
+        message: "Nh\xF3m \u0111\xE3 \u0111\u1EA7y."
+      });
+    }
+    res.status(200).json({
+      success: true,
+      status: "valid",
+      group: {
+        id: group.id,
+        name: group.name,
+        memberCount: group.members.length,
+        maxMembers: group.max_members
+      },
+      expiresAt: group.invite_expires_at
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+var joinGroupByInviteCode = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    const { inviteCode } = req.params;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const group = await db.groups.findByInviteCode(inviteCode);
+    if (!group) {
+      throw new AppError("Link m\u1EDDi kh\xF4ng h\u1EE3p l\u1EC7.", 404);
+    }
+    const now = /* @__PURE__ */ new Date();
+    if (group.invite_expires_at && new Date(group.invite_expires_at) < now) {
+      throw new AppError("Link m\u1EDDi \u0111\xE3 h\u1EBFt h\u1EA1n.", 400);
+    }
+    if (group.members.length >= group.max_members) {
+      throw new AppError("Nh\xF3m \u0111\xE3 \u0111\u1EA7y.", 400);
+    }
+    const isMember = group.members.some((m) => m.user_id === userId);
+    if (isMember) {
+      return res.status(200).json({
+        success: true,
+        alreadyMember: true,
+        groupId: group.id,
+        message: "B\u1EA1n \u0111\xE3 l\xE0 th\xE0nh vi\xEAn c\u1EE7a nh\xF3m n\xE0y."
+      });
+    }
+    await db.groupMembers.create({
+      group_id: group.id,
+      user_id: userId
+    });
+    const goal = await db.goals.create({
+      user_id: userId,
+      title: group.goal_title,
+      description: group.description ? `Group Habit: ${group.description}` : `Habit Group Goal: ${group.name}`,
+      category: group.goal_category,
+      target_count: group.goal_target_count,
+      frequency: group.goal_frequency,
+      due_date: null,
+      group_id: group.id
+    });
+    await db.streaks.create({
+      user_id: userId,
+      goal_id: goal.id
+    });
+    res.status(200).json({
+      success: true,
+      groupId: group.id,
+      message: "\u0110\xE3 tham gia nh\xF3m!"
     });
   } catch (error) {
     next(error);
@@ -1957,6 +2124,9 @@ var joinGroup = async (req, res, next) => {
     const group = await db.groups.findUnique({ id });
     if (!group) {
       throw new AppError("Group not found.", 404);
+    }
+    if (group.members.length >= group.max_members) {
+      throw new AppError("Nh\xF3m \u0111\xE3 \u0111\u1EA7y.", 400);
     }
     const isMember = group.members.some((m) => m.user_id === userId);
     if (isMember) {
@@ -1973,9 +2143,9 @@ var joinGroup = async (req, res, next) => {
       category: group.goal_category,
       target_count: group.goal_target_count,
       frequency: group.goal_frequency,
-      due_date: null
+      due_date: null,
+      group_id: group.id
     });
-    await db.goals.update(goal.id, { group_id: group.id });
     await db.streaks.create({
       user_id: userId,
       goal_id: goal.id
@@ -2270,10 +2440,13 @@ async function sendGroupChatNotifications(groupId, senderId, content, groupName,
 
 // src/routes/groups.ts
 var router4 = Router4();
+router4.get("/invite/:inviteCode", getGroupByInviteCode);
 router4.use(authMiddleware);
 router4.get("/", getGroups);
 router4.post("/", createGroup);
+router4.post("/join/:inviteCode", joinGroupByInviteCode);
 router4.get("/:id", getGroupById);
+router4.post("/:id/invite", createInviteCode);
 router4.post("/:id/join", joinGroup);
 router4.post("/:id/leave", leaveGroup);
 router4.delete("/:id/members/:userId", removeMember);

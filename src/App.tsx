@@ -16,6 +16,7 @@ import GoalsPage from "./pages/GoalsPage";
 import GroupsPage from "./pages/GroupsPage";
 import { QuickCheckInPage } from "./pages/QuickCheckInPage";
 import { OnboardingPage } from "./pages/OnboardingPage";
+import JoinGroupPage from "./pages/JoinGroupPage";
 
 import { useGoalStore } from "./store/goalStore";
 import { syncOfflineData } from "./services/syncManager";
@@ -128,6 +129,9 @@ export default function App() {
           <Routes>
             {/* Public authentication page — no sidebar */}
             <Route path="/login" element={<LoginPage />} />
+
+            {/* Join page — handles its own auth logic */}
+            <Route path="/join/:inviteCode" element={<JoinGroupPage />} />
 
             {/* Onboarding page — no sidebar, but protected */}
             <Route
