@@ -4,6 +4,33 @@
 
 # Changelog
 
+## [Sprint 9] - 2026-06-10 (Friends Follow & Activity Feed)
+### Đã thêm
+- **Theo dõi bạn bè & Feed hoạt động (US-29)**:
+  - Trang `/friends` mới để tìm kiếm và theo dõi người dùng khác.
+  - Thanh tìm kiếm theo tên hoặc email với cơ chế debounce tối ưu.
+  - Hệ thống theo dõi 1 chiều (không cần duyệt).
+  - Khung "Bạn bè hôm nay" trên Dashboard hiển thị 5 hoạt động check-in mới nhất từ bạn bè.
+  - Toggle quyền riêng tư trong Settings để ẩn/hiện hoạt động cá nhân trên feed người khác.
+  - Hiển thị số lượng "Đang theo dõi" và "Người theo dõi" trong trang Settings.
+  - Cập nhật Sidebar và Bottom Nav để truy cập nhanh trang Bạn bè.
+  - Optimistic updates cho các hành động theo dõi/hủy theo dõi.
+
+### Kỹ thuật
+- **Prisma Schema:** Thêm model `Follow` và trường `show_activity_in_feed` vào model `User`.
+- **API Endpoints:**
+  - `GET /api/friends/search`: Tìm kiếm người dùng.
+  - `POST /api/friends/follow`: Theo dõi người dùng.
+  - `DELETE /api/friends/follow`: Hủy theo dõi người dùng.
+  - `GET /api/friends/feed`: Lấy feed hoạt động của bạn bè.
+  - `GET /api/friends/stats`: Lấy số lượng follow.
+  - `PATCH /api/friends/privacy`: Cập nhật thiết lập quyền riêng tư.
+- **Frontend:**
+  - `src/pages/FriendsPage.tsx`: Trang quản lý bạn bè.
+  - `src/components/friends/`: Các component search, card và follow button.
+  - `src/components/dashboard/FriendsTodayCard.tsx`: Card feed hoạt động trên Dashboard.
+  - Cập nhật `authStore` để quản lý trạng thái quyền riêng tư.
+
 ## [Sprint 9] - 2026-06-10 (Group Invite & Member Management)
 ### Đã thêm
 * **Mời thành viên qua Link (Group Invite Link):**

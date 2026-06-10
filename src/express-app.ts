@@ -1,6 +1,7 @@
 // src/app.ts
 import express from "express";
 import authRoutes from "./routes/auth";
+import friendsRoutes from "./routes/friends";
 import goalRoutes from "./routes/goals";
 import statsRoutes from "./routes/stats";
 import groupRoutes from "./routes/groups";
@@ -17,6 +18,7 @@ app.use(express.json());
 
 // Backend REST API Endpoints registration
 app.use("/api/auth", authRoutes);
+app.use("/api/friends", friendsRoutes);
 app.use("/api/goals", goalRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/groups", groupRoutes);

@@ -12,6 +12,7 @@ import { GoalFormPage } from "./pages/GoalFormPage";
 import { Stats } from "./pages/Stats";
 import { SettingsPage } from "./pages/SettingsPage";
 import TimelinePage from "./pages/TimelinePage";
+import FriendsPage from "./pages/FriendsPage";
 import GoalsPage from "./pages/GoalsPage";
 import GroupsPage from "./pages/GroupsPage";
 import { QuickCheckInPage } from "./pages/QuickCheckInPage";
@@ -214,6 +215,7 @@ function AppLayout() {
           <Route path="/stats" element={<Stats />} />
           <Route path="/goals" element={<GoalsPage />} />
           <Route path="/timeline" element={<TimelinePage />} />
+          <Route path="/friends" element={<FriendsPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/quick-checkin" element={<QuickCheckInPage />} />

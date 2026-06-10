@@ -15,7 +15,8 @@ Chào mừng bạn đến với **Momentum**, hệ thống theo dõi và quản 
 8. [Bình luận & Chat nhóm (Group Chat)](#8-bình-luận--chat-nhóm-group-chat)
 9. [Chia Sẻ Thành Tích Một Chạm (Social Sharing)](#9-chia-sẻ-thành-tích-một-chạm-social-sharing)
 10. [Hẹn Giờ Pomodoro (Pomodoro Timer)](#10-hẹn-giờ-pomodoro-pomodoro-timer)
-11. [Các Câu Hỏi Thường Gặp (FAQs)](#11-các-câu-hỏi-thường-gặp-faqs)
+11. [Theo dõi Bạn bè & Feed hoạt động (Friends)](#11-theo-dõi-bạn-bè--feed-hoạt-động-friends)
+12. [Các Câu Hỏi Thường Gặp (FAQs)](#12-các-câu-hỏi-thường-gặp-faqs)
 
 ---
 
@@ -258,7 +259,30 @@ Momentum cung cấp tính năng **Social Sharing** cao cấp cho phép bạn kho
 
 ---
 
-### 9. Các Câu Hỏi Thường Gặp (FAQs)
+## 11. Theo dõi Bạn bè & Feed hoạt động (Friends)
+
+Tính năng **Theo dõi Bạn bè** giúp bạn kết nối với những người dùng khác để cùng nhau tạo động lực rèn luyện.
+
+*   **Tìm kiếm và Theo dõi:**
+    1.  Truy cập trang **Bạn bè** qua biểu tượng 👥 trên thanh điều hướng.
+    2.  Nhập tên hoặc email của người bạn muốn tìm vào thanh tìm kiếm.
+    3.  Kết quả sẽ hiển thị Level và Chuỗi ngày (Streak) cao nhất của họ.
+    4.  Nhấn **Theo dõi** để bắt đầu kết nối. Nút sẽ chuyển thành **Đang theo dõi**.
+*   **Feed hoạt động (Hoạt động bạn bè):**
+    1.  Tại màn hình **Dashboard**, bạn sẽ thấy khung **"Bạn bè hôm nay"**.
+    2.  Khung này hiển thị tối đa 5 hoạt động check-in mới nhất từ những người bạn đang theo dõi.
+    3.  Thông tin hiển thị bao gồm: Tên bạn bè, mục tiêu họ vừa hoàn thành và thời gian thực hiện.
+*   **Quản lý Quyền riêng tư:**
+    1.  Nếu bạn không muốn hoạt động của mình xuất hiện trên feed của người khác, hãy vào **Cài đặt**.
+    2.  Tìm mục **"Hiển thị hoạt động trong Feed bạn bè"** và tắt nó đi.
+    3.  Lưu ý: Bạn vẫn có thể xem hoạt động của người khác nếu đang theo dõi họ, nhưng họ sẽ không thấy hoạt động của bạn.
+*   **Xem chỉ số Follow:**
+    1.  Trong trang **Cài đặt**, dưới phần thông tin cá nhân, bạn có thể xem số lượng người bạn đang theo dõi (**Đang theo dõi**) và số người đang theo dõi bạn (**Người theo dõi**).
+
+---
+
+## 12. Các Câu Hỏi Thường Gặp (FAQs)
+
 
 **Q: Tại sao tôi vào trang tạo thói quen lại báo "Yêu cầu kết nối mạng" dù tôi vẫn đang online?**
 > **A:** Một số trình duyệt có thể báo nhầm trạng thái kết nối mạng (false offline). Trong trường hợp này, Momentum cung cấp một nút **"Tôi vẫn đang online, cho tôi tiếp tục"** ở ngay màn hình thông báo lỗi đó. Hãy bấm vào nút này để bỏ qua cảnh báo và tiếp tục thiết lập thói quen. Lưu ý: Khi lưu mục tiêu, bạn vẫn cần có kết nối mạng thực tế để dữ liệu được gửi lên máy chủ thành công.

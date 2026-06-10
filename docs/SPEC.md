@@ -251,6 +251,18 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
         - Giới hạn tối đa 3 thông báo nhóm mỗi ngày cho mỗi user để tránh spam.
     * **Giao diện:** Hỗ trợ Light/Dark Mode, Responsive (không bị bàn phím ảo che khuất trên mobile).
 
+#### US-29: Theo dõi bạn bè & Feed hoạt động (Friends Follow & Activity Feed)
+* **Độ ưu tiên:** Medium
+* **Story Point:** 5.0
+* **Mục tiêu:** Cho phép người dùng kết nối, theo dõi bạn bè và xem các hoạt động rèn luyện gần đây của họ để tạo động lực.
+* **Tiêu chí chấp nhận (AC):**
+    * **Tìm kiếm bạn bè:** Trang `/friends` cho phép tìm kiếm người dùng khác theo Tên hoặc Email. Kết quả hiển thị Avatar, Level và Streak cao nhất.
+    * **Hệ thống Follow 1 chiều:** Người dùng có thể nhấn "Theo dõi" để kết nối với người khác mà không cần sự đồng ý. Có thể "Hủy theo dõi" bất kỳ lúc nào.
+    * **Dashboard Activity Feed:** Khung "Bạn bè hôm nay" trên Dashboard hiển thị tối đa 5 hoạt động check-in mới nhất từ những người đang theo dõi.
+    * **Quyền riêng tư:** Người dùng có thể bật/tắt tùy chọn "Hiển thị hoạt động trong Feed bạn bè" trong phần Cài đặt. Nếu tắt, hoạt động của họ sẽ không xuất hiện trên feed của người khác.
+    * **Thống kê Follow:** Hiển thị số lượng "Đang theo dõi" và "Người theo dõi" trong trang Cài đặt hoặc Hồ sơ.
+    * **Hiệu năng & UX:** Tìm kiếm có cơ chế debounce để tránh quá tải API. Các hành động follow/unfollow sử dụng Optimistic Update để phản hồi tức thì.
+
 ---
 
 ## 4. Tech Stack Đề Xuất (Tinh gọn & Đồng bộ)

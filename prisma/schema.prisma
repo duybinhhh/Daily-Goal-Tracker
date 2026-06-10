@@ -15,6 +15,7 @@ model User {
   name          String
   timezone      String         @default("UTC")
   onboarding_completed Boolean @default(false)
+  show_activity_in_feed Boolean @default(true)
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt
   goals         Goal[]
@@ -29,6 +30,23 @@ model User {
   group_memberships HabitGroupMember[]
   group_messages    GroupMessage[]
   message_reactions MessageReaction[]
+  
+  following     Follow[] @relation("UserFollowing")
+  followers     Follow[] @relation("UserFollowers")
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  follower_id String
+  following_id String
+  created_at  DateTime @default(now())
+
+  follower    User @relation("UserFollowing", fields: [follower_id], references: [id], onDelete: Cascade)
+  following   User @relation("UserFollowers", fields: [following_id], references: [id], onDelete: Cascade)
+
+  @@unique([follower_id, following_id])
+  @@index([follower_id])
+  @@index([following_id])
 }
 
 model Goal {

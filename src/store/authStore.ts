@@ -18,6 +18,7 @@ interface AuthState {
   checkAuth: () => void;
   clearError: () => void;
   updateProfile: (name: string, email: string, timezone: string) => Promise<void>;
+  updatePrivacy: (showActivityInFeed: boolean) => Promise<void>;
   deleteAccount: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
 }
@@ -172,6 +173,24 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
     } catch (error: any) {
       const msg = error.response?.data?.message || "Failed to update profile.";
+      set({ error: msg, loading: false });
+      throw new Error(msg);
+    }
+  },
+
+  updatePrivacy: async (showActivityInFeed) => {
+    set({ loading: true, error: null });
+    try {
+      await api.patch("/api/friends/privacy", { showActivityInFeed });
+      set((state) => {
+        const updatedUser = state.user ? { ...state.user, show_activity_in_feed: showActivityInFeed } : null;
+        if (updatedUser) {
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+        }
+        return { user: updatedUser, loading: false };
+      });
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Failed to update privacy settings.";
       set({ error: msg, loading: false });
       throw new Error(msg);
     }

@@ -36,6 +36,24 @@ model User {
   group_memberships HabitGroupMember[]
   group_messages    GroupMessage[]
   message_reactions MessageReaction[]
+  
+  following     Follow[] @relation("UserFollowing")
+  followers     Follow[] @relation("UserFollowers")
+  show_activity_in_feed Boolean @default(true)
+}
+
+model Follow {
+  id           String   @id @default(uuid())
+  follower_id  String
+  following_id String
+  created_at   DateTime @default(now())
+
+  follower     User @relation("UserFollowing", fields: [follower_id], references: [id], onDelete: Cascade)
+  following    User @relation("UserFollowers", fields: [following_id], references: [id], onDelete: Cascade)
+
+  @@unique([follower_id, following_id])
+  @@index([follower_id])
+  @@index([following_id])
 }
 
 model Goal {
@@ -179,6 +197,7 @@ model GroupChatNotificationLog {
 *   `src/pages/`: Các trang màn hình chính (`DashboardPage`, `GoalsPage`, `Stats`, `SettingsPage`, `LoginPage`, `GoalFormPage`, `TimelinePage`, `GroupsPage`).
 *   `src/store/`: Zustand stores quản lý trạng thái client-side (`authStore`, `goalStore`, `groupStore`).
 *   `src/services/api.ts`: Cấu hình Axios instance kèm cơ chế bắt lỗi 401 tự động refresh session.
+*   `src/services/friends.ts`: Dịch vụ gọi API liên quan đến bạn bè.
 *   `server/db.ts`: Lớp wrapper Prisma Client đóng gói các API tương tác DB.
 
 ### 3.2 Luồng xử lý dữ liệu cốt lõi (Core Flows)
@@ -214,6 +233,12 @@ model GroupChatNotificationLog {
     *   **Reactions:** Phản ứng emoji trên từng tin nhắn với optimistic update.
     *   **Quyền hạn (Moderation):** API và UI kiểm tra quyền xóa tin nhắn (Owner vs Member).
     *   **Giới hạn thông báo (Notification Limit):** Backend kiểm tra `GroupChatNotificationLog` để đảm bảo mỗi người dùng nhận tối đa 3 thông báo chat nhóm mỗi ngày.
+13. **Theo dõi Bạn bè & Feed hoạt động (Friends Follow & Activity Feed)** [NEW]:
+    *   **Tìm kiếm:** API `GET /api/friends/search` hỗ trợ tìm kiếm theo tên/email.
+    *   **Theo dõi:** API `POST /api/friends/follow` và `DELETE /api/friends/follow` quản lý quan hệ follow 1 chiều.
+    *   **Activity Feed:** API `GET /api/friends/feed` lấy 5 hoạt động mới nhất từ bạn bè, tôn trọng thiết lập quyền riêng tư (`show_activity_in_feed`).
+    *   **Thống kê:** API `GET /api/friends/stats` cung cấp số lượng following/followers.
+    *   **Privacy:** API `PATCH /api/friends/privacy` cập nhật trạng thái hiển thị hoạt động cá nhân.
 ## Bổ sung 2026-06-09: Ghi chú kiến trúc AI Coach, Streak Freeze và local dev
 
 ### AI Coach

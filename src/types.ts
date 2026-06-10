@@ -6,9 +6,42 @@ export interface User {
   name: string;
   timezone: string;
   onboarding_completed?: boolean;
+  show_activity_in_feed?: boolean;
   created_at?: string;
   total_xp?: number;
   level?: number;
+}
+
+export interface Follow {
+  id: string;
+  follower_id: string;
+  following_id: string;
+  created_at: string;
+}
+
+export interface FriendUser {
+  id: string;
+  name: string;
+  email: string;
+  level: number;
+  streak: number;
+  isFollowing: boolean;
+  avatarInitials: string;
+}
+
+export interface FriendActivity {
+  id: string;
+  userId: string;
+  userName: string;
+  goalTitle: string;
+  type: string;
+  createdAt: string;
+  avatarInitials: string;
+}
+
+export interface FriendStats {
+  followingCount: number;
+  followersCount: number;
 }
 
 export interface Streak {

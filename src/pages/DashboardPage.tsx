@@ -7,6 +7,7 @@ import { useAuthStore } from "../store/authStore";
 import { useGoalStore } from "../store/goalStore";
 import { usePomodoroStore } from "../store/pomodoroStore";
 import { GoalCard } from "../components/GoalCard";
+import FriendsTodayCard from "../components/dashboard/FriendsTodayCard";
 import { useTranslation } from "../i18n";
 
 /* ── Shared section label style ── */
@@ -1116,6 +1117,7 @@ export const DashboardPage: React.FC = () => {
               totalActCount={totalActCount}
               goals={goals}
             />
+            <FriendsTodayCard />
           </div>
         </div>
       </main>

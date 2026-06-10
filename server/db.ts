@@ -20,6 +20,7 @@ function mapUser(u: any) {
     ...u,
     created_at: u.created_at.toISOString(),
     updated_at: u.updated_at.toISOString(),
+    show_activity_in_feed: u.show_activity_in_feed ?? true,
   };
 }
 
@@ -134,6 +135,7 @@ class PrismaDB {
         last_reminder_sent_date?: string | null;
         last_freeze_reminder_date?: string | null;
         onboarding_completed?: boolean;
+        show_activity_in_feed?: boolean;
         total_xp?: number;
         level?: number;
       }
@@ -150,6 +152,124 @@ class PrismaDB {
         where: { id },
       });
       return mapUser(deleted);
+    },
+  };
+
+  public friends = {
+    search: async (currentUserId: string, query: string) => {
+      const users = await prisma.user.findMany({
+        where: {
+          OR: [
+            { name: { contains: query, mode: "insensitive" } },
+            { email: { contains: query, mode: "insensitive" } },
+          ],
+          id: { not: currentUserId },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          level: true,
+          total_xp: true,
+          followers: {
+            where: { follower_id: currentUserId },
+          },
+          goals: {
+            select: {
+              streaks: {
+                select: {
+                  current_streak: true,
+                  longest_streak: true,
+                }
+              }
+            }
+          }
+        },
+        take: 20,
+      });
+
+      return users.map((u: any) => {
+        // Find max streak across all goals
+        let maxStreak = 0;
+        u.goals.forEach((g: any) => {
+          g.streaks.forEach((s: any) => {
+            if (s.current_streak > maxStreak) maxStreak = s.current_streak;
+          });
+        });
+
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          level: u.level,
+          streak: maxStreak,
+          isFollowing: u.followers.length > 0,
+          avatarInitials: u.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().substring(0, 2),
+        };
+      });
+    },
+    follow: async (followerId: string, followingId: string) => {
+      if (followerId === followingId) throw new Error("You cannot follow yourself.");
+      return await prisma.follow.upsert({
+        where: {
+          follower_id_following_id: {
+            follower_id: followerId,
+            following_id: followingId,
+          },
+        },
+        update: {},
+        create: {
+          follower_id: followerId,
+          following_id: followingId,
+        },
+      });
+    },
+    unfollow: async (followerId: string, followingId: string) => {
+      return await prisma.follow.deleteMany({
+        where: {
+          follower_id: followerId,
+          following_id: followingId,
+        },
+      });
+    },
+    getFeed: async (userId: string) => {
+      // Get IDs of users being followed
+      const following = await prisma.follow.findMany({
+        where: { follower_id: userId },
+        select: { following_id: true },
+      });
+      const followingIds = following.map((f: any) => f.following_id);
+
+      // Get latest check-ins from those users who have privacy enabled
+      const logs = await prisma.goalLog.findMany({
+        where: {
+          user_id: { in: followingIds },
+          user: { show_activity_in_feed: true },
+        },
+        include: {
+          user: true,
+          goal: true,
+        },
+        orderBy: { completed_at: "desc" },
+        take: 5,
+      });
+
+      return logs.map((l: any) => ({
+        id: l.id,
+        userId: l.user_id,
+        userName: l.user.name,
+        goalTitle: l.goal.title,
+        type: "checkin",
+        createdAt: l.completed_at.toISOString(),
+        avatarInitials: l.user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().substring(0, 2),
+      }));
+    },
+    getStats: async (userId: string) => {
+      const [followingCount, followersCount] = await Promise.all([
+        prisma.follow.count({ where: { follower_id: userId } }),
+        prisma.follow.count({ where: { following_id: userId } }),
+      ]);
+      return { followingCount, followersCount };
     },
   };
 

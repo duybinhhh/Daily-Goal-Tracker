@@ -24,7 +24,8 @@ function mapUser(u) {
   return {
     ...u,
     created_at: u.created_at.toISOString(),
-    updated_at: u.updated_at.toISOString()
+    updated_at: u.updated_at.toISOString(),
+    show_activity_in_feed: u.show_activity_in_feed ?? true
   };
 }
 function mapGoal(g) {
@@ -132,6 +133,116 @@ var PrismaDB = class {
           where: { id }
         });
         return mapUser(deleted);
+      }
+    };
+    this.friends = {
+      search: async (currentUserId, query) => {
+        const users = await prisma.user.findMany({
+          where: {
+            OR: [
+              { name: { contains: query, mode: "insensitive" } },
+              { email: { contains: query, mode: "insensitive" } }
+            ],
+            id: { not: currentUserId }
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            level: true,
+            total_xp: true,
+            followers: {
+              where: { follower_id: currentUserId }
+            },
+            goals: {
+              select: {
+                streaks: {
+                  select: {
+                    current_streak: true,
+                    longest_streak: true
+                  }
+                }
+              }
+            }
+          },
+          take: 20
+        });
+        return users.map((u) => {
+          let maxStreak = 0;
+          u.goals.forEach((g) => {
+            g.streaks.forEach((s) => {
+              if (s.current_streak > maxStreak) maxStreak = s.current_streak;
+            });
+          });
+          return {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            level: u.level,
+            streak: maxStreak,
+            isFollowing: u.followers.length > 0,
+            avatarInitials: u.name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2)
+          };
+        });
+      },
+      follow: async (followerId, followingId) => {
+        if (followerId === followingId) throw new Error("You cannot follow yourself.");
+        return await prisma.follow.upsert({
+          where: {
+            follower_id_following_id: {
+              follower_id: followerId,
+              following_id: followingId
+            }
+          },
+          update: {},
+          create: {
+            follower_id: followerId,
+            following_id: followingId
+          }
+        });
+      },
+      unfollow: async (followerId, followingId) => {
+        return await prisma.follow.deleteMany({
+          where: {
+            follower_id: followerId,
+            following_id: followingId
+          }
+        });
+      },
+      getFeed: async (userId) => {
+        const following = await prisma.follow.findMany({
+          where: { follower_id: userId },
+          select: { following_id: true }
+        });
+        const followingIds = following.map((f) => f.following_id);
+        const logs = await prisma.goalLog.findMany({
+          where: {
+            user_id: { in: followingIds },
+            user: { show_activity_in_feed: true }
+          },
+          include: {
+            user: true,
+            goal: true
+          },
+          orderBy: { completed_at: "desc" },
+          take: 5
+        });
+        return logs.map((l) => ({
+          id: l.id,
+          userId: l.user_id,
+          userName: l.user.name,
+          goalTitle: l.goal.title,
+          type: "checkin",
+          createdAt: l.completed_at.toISOString(),
+          avatarInitials: l.user.name.split(" ").map((n) => n[0]).join("").toUpperCase().substring(0, 2)
+        }));
+      },
+      getStats: async (userId) => {
+        const [followingCount, followersCount] = await Promise.all([
+          prisma.follow.count({ where: { follower_id: userId } }),
+          prisma.follow.count({ where: { following_id: userId } })
+        ]);
+        return { followingCount, followersCount };
       }
     };
     // Goals CRUD Operations
@@ -925,8 +1036,96 @@ router.put("/push-subscription", authMiddleware, updatePushSubscription);
 router.get("/vapid-public-key", getVapidPublicKey);
 var auth_default = router;
 
-// src/routes/goals.ts
+// src/routes/friends.ts
 import { Router as Router2 } from "express";
+
+// src/controllers/friendsController.ts
+var searchUsers = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", 401);
+    const query = req.query.q;
+    if (!query || query.trim().length === 0) {
+      return res.status(200).json({ users: [] });
+    }
+    const users = await db.friends.search(userId, query);
+    res.status(200).json({ users });
+  } catch (error) {
+    next(error);
+  }
+};
+var followUser = async (req, res, next) => {
+  try {
+    const followerId = req.user?.id;
+    if (!followerId) throw new AppError("Unauthorized", 401);
+    const { userId: followingId } = req.body;
+    if (!followingId) throw new AppError("Following User ID is required", 400);
+    await db.friends.follow(followerId, followingId);
+    res.status(200).json({ success: true, message: "Successfully followed user." });
+  } catch (error) {
+    next(error);
+  }
+};
+var unfollowUser = async (req, res, next) => {
+  try {
+    const followerId = req.user?.id;
+    if (!followerId) throw new AppError("Unauthorized", 401);
+    const { userId: followingId } = req.body;
+    if (!followingId) throw new AppError("Following User ID is required", 400);
+    await db.friends.unfollow(followerId, followingId);
+    res.status(200).json({ success: true, message: "Successfully unfollowed user." });
+  } catch (error) {
+    next(error);
+  }
+};
+var getActivityFeed = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", 401);
+    const activities = await db.friends.getFeed(userId);
+    res.status(200).json({ activities });
+  } catch (error) {
+    next(error);
+  }
+};
+var getFollowStats = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", 401);
+    const stats = await db.friends.getStats(userId);
+    res.status(200).json({ ...stats });
+  } catch (error) {
+    next(error);
+  }
+};
+var updatePrivacySetting = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized", 401);
+    const { showActivityInFeed } = req.body;
+    if (showActivityInFeed === void 0) {
+      throw new AppError("showActivityInFeed is required", 400);
+    }
+    await db.users.update(userId, { show_activity_in_feed: !!showActivityInFeed });
+    res.status(200).json({ success: true, message: "Privacy setting updated." });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// src/routes/friends.ts
+var router2 = Router2();
+router2.use(authMiddleware);
+router2.get("/search", searchUsers);
+router2.post("/follow", followUser);
+router2.delete("/follow", unfollowUser);
+router2.get("/feed", getActivityFeed);
+router2.get("/stats", getFollowStats);
+router2.patch("/privacy", updatePrivacySetting);
+var friends_default = router2;
+
+// src/routes/goals.ts
+import { Router as Router3 } from "express";
 
 // src/controllers/goalController.ts
 var getLocalDateParts = (date, timezone) => {
@@ -1442,22 +1641,22 @@ var bulkDeleteGoals = async (req, res, next) => {
 };
 
 // src/routes/goals.ts
-var router2 = Router2();
-router2.use(authMiddleware);
-router2.get("/", getGoals);
-router2.post("/", createGoal);
-router2.put("/bulk/archive", bulkArchiveGoals);
-router2.put("/bulk/pause", bulkPauseGoals);
-router2.post("/bulk/delete", bulkDeleteGoals);
-router2.get("/:id", getGoalById);
-router2.put("/:id", updateGoal);
-router2.delete("/:id", deleteGoal);
-router2.post("/:id/complete", completeGoal);
-router2.delete("/logs/:logId", deleteLog);
-var goals_default = router2;
+var router3 = Router3();
+router3.use(authMiddleware);
+router3.get("/", getGoals);
+router3.post("/", createGoal);
+router3.put("/bulk/archive", bulkArchiveGoals);
+router3.put("/bulk/pause", bulkPauseGoals);
+router3.post("/bulk/delete", bulkDeleteGoals);
+router3.get("/:id", getGoalById);
+router3.put("/:id", updateGoal);
+router3.delete("/:id", deleteGoal);
+router3.post("/:id/complete", completeGoal);
+router3.delete("/logs/:logId", deleteLog);
+var goals_default = router3;
 
 // src/routes/stats.ts
-import { Router as Router3 } from "express";
+import { Router as Router4 } from "express";
 
 // src/controllers/statsController.ts
 function getLogDedupeKey(log) {
@@ -1823,15 +2022,15 @@ var getTrendComparison = async (req, res, next) => {
 };
 
 // src/routes/stats.ts
-var router3 = Router3();
-router3.use(authMiddleware);
-router3.get("/dashboard", getDashboardStats);
-router3.get("/history", getHistory);
-router3.get("/trend", getTrendComparison);
-var stats_default = router3;
+var router4 = Router4();
+router4.use(authMiddleware);
+router4.get("/dashboard", getDashboardStats);
+router4.get("/history", getHistory);
+router4.get("/trend", getTrendComparison);
+var stats_default = router4;
 
 // src/routes/groups.ts
-import { Router as Router4 } from "express";
+import { Router as Router5 } from "express";
 
 // src/controllers/groupController.ts
 var getGroups = async (req, res, next) => {
@@ -2439,26 +2638,26 @@ async function sendGroupChatNotifications(groupId, senderId, content, groupName,
 }
 
 // src/routes/groups.ts
-var router4 = Router4();
-router4.get("/invite/:inviteCode", getGroupByInviteCode);
-router4.use(authMiddleware);
-router4.get("/", getGroups);
-router4.post("/", createGroup);
-router4.post("/join/:inviteCode", joinGroupByInviteCode);
-router4.get("/:id", getGroupById);
-router4.post("/:id/invite", createInviteCode);
-router4.post("/:id/join", joinGroup);
-router4.post("/:id/leave", leaveGroup);
-router4.delete("/:id/members/:userId", removeMember);
-router4.delete("/:id", deleteGroup);
-router4.get("/:groupId/messages", getGroupMessages);
-router4.post("/:groupId/messages", sendGroupMessage);
-router4.post("/:groupId/messages/:messageId/reactions", toggleReaction);
-router4.delete("/:groupId/messages/:messageId", deleteMessage);
-var groups_default = router4;
+var router5 = Router5();
+router5.get("/invite/:inviteCode", getGroupByInviteCode);
+router5.use(authMiddleware);
+router5.get("/", getGroups);
+router5.post("/", createGroup);
+router5.post("/join/:inviteCode", joinGroupByInviteCode);
+router5.get("/:id", getGroupById);
+router5.post("/:id/invite", createInviteCode);
+router5.post("/:id/join", joinGroup);
+router5.post("/:id/leave", leaveGroup);
+router5.delete("/:id/members/:userId", removeMember);
+router5.delete("/:id", deleteGroup);
+router5.get("/:groupId/messages", getGroupMessages);
+router5.post("/:groupId/messages", sendGroupMessage);
+router5.post("/:groupId/messages/:messageId/reactions", toggleReaction);
+router5.delete("/:groupId/messages/:messageId", deleteMessage);
+var groups_default = router5;
 
 // src/routes/ai.ts
-import { Router as Router5 } from "express";
+import { Router as Router6 } from "express";
 
 // src/controllers/aiController.ts
 import { GoogleGenAI } from "@google/genai";
@@ -2650,14 +2849,14 @@ var postAIChat = async (req, res, next) => {
 };
 
 // src/routes/ai.ts
-var router5 = Router5();
-router5.use(authMiddleware);
-router5.post("/report", getAIReport);
-router5.post("/chat", postAIChat);
-var ai_default = router5;
+var router6 = Router6();
+router6.use(authMiddleware);
+router6.post("/report", getAIReport);
+router6.post("/chat", postAIChat);
+var ai_default = router6;
 
 // src/routes/freeze.ts
-import { Router as Router6 } from "express";
+import { Router as Router7 } from "express";
 
 // src/controllers/freezeController.ts
 function getLocalDateString2(date, timezone) {
@@ -2730,15 +2929,15 @@ var getFreezeDates = async (req, res, next) => {
 };
 
 // src/routes/freeze.ts
-var router6 = Router6();
-router6.use(authMiddleware);
-router6.get("/tokens", getFreezeTokens);
-router6.post("/activate", activateFreeze);
-router6.get("/dates", getFreezeDates);
-var freeze_default = router6;
+var router7 = Router7();
+router7.use(authMiddleware);
+router7.get("/tokens", getFreezeTokens);
+router7.post("/activate", activateFreeze);
+router7.get("/dates", getFreezeDates);
+var freeze_default = router7;
 
 // src/routes/xp.ts
-import { Router as Router7 } from "express";
+import { Router as Router8 } from "express";
 
 // src/lib/xpSystem.ts
 var LEVELS = [
@@ -2803,15 +3002,16 @@ var awardXP = async (req, res, next) => {
 };
 
 // src/routes/xp.ts
-var router7 = Router7();
-router7.use(authMiddleware);
-router7.post("/award", awardXP);
-var xp_default = router7;
+var router8 = Router8();
+router8.use(authMiddleware);
+router8.post("/award", awardXP);
+var xp_default = router8;
 
 // src/express-app.ts
 var app = express();
 app.use(express.json());
 app.use("/api/auth", auth_default);
+app.use("/api/friends", friends_default);
 app.use("/api/goals", goals_default);
 app.use("/api/stats", stats_default);
 app.use("/api/groups", groups_default);

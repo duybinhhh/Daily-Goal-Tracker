@@ -154,6 +154,7 @@ export default function Sidebar() {
         <NavItem to="/goals" icon="checklist" label={t("nav.goals")} />
         <NavItem to="/timeline" icon="timeline" label={t("nav.timeline")} />
         <NavItem to="/groups" icon="group" label={t("nav.habitGroups")} />
+        <NavItem to="/friends" icon="people" label="Bạn bè" />
         <button
           type="button"
           onClick={handleOpenAICoach}
