@@ -324,27 +324,59 @@ Hệ thống quản lý mục tiêu cá nhân (**Goal Tracking**) giúp cá nhâ
 
 ### Discipline Room (Phòng Kỷ Luật) - AI Camera Coach
 * **Mục tiêu:** Cung cấp trải nghiệm tập trung cao độ thông qua mô phỏng phòng làm việc ảo có AI Camera Coach giám sát bằng công nghệ nhận diện khuôn mặt thời gian thực.
-* **Công nghệ AI:** Tích hợp **MediaPipe Tasks Vision (Face Detector)** chạy trực tiếp trên Browser (WASM).
-* **Luồng sử dụng:**
-  - **Create Room:** Người dùng nhập mục tiêu, chọn chế độ (Study/Deep Work), và thời gian phiên. Hệ thống tự động tải model AI (Pre-load).
-  - **Waiting Room:** Hiển thị mã mời và giả lập partner tham gia sau 3 giây.
-  - **Active Session:** 
-    - Đếm ngược 3 giây trước khi bắt đầu.
-    - Xin quyền Camera, stream video trực tiếp.
-    - **Real AI Detection Loop**: Chạy detection mỗi 1000ms.
-    - **Phân tích trạng thái**: 
-        - `Focused`: Phát hiện có khuôn mặt.
-        - `Away`: Không phát hiện khuôn mặt liên tục trong 5 giây.
-    - **Hệ thống Chỉ số (Metrics)**:
-        - `Presence Score`: (Số giây phát hiện mặt / Tổng số giây session) * 100.
-        - `Away Count`: Số lần chuyển từ Focused sang Away.
-        - `Focus Score`: max(0, Presence Score - Away Count * 5).
-  - **Session Report:** Thống kê sau phiên, quy đổi Focus Score thành XP Earned và cung cấp Insight từ AI Coach.
-* **Đặc điểm Kỹ thuật:**
-  - Chạy 100% Client-side: Video không được gửi lên server, đảm bảo quyền riêng tư tuyệt đối.
-  - Xử lý cleanup: Tự động giải phóng Camera và AI detector khi kết thúc phiên hoặc rời trang.
-  - Xử lý lỗi: Thông báo rõ ràng khi trình duyệt không hỗ trợ camera hoặc bị từ chối quyền.
-* **Component liên quan:** `src/pages/DisciplineRoomPage.tsx`.
+* **Công nghệ AI:** Tích hợp **MediaPipe FaceLandmarker** chạy trực tiếp trên Browser (WASM) để phân tích hướng mặt và trạng thái chú ý.
+* **Các trạng thái AI mở rộng:**
+    - `Camera Off`: Chưa bật hoặc bị từ chối quyền camera.
+    - `Detecting`: Đang khởi động model.
+    - `Focused`: Nhìn thẳng về màn hình.
+    - `Reading/Writing`: Cúi đầu làm bài/đọc sách (được coi là tập trung trong Study Mode).
+    - `Looking Away`: Quay mặt sang hướng khác quá ngưỡng cho phép.
+    - `Head Down`: Cúi đầu quá lâu hoặc không đúng chế độ.
+    - `Away`: Không thấy mặt quá 5 giây.
+    - `Low Confidence`: Ánh sáng yếu hoặc góc quay không rõ.
+* **Luồng xử lý theo Chế độ (Mode-Aware Logic):**
+    - **Study Mode:** Chấp nhận `Reading/Writing` (cúi đầu < 60 giây), ngưỡng `Looking Away` là 30 giây. Ưu tiên hiện diện và sự kiên trì.
+    - **Deep Work Mode:** Khắt khe hơn, ngưỡng `Head Down` 15 giây, `Looking Away` 10 giây. Ưu tiên sự chú ý liên tục vào màn hình.
+* **Hệ thống Chỉ số Nâng cao (Advanced Metrics):**
+    - `Presence Score`: Tỷ lệ thời gian có mặt trước camera.
+    - `Attention Score`: Mức độ chú ý hợp lệ (Focused + Reading/Writing) trong thời gian có mặt.
+    - `Focus Score`: Chỉ số tổng hợp từ Presence, Attention và trừ điểm các lần xao nhãng (Away, Look Away, Head Down) theo trọng số của từng Mode.
+    - `AI Confidence`: Độ tin cậy trung bình của phân tích AI trong phiên.
+* **Đặc điểm Kỹ thuật & Bảo mật:**
+    - **Privacy First:** Video/Frame không gửi lên server. Phân tích 100% tại local browser.
+    - **Real-time Partner Sync:** Đồng bộ Status, Focus Score và Frame giả lập (base64) của partner qua Server Relay (không lưu trữ).
+    - **Gamification:** Thưởng XP dựa trên Focus Score (lên tới 200 XP) và các mốc bonus (Presence > 90%, không Away).
+* **Component liên quan:** `src/pages/DisciplineRoomPage.tsx`, `src/controllers/disciplineRoomController.ts`.
+
+### US-30: Danh sách phòng chờ Discipline Room công khai
+* **Độ ưu tiên**: High
+* **Story Point**: 5.0
+* **Mục tiêu**: Cho phép người dùng dễ dàng tìm kiếm và tham gia vào các phiên kỷ luật đang chờ mà không cần phải có bạn bè hoặc mã mời từ trước.
+* **Tiêu chí chấp nhận (AC)**:
+    * **AC-1 (Phòng Public/Private)**: Khi tạo phòng, người dùng có tùy chọn "Công khai phòng". Nếu bật, phòng sẽ xuất hiện trong danh sách chờ. Nếu tắt, phòng là riêng tư và chỉ join được bằng Invite Code.
+    * **AC-2 (Danh sách chờ)**: Hiển thị section "Phòng Chờ Công Khai" ngay trên trang Discipline Room khi ở màn hình khởi tạo.
+    * **AC-3 (Lọc & Sắp xếp)**: Hỗ trợ lọc phòng theo Mode (Study/Deep Work) và Thời lượng (5/15/25p). Sắp xếp phòng mới nhất lên đầu.
+    * **AC-4 (Tham gia nhanh)**: User có thể bấm "Tham gia" trực tiếp từ card phòng. Hệ thống tự động xử lý join và đưa user vào Waiting Room.
+    * **AC-5 (Quản lý trạng thái)**: Danh sách chỉ hiển thị phòng có status `WAITING` và số người < 2.
+    * **AC-6 (Quản lý hết hạn)**: Các phòng chờ quá lâu (quá `expires_at`) sẽ tự động ẩn khỏi danh sách công khai.
+    * **AC-7 (Tự động cập nhật)**: Sử dụng polling 10 giây/lần để refresh danh sách mà không làm gián đoạn trải nghiệm người dùng.
+    * **AC-8 (Bảo mật thông tin)**: Chỉ hiển thị thông tin cơ bản của Creator (Tên, Level, XP) và thông tin phòng. Không hiển thị email hoặc dữ liệu nhạy cảm.
+
+### US-31: Discipline Room - Ready Check & Pre-Session Lobby
+* **Độ ưu tiên**: High
+* **Story Point**: 5.0
+* **Mục tiêu**: Tạo giai đoạn chuẩn bị (Pre-Session Lobby) trước khi phiên tập trung chính thức bắt đầu, giúp 2 người tham gia tương tác, trao đổi mục tiêu và đồng bộ xác nhận sẵn sàng thông qua cơ chế yêu cầu-xác nhận trước khi bật camera AI.
+* **Tiêu chí chấp nhận (AC)**:
+    * **AC-1 (Trạng thái phòng)**: Thêm trạng thái phòng chờ `WAITING_PARTNER` (khi creator tạo phòng), `LOBBY` (khi partner đã join và cả hai đang trao đổi), và `START_CONFIRM` (khi một người yêu cầu bắt đầu).
+    * **AC-2 (Mục tiêu phiên tập trung)**: Cho phép mỗi người dùng nhập mục tiêu phiên học của mình (tối đa 100 ký tự). Mục tiêu được lưu trữ vào DB và đồng bộ hiển thị sang phía đối tác theo thời gian thực.
+    * **AC-3 (Xác nhận bắt đầu phiên)**: Cơ chế xác nhận 2 bước. Một người bấm "Bắt đầu phiên ngay" (trạng thái chuyển sang `START_CONFIRM`), người còn lại phải bấm xác nhận. Khi cả hai cùng sẵn sàng, trạng thái phòng chuyển thành `ACTIVE`.
+    * **AC-4 (Đồng bộ đếm ngược 3-2-1)**: Khi phòng chuyển sang `ACTIVE`, cả hai phía client kích hoạt màn hình đếm ngược 3-2-1 đồng bộ trước khi tự động khởi chạy Camera AI và bộ đếm thời gian.
+    * **AC-5 (Privacy & Performance)**: Camera AI và timer phiên tập trung chỉ khởi chạy sau khi vào trạng thái `ACTIVE` và kết thúc countdown. Không xin quyền camera trong Lobby.
+    * **AC-6 (Hủy/Rời phòng chờ)**:
+        * Nếu creator rời phòng trong giai đoạn chờ: cập nhật trạng thái phòng thành `CANCELLED`, giải tán phòng và thông báo cho partner.
+        * Nếu partner rời phòng trong giai đoạn sẵn sàng: xóa partner khỏi danh sách người tham gia, đưa phòng trở lại trạng thái `WAITING_PARTNER`, reset trạng thái sẵn sàng của creator về `false` và hiển thị thông báo hệ thống.
+    * **AC-7 (Cảnh báo chờ lâu - 2-minute Timeout)**: Nếu ở Lobby quá 2 phút mà đối tác chưa sẵn sàng, hệ thống tự động hiển thị overlay cảnh báo cho phép chọn "Tiếp tục chờ" hoặc "Rời phòng".
+    * **AC-8 (Hệ thống System Messages)**: Tự động đăng tin nhắn hệ thống vào chat khi có yêu cầu bắt đầu ("X muốn bắt đầu..."), khi xác nhận ("Y đã sẵn sàng"), hoặc khi hủy yêu cầu ("X muốn chờ thêm").
 
 ### Thông tin còn thiếu / cần hoàn thiện
 * Chưa có migration file chính thức cho Streak Freeze trong `prisma/migrations`.

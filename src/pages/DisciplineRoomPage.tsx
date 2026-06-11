@@ -1,33 +1,74 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Camera, CameraOff, Users, Clock, Zap, Target, Award, Copy, Check, Info, Brain, Loader2, ArrowRight } from "lucide-react";
+﻿import React, { useState, useEffect, useRef } from "react";
+import { Camera, CameraOff, Users, Clock, Zap, Target, Award, Copy, Check, Info, Brain, Loader2, ArrowRight, Maximize2, Minimize2, ChevronRight, ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { FaceDetector, FilesetResolver } from "@mediapipe/tasks-vision";
+import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 import api from "../services/api";
+import { useAuthStore } from "../store/authStore";
 
-type Phase = "CREATE" | "WAITING" | "ACTIVE" | "REPORT";
+type AIStatus = "Camera Off" | "Detecting" | "Focused" | "Reading/Writing" | "Looking Away" | "Head Down" | "Away" | "Low Confidence";
+type Phase = "CREATE" | "WAITING" | "LOBBY" | "ACTIVE" | "REPORT";
 type Mode = "Study" | "Deep Work";
 
 interface SessionReport {
   duration_seconds: number;
   presence_score: number;
   focus_score: number;
+  attention_score: number;
   away_count: number;
+  looking_away_count: number;
+  head_down_count: number;
+  reading_writing_time: number;
+  total_away_time: number;
+  ai_confidence: number;
   xp_earned: number;
   ai_insight: string;
+  metadata?: {
+    timeline: any[];
+    total_focused_time: number;
+    total_reading_writing_time: number;
+    total_looking_away_time: number;
+    total_head_down_time: number;
+    total_away_time: number;
+    low_confidence_time: number;
+    manual_checkpoint_count: number;
+    mode: Mode;
+  };
 }
 
 export function DisciplineRoomPage() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [phase, setPhase] = useState<Phase>("CREATE");
+
+  // Ready Lobby (Pre-Session Lobby) States
+  const [localGoal, setLocalGoal] = useState("");
+  const [partnerGoal, setPartnerGoal] = useState("");
+  const [localReady, setLocalReady] = useState(false);
+  const [partnerReady, setPartnerReady] = useState(false);
+  const [readyCheckStartTime, setReadyCheckStartTime] = useState<number | null>(null);
+  const [partnerName, setPartnerName] = useState("");
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const isGoalInputFocusedRef = useRef(false);
+  const lastSavedLocalGoalRef = useRef("");
 
   // Create/Join Room State
   const [roomId, setRoomId] = useState("");
   const [title, setTitle] = useState("");
   const [mode, setMode] = useState<Mode>("Study");
   const [duration, setDuration] = useState<number>(15);
+  const [isPublic, setIsPublic] = useState(false);
   const [inviteCodeInput, setInviteCodeInput] = useState("");
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tab state for CREATE phase
+  const [activeTab, setActiveTab] = useState<"create" | "join" | "public">("create");
+
+  // Waiting Room List State
+  const [waitingRooms, setWaitingRooms] = useState<any[]>([]);
+  const [isWaitingRoomsLoading, setIsWaitingRoomsLoading] = useState(false);
+  const [filterMode, setFilterMode] = useState<string>("All");
+  const [filterDuration, setFilterDuration] = useState<string>("All");
 
   // Waiting Room State
   const [inviteCode, setInviteCode] = useState("");
@@ -38,10 +79,73 @@ export function DisciplineRoomPage() {
   // Active Session State
   const [countdown, setCountdown] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
-  const [cameraStatus, setCameraStatus] = useState<"Camera Off" | "Detecting" | "Focused" | "Away">("Detecting");
+  const [cameraStatus, setCameraStatus] = useState<AIStatus>("Detecting");
   const [focusScore, setFocusScore] = useState(100);
   const [presenceScore, setPresenceScore] = useState(100);
+  const [attentionScore, setAttentionScore] = useState(100);
+  const [aiConfidence, setAiConfidence] = useState(100);
   const [awayCount, setAwayCount] = useState(0);
+  const [lookingAwayCount, setLookingAwayCount] = useState(0);
+  const [headDownCount, setHeadDownCount] = useState(0);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // V2 New States
+  const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
+  const [activeAlert, setActiveAlert] = useState<{ type: string; message: string; severity: 'light' | 'strong' } | null>(null);
+  const [checkpoint, setCheckpoint] = useState<{ question: string; options: string[] } | null>(null);
+  const [totalSeconds, setTotalSeconds] = useState(0);
+
+  // New detailed metrics refs (for report)
+  const totalFocusedSecondsRef = useRef(0);
+  const totalReadingWritingSecondsRef = useRef(0);
+  const totalLookingAwaySecondsRef = useRef(0);
+  const totalHeadDownSecondsRef = useRef(0);
+  const totalAwaySecondsRef = useRef(0);
+  const lowConfidenceSecondsRef = useRef(0);
+  const manualCheckpointCountRef = useRef(0);
+
+  // Alert/Checkpoint timers & Cooldowns
+  const alertCooldownsRef = useRef<{ [key: string]: number }>({});
+  const lastCheckpointTimeRef = useRef(0);
+  const checkpointBypassTimerRef = useRef<number | null>(null); // For "Reading/Writing" bypass after checkpoint
+
+  const timelineEventsRef = useRef<any[]>([]);
+
+  const addTimelineEvent = (type: string, note?: string) => {
+    const lastEvent = timelineEventsRef.current[timelineEventsRef.current.length - 1];
+    const now = Date.now();
+    
+    // If it's the same type, just update duration if it's the very next tick? 
+    // Actually, let's keep it simple: create a new event only if type changes.
+    if (lastEvent && lastEvent.type === type && !note) {
+      lastEvent.endTime = now;
+      lastEvent.durationSeconds = Math.round((now - lastEvent.startTime) / 1000);
+      return;
+    }
+
+    if (lastEvent) {
+      lastEvent.endTime = now;
+      lastEvent.durationSeconds = Math.round((now - lastEvent.startTime) / 1000);
+    }
+
+    const newEvent = {
+      type,
+      startTime: now,
+      mode: modeRef.current, // Use ref to get latest mode if needed
+      confidence: aiConfidenceRef.current,
+      note
+    };
+    timelineEventsRef.current.push(newEvent);
+    setTimelineEvents([...timelineEventsRef.current]);
+  };
+
+  const modeRef = useRef<Mode>(mode);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+
+  const aiConfidenceRef = useRef(100);
+  useEffect(() => { aiConfidenceRef.current = aiConfidence; }, [aiConfidence]);
+
   const [isDetectorLoading, setIsDetectorLoading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraLoading, setIsCameraLoading] = useState(false);
@@ -49,30 +153,81 @@ export function DisciplineRoomPage() {
 
   // Partner State (via server relay)
   const [partnerFrame, setPartnerFrame] = useState<string | null>(null);
-  const [partnerStatus, setPartnerStatus] = useState<"Camera Off" | "Detecting" | "Focused" | "Away">("Detecting");
+  const [partnerStatus, setPartnerStatus] = useState<AIStatus>("Detecting");
+  const [partnerFocusScore, setPartnerFocusScore] = useState(100);
+  const [partnerPresenceScore, setPartnerPresenceScore] = useState(100);
+  const [partnerAwayCount, setPartnerAwayCount] = useState(0);
+
+  // Chat State
+  const [messages, setMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const lastMessageTimeRef = useRef<number>(0);
 
   // Report State
   const [serverReport, setServerReport] = useState<SessionReport | null>(null);
+
+  // ─── Fetch Waiting Rooms ──────────────────────────────────────────────────
+  const fetchWaitingRooms = async (silent = false) => {
+    if (!silent) setIsWaitingRoomsLoading(true);
+    try {
+      const response = await api.get("/api/discipline-room/waiting");
+      setWaitingRooms(response.data.data);
+    } catch (err) {
+      console.error("Failed to fetch waiting rooms", err);
+    } finally {
+      if (!silent) setIsWaitingRoomsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (phase === "CREATE") {
+      fetchWaitingRooms();
+      const interval = setInterval(() => fetchWaitingRooms(true), 10000);
+      return () => clearInterval(interval);
+    }
+  }, [phase]);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const partnerCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const detectorRef = useRef<FaceDetector | null>(null);
+  const detectorRef = useRef<FaceLandmarker | null>(null);
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const frameBroadcastIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const partnerPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const cameraStatusRef = useRef<"Camera Off" | "Detecting" | "Focused" | "Away">("Detecting");
+  const cameraStatusRef = useRef<AIStatus>("Detecting");
   // Unique per browser tab — lets the server distinguish two tabs of the same account
   const clientIdRef = useRef(`tab-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   // Stats tracking refs
   const totalTicksRef = useRef(0);
   const faceDetectedTicksRef = useRef(0);
+  const validAttentionTicksRef = useRef(0);
   const lastFaceTickRef = useRef(0);
   const isCurrentlyAwayRef = useRef(false);
+
+  // New detailed metrics refs
+  const lookingAwayTicksRef = useRef(0);
+  const headDownTicksRef = useRef(0);
+  const readingWritingTicksRef = useRef(0);
+  const totalAwayTicksRef = useRef(0);
+  const confidenceSumRef = useRef(0);
+
+  // Event count refs (to avoid double counting continuous events)
+  const lookingAwayCountRef = useRef(0);
+  const headDownCountRef = useRef(0);
+  const awayCountRef = useRef(0);
+  const isCurrentlyLookingAwayRef = useRef(false);
+  const isCurrentlyHeadDownRef = useRef(false);
+
+  // Time thresholds tracking
+  const stateStartTimeRef = useRef<number>(Date.now());
+  const lastStatusRef = useRef<AIStatus>("Detecting");
 
   // ─── Assign stream to video element ─────────────────────────────────────────
   useEffect(() => {
@@ -112,6 +267,9 @@ export function DisciplineRoomPage() {
         if (res.data.frame) {
           setPartnerFrame(res.data.frame);
           setPartnerStatus(res.data.status || "Focused");
+          setPartnerFocusScore(res.data.focusScore || 100);
+          setPartnerPresenceScore(res.data.presenceScore || 100);
+          setPartnerAwayCount(res.data.awayCount || 0);
         } else {
           setPartnerStatus("Camera Off");
         }
@@ -120,7 +278,7 @@ export function DisciplineRoomPage() {
       }
     };
 
-    partnerPollIntervalRef.current = setInterval(pollPartner, 1200);
+    partnerPollIntervalRef.current = setInterval(pollPartner, 500);
     return () => {
       if (partnerPollIntervalRef.current) clearInterval(partnerPollIntervalRef.current);
     };
@@ -134,15 +292,16 @@ export function DisciplineRoomPage() {
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
       );
-      detectorRef.current = await FaceDetector.createFromOptions(vision, {
+      detectorRef.current = await FaceLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
+          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
           delegate: "GPU"
         },
-        runningMode: "IMAGE"
+        runningMode: "IMAGE",
+        numFaces: 1
       });
     } catch (err) {
-      console.error("Failed to initialize face detector", err);
+      console.error("Failed to initialize face landmarker", err);
     } finally {
       setIsDetectorLoading(false);
     }
@@ -160,7 +319,8 @@ export function DisciplineRoomPage() {
       const response = await api.post("/api/discipline-room/create", {
         title: title.trim(),
         mode,
-        durationMinutes: duration
+        durationMinutes: duration,
+        isPublic
       });
       const room = response.data.room;
       setRoomId(room.id);
@@ -175,14 +335,19 @@ export function DisciplineRoomPage() {
     }
   };
 
-  const handleJoinRoom = async () => {
-    if (!inviteCodeInput) return;
+  const handleJoinRoom = async (targetRoomId?: string) => {
+    if (!inviteCodeInput && !targetRoomId) return;
     setIsActionLoading(true);
     setError(null);
     try {
-      const response = await api.post("/api/discipline-room/join", {
-        inviteCode: inviteCodeInput.toUpperCase()
-      });
+      const payload: any = {};
+      if (targetRoomId) {
+        payload.roomId = targetRoomId;
+      } else {
+        payload.inviteCode = inviteCodeInput.toUpperCase();
+      }
+
+      const response = await api.post("/api/discipline-room/join", payload);
       const room = response.data.room;
       setRoomId(room.id);
       setInviteCode(room.invite_code);
@@ -199,28 +364,69 @@ export function DisciplineRoomPage() {
     }
   };
 
+  const syncRoomState = async (id: string) => {
+    const response = await api.post(`/api/discipline-room/${id}/heartbeat`);
+    const roomResp = await api.get(`/api/discipline-room/${id}`);
+    const room = roomResp.data.room;
+    const status = room.status || response.data.status;
+
+    setTitle(room.title);
+    setMode(room.mode as Mode);
+    setDuration(room.duration_minutes);
+    setInviteCode(room.invite_code || "");
+    setPartnerJoined(room.participants.length >= 2);
+
+    const currentUserId = user?.id;
+    const localPart = room.participants.find((p: any) => p.user_id === currentUserId);
+    const partnerPart = room.participants.find((p: any) => p.user_id !== currentUserId);
+
+    if (localPart) {
+      setLocalReady(!!localPart.is_ready);
+      if (!isGoalInputFocusedRef.current) {
+        const syncedGoal = localPart.goal || "";
+        setLocalGoal(syncedGoal);
+        lastSavedLocalGoalRef.current = syncedGoal;
+      }
+      setIsCreator(localPart.role === "CREATOR");
+    }
+
+    if (partnerPart) {
+      setPartnerReady(!!partnerPart.is_ready);
+      setPartnerGoal(partnerPart.goal || "");
+      setPartnerName(partnerPart.user?.name || "Partner");
+    } else {
+      setPartnerReady(false);
+      setPartnerGoal("");
+      setPartnerName("");
+    }
+
+    if (status === "WAITING_PARTNER") {
+      setPhase("WAITING");
+      setReadyCheckStartTime(null);
+      setShowTimeoutWarning(false);
+    } else if (status === "LOBBY" || status === "READY_CHECK" || status === "START_CONFIRM") {
+      setPhase("LOBBY");
+      setReadyCheckStartTime((prev) => prev || Date.now());
+    } else if (status === "ACTIVE") {
+      setPhase("ACTIVE");
+      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+      setCountdown((prev) => prev ?? 3);
+    } else if (status === "COMPLETED") {
+      setPhase("REPORT");
+      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    } else if (status === "CANCELLED") {
+      cleanupSession();
+      resetRoom();
+      setError("Phòng đã bị hủy bởi chủ phòng.");
+    }
+  };
+
   const startHeartbeat = (id: string) => {
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-    heartbeatIntervalRef.current = setInterval(async () => {
-      try {
-        const response = await api.post(`/api/discipline-room/${id}/heartbeat`);
-        const status = response.data.status;
-
-        const roomResp = await api.get(`/api/discipline-room/${id}`);
-        const room = roomResp.data.room;
-        if (room.participants.length >= 2) {
-          setPartnerJoined(true);
-        }
-
-        if (status === "ACTIVE") {
-          setPhase("ACTIVE");
-          if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-          setCountdown(3);
-        }
-      } catch (err) {
-        console.error("Heartbeat failed", err);
-      }
-    }, 3000);
+    syncRoomState(id).catch((err) => console.error("Initial room sync failed", err));
+    heartbeatIntervalRef.current = setInterval(() => {
+      syncRoomState(id).catch((err) => console.error("Heartbeat failed", err));
+    }, 1500);
   };
 
   const copyToClipboard = () => {
@@ -257,9 +463,24 @@ export function DisciplineRoomPage() {
   // ─── Start tracking session ──────────────────────────────────────────────────
   const startTracking = async () => {
     setTimeLeft(duration * 60);
+    setTotalSeconds(0);
     setFocusScore(100);
     setPresenceScore(100);
     setAwayCount(0);
+    setTimelineEvents([]);
+    timelineEventsRef.current = [];
+    addTimelineEvent("Session Started");
+
+    totalFocusedSecondsRef.current = 0;
+    totalReadingWritingSecondsRef.current = 0;
+    totalLookingAwaySecondsRef.current = 0;
+    totalHeadDownSecondsRef.current = 0;
+    totalAwaySecondsRef.current = 0;
+    lowConfidenceSecondsRef.current = 0;
+    manualCheckpointCountRef.current = 0;
+    alertCooldownsRef.current = {};
+    checkpointBypassTimerRef.current = null;
+
     setCameraStatus("Detecting");
     cameraStatusRef.current = "Detecting";
     setCameraError(null);
@@ -341,6 +562,16 @@ export function DisciplineRoomPage() {
     api.post(`/api/discipline-room/${roomId}/frame`, {
       frame: frameData,
       status: cameraStatusRef.current,
+      focusScore,
+      attentionScore,
+      presenceScore,
+      totalFocusedTime: totalFocusedSecondsRef.current,
+      totalReadingWritingTime: totalReadingWritingSecondsRef.current,
+      totalAwayTime: totalAwaySecondsRef.current,
+      awayCount,
+      currentAlertType: activeAlert?.type || null,
+      lastEventType: timelineEventsRef.current[timelineEventsRef.current.length - 1]?.type || null,
+      aiConfidence,
       clientId: clientIdRef.current,
     }).catch(() => {});
   };
@@ -351,42 +582,179 @@ export function DisciplineRoomPage() {
 
     try {
       totalTicksRef.current++;
+      setTotalSeconds(prev => prev + 1);
 
-      const detections = detectorRef.current.detect(videoRef.current);
-      const hasFace = detections.detections.length > 0;
+      const result = detectorRef.current.detect(videoRef.current);
+      const hasFace = result.faceLandmarks && result.faceLandmarks.length > 0;
+
+      let currentRawStatus: AIStatus = "Away";
+      let confidence = 0;
 
       if (hasFace) {
         faceDetectedTicksRef.current++;
         lastFaceTickRef.current = totalTicksRef.current;
+        confidence = Math.round((result.faceLandmarks[0][0] ? 90 : 0) + (result.faceLandmarks[0][4] ? 10 : 0)); // Simplified confidence
+        confidenceSumRef.current += confidence;
 
-        if (isCurrentlyAwayRef.current || cameraStatusRef.current !== "Focused") {
-          isCurrentlyAwayRef.current = false;
-          cameraStatusRef.current = "Focused";
-          setCameraStatus("Focused");
-        }
+        const landmarks = result.faceLandmarks[0];
+        const eyeCenterY = (landmarks[33].y + landmarks[263].y) / 2;
+        const relativeNoseY = (landmarks[4].y - eyeCenterY) / (landmarks[152].y - eyeCenterY);
+        const eyeDist = landmarks[263].x - landmarks[33].x;
+        const relativeNoseX = (landmarks[4].x - landmarks[33].x) / eyeDist;
+
+        const IS_HEAD_DOWN = relativeNoseY > 0.75;
+        const IS_LOOKING_AWAY = relativeNoseX < 0.25 || relativeNoseX > 0.75;
+
+        if (IS_HEAD_DOWN) currentRawStatus = "Head Down";
+        else if (IS_LOOKING_AWAY) currentRawStatus = "Looking Away";
+        else currentRawStatus = "Focused";
       } else {
-        const ticksSinceLastFace = totalTicksRef.current - lastFaceTickRef.current;
+        currentRawStatus = "Away";
+        totalAwayTicksRef.current++;
+      }
 
-        if (ticksSinceLastFace >= 5 && !isCurrentlyAwayRef.current) {
-          isCurrentlyAwayRef.current = true;
-          cameraStatusRef.current = "Away";
-          setCameraStatus("Away");
-          setAwayCount(prev => prev + 1);
+      // ─── State Machine with Mode-Aware Thresholds & Smart Alerts ────────────────
+      const now = Date.now();
+      const timeInCurrentRawState = (now - stateStartTimeRef.current) / 1000;
+      let finalStatus: AIStatus = cameraStatusRef.current;
+
+      const triggerAlert = (type: string, message: string, severity: 'light' | 'strong') => {
+        const cooldown = alertCooldownsRef.current[type] || 0;
+        if (now - cooldown > 60000) { // 60s cooldown
+          setActiveAlert({ type, message, severity });
+          alertCooldownsRef.current[type] = now;
+          setTimeout(() => setActiveAlert(null), 5000); // Auto hide after 5s
+        }
+      };
+
+      const triggerCheckpoint = (question: string, options: string[]) => {
+        if (now - lastCheckpointTimeRef.current > 120000) { // 2 min cooldown
+          setCheckpoint({ question, options });
+          lastCheckpointTimeRef.current = now;
+        }
+      };
+
+      // Check if bypass active (e.g. user said "Reading/Writing")
+      const isBypassActive = checkpointBypassTimerRef.current && now < checkpointBypassTimerRef.current;
+
+      if (currentRawStatus === "Away") {
+        if (timeInCurrentRawState >= 5) {
+          finalStatus = "Away";
+          if (!isCurrentlyAwayRef.current) {
+            isCurrentlyAwayRef.current = true;
+            awayCountRef.current++;
+            addTimelineEvent("Away");
+          }
+          triggerAlert("AWAY", "Bạn đã rời khỏi camera quá lâu!", "strong");
+        }
+      } else if (currentRawStatus === "Focused") {
+        finalStatus = "Focused";
+        if (cameraStatusRef.current !== "Focused") {
+          addTimelineEvent("Focused");
+        }
+        isCurrentlyAwayRef.current = false;
+        isCurrentlyLookingAwayRef.current = false;
+        isCurrentlyHeadDownRef.current = false;
+      } else if (currentRawStatus === "Head Down") {
+        if (isBypassActive) {
+          finalStatus = "Reading/Writing";
+        } else if (mode === "Study") {
+          if (timeInCurrentRawState < 60) {
+            finalStatus = "Reading/Writing";
+            if (cameraStatusRef.current !== "Reading/Writing") addTimelineEvent("Reading/Writing");
+          } else {
+            finalStatus = "Head Down";
+            if (!isCurrentlyHeadDownRef.current) {
+              isCurrentlyHeadDownRef.current = true;
+              headDownCountRef.current++;
+              addTimelineEvent("Head Down");
+            }
+            if (timeInCurrentRawState >= 90) {
+              triggerAlert("HEAD_DOWN_STUDY", "Bạn vẫn đang đọc/ghi chép chứ?", "light");
+              triggerCheckpoint("Bạn đang làm gì?", ["Đang học bài", "Đang đọc sách", "Tạm nghỉ", "Bỏ qua"]);
+            }
+          }
+        } else {
+          // Deep Work
+          if (timeInCurrentRawState < 15) {
+            finalStatus = "Focused";
+          } else {
+            finalStatus = "Head Down";
+            if (!isCurrentlyHeadDownRef.current) {
+              isCurrentlyHeadDownRef.current = true;
+              headDownCountRef.current++;
+              addTimelineEvent("Head Down");
+            }
+            triggerAlert("HEAD_DOWN_DEEP", "Bạn cúi xuống quá lâu trong Deep Work!", "light");
+          }
+        }
+      } else if (currentRawStatus === "Looking Away") {
+        const threshold = mode === "Study" ? 30 : 10;
+        if (timeInCurrentRawState < threshold) {
+          finalStatus = "Focused";
+        } else {
+          finalStatus = "Looking Away";
+          if (!isCurrentlyLookingAwayRef.current) {
+            isCurrentlyLookingAwayRef.current = true;
+            lookingAwayCountRef.current++;
+            addTimelineEvent("Looking Away");
+          }
+          triggerAlert("LOOKING_AWAY", "Hãy tập trung vào màn hình!", "light");
         }
       }
 
-      const presence = totalTicksRef.current > 0
-        ? Math.round((faceDetectedTicksRef.current / totalTicksRef.current) * 100)
-        : 100;
-      setPresenceScore(presence);
+      if (currentRawStatus !== lastStatusRef.current) {
+        stateStartTimeRef.current = now;
+        lastStatusRef.current = currentRawStatus;
+      }
 
-      setAwayCount(currentAwayCount => {
-        const focus = Math.max(0, presence - currentAwayCount * 5);
-        setFocusScore(focus);
-        return currentAwayCount;
-      });
+      if (hasFace && confidence < 40) {
+        finalStatus = "Low Confidence";
+        if (cameraStatusRef.current !== "Low Confidence") addTimelineEvent("Low Confidence");
+      }
+
+      setCameraStatus(finalStatus);
+      cameraStatusRef.current = finalStatus;
+
+      // ─── Metrics Tracking (Seconds) ──────────────────────────────────────────
+      if (finalStatus === "Focused") totalFocusedSecondsRef.current++;
+      else if (finalStatus === "Reading/Writing") totalReadingWritingSecondsRef.current++;
+      else if (finalStatus === "Head Down") totalHeadDownSecondsRef.current++;
+      else if (finalStatus === "Looking Away") totalLookingAwaySecondsRef.current++;
+      else if (finalStatus === "Away") totalAwaySecondsRef.current++;
+      else if (finalStatus === "Low Confidence") lowConfidenceSecondsRef.current++;
+
+      // ─── Scoring Logic ─────────────────────────────────────────────────────────
+      const presence = Math.round((faceDetectedTicksRef.current / totalTicksRef.current) * 100);
+      
+      // Attention Score based on valid focused time
+      const totalValidTime = totalFocusedSecondsRef.current + (totalReadingWritingSecondsRef.current * (mode === "Study" ? 1.0 : 0.8));
+      const attention = faceDetectedTicksRef.current > 0 
+        ? Math.round((totalValidTime / faceDetectedTicksRef.current) * 100)
+        : 0;
+      
+      const avgConfidence = Math.round(confidenceSumRef.current / totalTicksRef.current);
+
+      setPresenceScore(presence);
+      setAttentionScore(Math.min(100, attention));
+      setAiConfidence(avgConfidence);
+      setAwayCount(awayCountRef.current);
+      setLookingAwayCount(lookingAwayCountRef.current);
+      setHeadDownCount(headDownCountRef.current);
+
+      // Focus Score Logic (V2 improved)
+      let focus = 100;
+      const penalty = 
+        (totalAwaySecondsRef.current * 2) + 
+        (totalLookingAwaySecondsRef.current * 0.5) + 
+        (totalHeadDownSecondsRef.current * (mode === "Deep Work" ? 1 : 0.2)) +
+        (awayCountRef.current * 5);
+      
+      focus = 100 - (penalty / totalTicksRef.current * 100);
+      setFocusScore(Math.max(0, Math.min(100, Math.round(focus))));
+
     } catch (err) {
-      console.warn("Face detection skipped:", err);
+      console.warn("Face detection error:", err);
     }
   };
 
@@ -394,13 +762,34 @@ export function DisciplineRoomPage() {
   const handleEndSession = async () => {
     cleanupSession();
     setIsActionLoading(true);
+    addTimelineEvent("Session Ended");
+
     try {
       const timeSpent = duration * 60 - timeLeft;
+      const metadata = {
+        timeline: timelineEventsRef.current,
+        total_focused_time: totalFocusedSecondsRef.current,
+        total_reading_writing_time: totalReadingWritingSecondsRef.current,
+        total_looking_away_time: totalLookingAwaySecondsRef.current,
+        total_head_down_time: totalHeadDownSecondsRef.current,
+        total_away_time: totalAwaySecondsRef.current,
+        low_confidence_time: lowConfidenceSecondsRef.current,
+        manual_checkpoint_count: manualCheckpointCountRef.current,
+        mode: modeRef.current
+      };
+
       const response = await api.post(`/api/discipline-room/${roomId}/end`, {
         durationSeconds: timeSpent,
         presenceScore,
         focusScore,
-        awayCount
+        attentionScore,
+        awayCount,
+        lookingAwayCount,
+        headDownCount,
+        readingWritingTime: totalReadingWritingSecondsRef.current,
+        totalAwayTime: totalAwaySecondsRef.current,
+        aiConfidence,
+        metadata
       });
       setServerReport(response.data.report);
       setPhase("REPORT");
@@ -421,6 +810,8 @@ export function DisciplineRoomPage() {
     setInviteCode("");
     setInviteCodeInput("");
     setServerReport(null);
+    setIsMaximized(false);
+    setIsSidebarOpen(true);
   };
 
   const formatTime = (seconds: number) => {
@@ -429,122 +820,407 @@ export function DisciplineRoomPage() {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  const getChatMessages = async () => {
+    if (!roomId) return;
+    try {
+      const after = lastMessageTimeRef.current ? new Date(lastMessageTimeRef.current).toISOString() : "";
+      const url = after ? `/api/discipline-room/${roomId}/messages?after=${after}` : `/api/discipline-room/${roomId}/messages`;
+      const res = await api.get(url);
+      if (res.data.success && res.data.messages.length > 0) {
+        setMessages(prev => {
+          const newMessages = res.data.messages.filter((m: any) => !prev.find(p => p.id === m.id));
+          if (newMessages.length > 0) {
+             if (!isChatOpen) setUnreadCount(c => c + newMessages.length);
+             return [...prev, ...newMessages];
+          }
+          return prev;
+        });
+        lastMessageTimeRef.current = new Date(res.data.messages[res.data.messages.length - 1].created_at).getTime();
+        setTimeout(() => {
+          if (chatScrollRef.current) {
+            chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+          }
+        }, 100);
+      }
+    } catch (err) {}
+  };
+
+  useEffect(() => {
+    let interval: any;
+    if ((phase === "ACTIVE" || phase === "LOBBY") && roomId) {
+      interval = setInterval(getChatMessages, 2000);
+      getChatMessages();
+    }
+    return () => clearInterval(interval);
+  }, [phase, roomId]);
+
+  useEffect(() => {
+    if (phase !== "LOBBY" || !readyCheckStartTime) {
+      setShowTimeoutWarning(false);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - readyCheckStartTime;
+      if (elapsed > 2 * 60 * 1000) {
+        setShowTimeoutWarning(true);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [phase, readyCheckStartTime]);
+
+  const handleUpdateGoal = async (goalText: string) => {
+    const trimmed = goalText.trim().substring(0, 100);
+    setLocalGoal(trimmed);
+    if (trimmed === lastSavedLocalGoalRef.current) return;
+    try {
+      await api.post(`/api/discipline-room/${roomId}/goal`, { goal: trimmed });
+      lastSavedLocalGoalRef.current = trimmed;
+      getChatMessages();
+    } catch (err: any) {
+      console.error("Failed to update goal", err);
+    }
+  };
+
+  const handleToggleReady = async () => {
+    const nextReady = !localReady;
+    try {
+      await api.post(`/api/discipline-room/${roomId}/ready`, { ready: nextReady });
+      setLocalReady(nextReady);
+      getChatMessages();
+    } catch (err: any) {
+      console.error("Failed to toggle ready", err);
+    }
+  };
+
+  const handleLeaveRoom = async () => {
+    try {
+      await api.post(`/api/discipline-room/${roomId}/leave`);
+    } catch (err: any) {
+      console.error("Failed to leave room", err);
+    } finally {
+      cleanupSession();
+      resetRoom();
+    }
+  };
+
+  const sendChatMessage = async (msg: string, type: "USER"|"SYSTEM" = "USER", eventType: string = "") => {
+    if (!roomId || !msg.trim()) return;
+    try {
+      await api.post(`/api/discipline-room/${roomId}/messages`, {
+        message: msg,
+        type,
+        eventType
+      });
+      getChatMessages();
+    } catch (err) {}
+  };
+
+  const handleSendChat = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim()) return;
+    sendChatMessage(chatInput, "USER");
+    setChatInput("");
+  };
+
+  // ─── Track Partner Status Changes for System Messages ───────────────────
+  const previousPartnerStatusRef = useRef<AIStatus>("Detecting");
+  useEffect(() => {
+    if (phase !== "ACTIVE") return;
+    if (partnerStatus === previousPartnerStatusRef.current) return;
+
+    if (previousPartnerStatusRef.current !== "Away" && partnerStatus === "Away") {
+      sendChatMessage("Partner đang Away.", "SYSTEM", "PARTNER_AWAY");
+    } else if (previousPartnerStatusRef.current === "Away" && (partnerStatus === "Focused" || partnerStatus === "Reading/Writing")) {
+      sendChatMessage("Partner đã quay lại Focused.", "SYSTEM", "PARTNER_FOCUSED");
+    }
+
+    previousPartnerStatusRef.current = partnerStatus;
+  }, [partnerStatus, phase]);
+
   // ─── UI Rendering ─────────────────────────────────────────────────────────────
-  const renderCreate = () => (
-    <div className="max-w-4xl mx-auto mt-10 grid grid-cols-1 md:grid-cols-2 gap-8 px-4">
-      {/* Create Section */}
-      <div className="p-8 rounded-3xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-2xl">
-        <div className="flex justify-center mb-6">
-          <div className="p-4 bg-[var(--color-primary-container)] rounded-2xl shadow-inner">
-            {isDetectorLoading ? <Loader2 className="animate-spin text-[var(--color-primary)]" size={40} /> : <Camera size={40} className="text-[var(--color-primary)]" />}
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold text-center mb-2">Tạo phòng mới</h2>
-        <p className="text-center text-[var(--color-on-surface-variant)] mb-8 text-sm">
-          Bắt đầu phiên tập trung của riêng bạn
-        </p>
+  const renderCreateTab = () => (
+    <div className="space-y-6">
+      <div>
+        <label className="block text-sm font-semibold mb-2 ml-1">Mục tiêu của bạn</label>
+        <input
+          type="text"
+          className="w-full px-5 py-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--color-surface)] text-[var(--color-on-surface)] outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)] transition-all"
+          placeholder="Ví dụ: Học lập trình..."
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </div>
 
-        <div className="space-y-6">
-          <div>
-            <label className="block text-sm font-semibold mb-2 ml-1">Mục tiêu của bạn</label>
-            <input
-              type="text"
-              className="w-full px-5 py-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--color-surface)] text-[var(--color-on-surface)] outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)] transition-all"
-              placeholder="Ví dụ: Học lập trình..."
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-2 ml-1">Chế độ</label>
-            <div className="grid grid-cols-2 gap-3">
-              {(["Study", "Deep Work"] as Mode[]).map(m => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={`py-3 rounded-2xl text-sm font-bold border transition-all ${mode === m ? 'bg-[var(--color-primary)] text-[var(--color-on-primary)] border-[var(--color-primary)] shadow-lg shadow-[var(--color-primary)]/20' : 'bg-transparent border-[var(--border-subtle)] text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-high)]'}`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-2 ml-1">Thời gian</label>
-            <div className="grid grid-cols-3 gap-3">
-              {[5, 15, 25].map(d => (
-                <button
-                  key={d}
-                  onClick={() => setDuration(d)}
-                  className={`py-3 rounded-2xl text-sm font-bold border transition-all ${duration === d ? 'bg-[var(--color-primary)] text-[var(--color-on-primary)] border-[var(--color-primary)] shadow-lg shadow-[var(--color-primary)]/20' : 'bg-transparent border-[var(--border-subtle)] text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-high)]'}`}
-                >
-                  {d}p
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            onClick={handleCreateRoom}
-            disabled={!title || isDetectorLoading || isActionLoading}
-            className={`w-full py-4 mt-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-3 text-lg ${title && !isDetectorLoading && !isActionLoading ? 'bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-95 shadow-xl shadow-[var(--color-primary)]/30 active:scale-95' : 'bg-[var(--color-surface-container-high)] text-[var(--color-on-surface-variant)] cursor-not-allowed opacity-50'}`}
-          >
-            {isActionLoading ? <Loader2 size={24} className="animate-spin" /> : <Zap size={24} />}
-            {isActionLoading ? "Đang tạo..." : "Tạo phòng"}
-          </button>
+      <div>
+        <label className="block text-sm font-semibold mb-2 ml-1">Chế độ</label>
+        <div className="grid grid-cols-2 gap-3">
+          {(["Study", "Deep Work"] as Mode[]).map(m => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`py-3 rounded-2xl text-sm font-bold border transition-all ${mode === m ? 'bg-[var(--color-primary)] text-[var(--color-on-primary)] border-[var(--color-primary)] shadow-lg shadow-[var(--color-primary)]/20' : 'bg-transparent border-[var(--border-subtle)] text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-high)]'}`}
+            >
+              {m}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Join Section */}
-      <div className="p-8 rounded-3xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-2xl flex flex-col">
-        <div className="flex justify-center mb-6">
-          <div className="p-4 bg-green-500/10 rounded-2xl shadow-inner">
-            <Users size={40} className="text-green-500" />
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold text-center mb-2">Tham gia phòng</h2>
-        <p className="text-center text-[var(--color-on-surface-variant)] mb-8 text-sm">
-          Nhập mã mời để cùng tập trung với partner
-        </p>
-
-        <div className="space-y-6 mt-auto mb-auto">
-          <div>
-            <label className="block text-sm font-semibold mb-2 ml-1">Mã mời (Invite Code)</label>
-            <input
-              type="text"
-              className="w-full px-5 py-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--color-surface)] text-[var(--color-on-surface)] outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-center text-3xl font-mono font-black tracking-widest"
-              placeholder="ABCDEF"
-              maxLength={6}
-              value={inviteCodeInput}
-              onChange={(e) => setInviteCodeInput(e.target.value.toUpperCase())}
-            />
-          </div>
-
-          {error && (
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm font-medium text-center">
-              {error}
-            </div>
-          )}
-
-          <button
-            onClick={handleJoinRoom}
-            disabled={!inviteCodeInput || isActionLoading}
-            className={`w-full py-4 mt-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-3 text-lg ${inviteCodeInput && !isActionLoading ? 'bg-green-500 text-white hover:opacity-95 shadow-xl shadow-green-500/30 active:scale-95' : 'bg-[var(--color-surface-container-high)] text-[var(--color-on-surface-variant)] cursor-not-allowed opacity-50'}`}
-          >
-            {isActionLoading ? <Loader2 size={24} className="animate-spin" /> : <ArrowRight size={24} />}
-            {isActionLoading ? "Đang kiểm tra..." : "Vào phòng"}
-          </button>
+      <div>
+        <label className="block text-sm font-semibold mb-2 ml-1">Thời gian</label>
+        <div className="grid grid-cols-3 gap-3">
+          {[5, 15, 25].map(d => (
+            <button
+              key={d}
+              onClick={() => setDuration(d)}
+              className={`py-3 rounded-2xl text-sm font-bold border transition-all ${duration === d ? 'bg-[var(--color-primary)] text-[var(--color-on-primary)] border-[var(--color-primary)] shadow-lg shadow-[var(--color-primary)]/20' : 'bg-transparent border-[var(--border-subtle)] text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-high)]'}`}
+            >
+              {d}p
+            </button>
+          ))}
         </div>
       </div>
+
+      <div className="flex items-center justify-between p-4 rounded-2xl bg-[var(--color-surface-container-high)] border border-[var(--border-subtle)]">
+        <div className="flex items-center gap-3">
+          <Users size={20} className="text-[var(--color-primary)]" />
+          <div>
+            <div className="text-sm font-bold">Công khai phòng</div>
+            <div className="text-[10px] opacity-60">Người khác có thể thấy và tham gia</div>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsPublic(!isPublic)}
+          className={`w-12 h-6 rounded-full transition-all relative ${isPublic ? 'bg-[var(--color-primary)]' : 'bg-gray-400'}`}
+        >
+          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isPublic ? 'left-7' : 'left-1'}`}></div>
+        </button>
+      </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm font-medium text-center">
+          {error}
+        </div>
+      )}
+
+      <button
+        onClick={handleCreateRoom}
+        disabled={!title || isDetectorLoading || isActionLoading}
+        className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-3 text-lg ${title && !isDetectorLoading && !isActionLoading ? 'bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-95 shadow-xl shadow-[var(--color-primary)]/30 active:scale-95' : 'bg-[var(--color-surface-container-high)] text-[var(--color-on-surface-variant)] cursor-not-allowed opacity-50'}`}
+      >
+        {isActionLoading ? <Loader2 size={24} className="animate-spin" /> : <Zap size={24} />}
+        {isActionLoading ? "Đang tạo..." : "Tạo phòng"}
+      </button>
     </div>
   );
+
+  const renderJoinTab = () => (
+    <div className="space-y-6">
+      <div>
+        <label className="block text-sm font-semibold mb-2 ml-1">Mã mời (Invite Code)</label>
+        <input
+          type="text"
+          className="w-full px-5 py-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--color-surface)] text-[var(--color-on-surface)] outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-center text-3xl font-mono font-black tracking-widest"
+          placeholder="ABCDEF"
+          maxLength={6}
+          value={inviteCodeInput}
+          onChange={(e) => setInviteCodeInput(e.target.value.toUpperCase())}
+        />
+      </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm font-medium text-center">
+          {error}
+        </div>
+      )}
+
+      <button
+        onClick={() => handleJoinRoom()}
+        disabled={!inviteCodeInput || isActionLoading}
+        className={`w-full py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-3 text-lg ${inviteCodeInput && !isActionLoading ? 'bg-green-500 text-white hover:opacity-95 shadow-xl shadow-green-500/30 active:scale-95' : 'bg-[var(--color-surface-container-high)] text-[var(--color-on-surface-variant)] cursor-not-allowed opacity-50'}`}
+      >
+        {isActionLoading ? <Loader2 size={24} className="animate-spin" /> : <ArrowRight size={24} />}
+        {isActionLoading ? "Đang kiểm tra..." : "Vào phòng"}
+      </button>
+    </div>
+  );
+
+  const renderPublicTab = () => {
+    const filteredRooms = waitingRooms.filter(room => {
+      if (filterMode !== "All" && room.mode !== filterMode) return false;
+      if (filterDuration !== "All" && room.duration_minutes !== parseInt(filterDuration)) return false;
+      return true;
+    });
+
+    return (
+      <div>
+        <div className="flex items-center gap-2 mb-6">
+          <select
+            value={filterMode}
+            onChange={(e) => setFilterMode(e.target.value)}
+            className="px-4 py-2 rounded-xl bg-[var(--color-surface-container-high)] border border-[var(--border-subtle)] text-xs font-bold outline-none flex-1"
+          >
+            <option value="All">Tất cả Mode</option>
+            <option value="Study">Study</option>
+            <option value="Deep Work">Deep Work</option>
+          </select>
+          <select
+            value={filterDuration}
+            onChange={(e) => setFilterDuration(e.target.value)}
+            className="px-4 py-2 rounded-xl bg-[var(--color-surface-container-high)] border border-[var(--border-subtle)] text-xs font-bold outline-none flex-1"
+          >
+            <option value="All">Mọi thời lượng</option>
+            <option value="5">5 phút</option>
+            <option value="15">15 phút</option>
+            <option value="25">25 phút</option>
+          </select>
+          <button
+            onClick={() => fetchWaitingRooms()}
+            className="p-2 rounded-xl bg-[var(--color-surface-container-high)] border border-[var(--border-subtle)] hover:bg-[var(--color-primary-container)] transition-all"
+            title="Làm mới"
+          >
+            {isWaitingRoomsLoading ? <Loader2 size={16} className="animate-spin text-[var(--color-primary)]" /> : <ArrowRight size={16} className="rotate-[-90deg] text-[var(--color-on-surface-variant)]" />}
+          </button>
+        </div>
+
+        {isWaitingRoomsLoading && waitingRooms.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Loader2 className="animate-spin text-[var(--color-primary)] mb-4" size={36} />
+            <p className="font-medium opacity-60">Đang tìm các phòng chờ...</p>
+          </div>
+        ) : filteredRooms.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="p-5 bg-[var(--color-surface-container-high)] rounded-2xl mb-4 opacity-30">
+              <Users size={40} />
+            </div>
+            <h4 className="font-bold mb-1">Chưa có phòng chờ nào</h4>
+            <p className="text-sm opacity-60 max-w-xs mt-1">Hãy tạo một phòng công khai để người khác có thể cùng tham gia!</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredRooms.map((room) => (
+              <div
+                key={room.id}
+                className="p-5 rounded-2xl bg-[var(--color-surface-container-high)] border border-[var(--border-subtle)] hover:border-[var(--color-primary)]/40 transition-all flex items-center gap-4"
+              >
+                <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-container)] flex items-center justify-center font-black text-[var(--color-primary)] text-sm flex-shrink-0">
+                  {room.creator?.name?.substring(0, 1).toUpperCase() || "U"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm truncate">{room.title}</div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-[10px] opacity-60">{room.creator?.name || "Người dùng"} · Lv{room.creator?.level || 1}</span>
+                    <span className="px-1.5 py-0.5 bg-[var(--color-surface)] text-[var(--color-on-surface-variant)] text-[10px] font-bold rounded-md">{room.mode}</span>
+                    <span className="px-1.5 py-0.5 bg-[var(--color-surface)] text-[var(--color-on-surface-variant)] text-[10px] font-bold rounded-md">{room.duration_minutes}p</span>
+                    <span className="flex items-center gap-1 text-green-500 text-[10px] font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                      {room.participants?.length || 1}/2
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleJoinRoom(room.id)}
+                  disabled={isActionLoading}
+                  className="px-5 py-2 bg-[var(--color-primary)] text-[var(--color-on-primary)] rounded-xl font-bold text-sm shadow-lg shadow-[var(--color-primary)]/20 hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 flex-shrink-0"
+                >
+                  {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+                  Tham gia
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCreate = () => {
+    const tabs = [
+      { id: "create" as const, label: "Tạo phòng", icon: <Zap size={16} /> },
+      { id: "join" as const, label: "Tham gia", icon: <ArrowRight size={16} /> },
+      { id: "public" as const, label: "Phòng Chờ Công Khai", icon: <Users size={16} />, badge: waitingRooms.length > 0 ? waitingRooms.length : null },
+    ];
+
+    return (
+      <div className="max-w-2xl mx-auto mt-10 px-4">
+        {/* Tab Bar */}
+        <div className="flex gap-2 p-1.5 bg-[var(--color-surface-container)] rounded-2xl border border-[var(--border-subtle)] mb-8 shadow-sm">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setError(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-sm font-bold transition-all relative
+                ${activeTab === tab.id
+                  ? 'bg-[var(--color-surface)] text-[var(--color-on-surface)] shadow-md'
+                  : 'text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-high)]'
+                }`}
+            >
+              {tab.icon}
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.id === 'create' ? 'Tạo' : tab.id === 'join' ? 'Tham gia' : 'Công khai'}</span>
+              {tab.badge !== null && tab.badge !== undefined && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[10px] font-black rounded-full flex items-center justify-center px-1 shadow">
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div className="p-8 rounded-3xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-2xl">
+          {activeTab === "create" && (
+            <>
+              <div className="flex justify-center mb-6">
+                <div className="p-4 bg-[var(--color-primary-container)] rounded-2xl shadow-inner">
+                  {isDetectorLoading ? <Loader2 className="animate-spin text-[var(--color-primary)]" size={36} /> : <Camera size={36} className="text-[var(--color-primary)]" />}
+                </div>
+              </div>
+              <h2 className="text-xl font-bold text-center mb-1">Tạo phòng mới</h2>
+              <p className="text-center text-[var(--color-on-surface-variant)] mb-6 text-sm">Bắt đầu phiên tập trung của riêng bạn</p>
+              {renderCreateTab()}
+            </>
+          )}
+          {activeTab === "join" && (
+            <>
+              <div className="flex justify-center mb-6">
+                <div className="p-4 bg-green-500/10 rounded-2xl shadow-inner">
+                  <Users size={36} className="text-green-500" />
+                </div>
+              </div>
+              <h2 className="text-xl font-bold text-center mb-1">Tham gia phòng</h2>
+              <p className="text-center text-[var(--color-on-surface-variant)] mb-6 text-sm">Nhập mã mời để cùng tập trung với partner</p>
+              {renderJoinTab()}
+            </>
+          )}
+          {activeTab === "public" && (
+            <>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Users className="text-[var(--color-primary)]" size={22} />
+                    Phòng Chờ Công Khai
+                  </h2>
+                  <p className="text-sm text-[var(--color-on-surface-variant)] mt-0.5">Tìm partner để cùng nhau rèn luyện kỷ luật</p>
+                </div>
+                <span className="text-xs font-bold text-[var(--color-on-surface-variant)] opacity-60">Cập nhật mỗi 10s</span>
+              </div>
+              {renderPublicTab()}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderWaitingRoomList = () => null;
 
   const renderWaiting = () => (
     <div className="max-w-md mx-auto mt-10 p-8 rounded-3xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] text-center shadow-2xl shadow-black/10">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-1">{title || "Chưa đặt tên"}</h2>
+        <h2 className="text-2xl font-bold mb-1">{title || "Phòng tập trung"}</h2>
         <div className="flex items-center justify-center gap-2">
            <span className="px-3 py-1 bg-[var(--color-primary-container)] text-[var(--color-primary)] text-xs font-bold rounded-full">{mode}</span>
            <span className="px-3 py-1 bg-[var(--color-surface-container-highest)] text-[var(--color-on-surface-variant)] text-xs font-bold rounded-full">{duration} phút</span>
@@ -561,13 +1237,13 @@ export function DisciplineRoomPage() {
         </div>
       </div>
 
-      <div className={`flex items-center justify-center gap-4 mb-10 p-5 rounded-2xl transition-all border ${partnerJoined ? "bg-green-500/10 border-green-500/30 text-green-500" : "bg-[var(--color-surface-container-highest)] border-[var(--border-subtle)]"}`}>
+      <div className={`flex items-center justify-center gap-4 mb-8 p-5 rounded-2xl transition-all border ${partnerJoined ? "bg-green-500/10 border-green-500/30 text-green-500" : "bg-[var(--color-surface-container-highest)] border-[var(--border-subtle)]"}`}>
         {partnerJoined ? (
            <div className="flex items-center gap-3">
              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white shadow-lg shadow-green-500/30">
                <Users size={20} />
              </div>
-             <span className="font-bold">Partner đã sẵn sàng!</span>
+             <span className="font-bold">Partner đã tham gia. Đang mở sảnh trao đổi...</span>
            </div>
         ) : (
            <div className="flex items-center gap-3">
@@ -577,24 +1253,438 @@ export function DisciplineRoomPage() {
         )}
       </div>
 
-      {isCreator ? (
+      <div className="text-sm font-medium text-[var(--color-on-surface-variant)]">
+        {partnerJoined ? "Bạn sẽ vào sảnh để trao đổi trước khi camera AI bắt đầu." : "Gửi mã mời cho bạn bè để bắt đầu."}
+      </div>
+      <div className="mt-6 pt-4 border-t border-[var(--border-subtle)] flex justify-center">
         <button
-          onClick={startRealSession}
-          disabled={!partnerJoined || isActionLoading}
-          className={`w-full py-4 rounded-2xl font-black text-lg transition-all ${partnerJoined && !isActionLoading ? 'bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-95 shadow-xl shadow-[var(--color-primary)]/40 active:scale-95' : 'bg-[var(--color-surface-container-high)] text-[var(--color-on-surface-variant)] cursor-not-allowed opacity-50'}`}
+          onClick={handleLeaveRoom}
+          className="w-full py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all active:scale-95 animate-fade-in"
         >
-          {isActionLoading ? <Loader2 size={24} className="animate-spin" /> : "BẮT ĐẦU PHIÊN"}
+          {isCreator ? "Hủy phòng" : "Rời phòng"}
         </button>
-      ) : (
-        <div className="text-sm font-medium text-[var(--color-on-surface-variant)] animate-pulse">
-          Đang chờ creator bắt đầu phiên...
-        </div>
-      )}
+      </div>
     </div>
   );
+  const getStatusLabel = (status: AIStatus) => {
+    const labels: Record<AIStatus, string> = {
+      "Camera Off": "Tắt camera",
+      Detecting: "Đang nhận diện",
+      Focused: "Đang tập trung",
+      "Reading/Writing": "Đọc / ghi chép",
+      "Looking Away": "Nhìn ra ngoài",
+      "Head Down": "Cúi đầu",
+      Away: "Rời chỗ",
+      "Low Confidence": "Tín hiệu yếu"
+    };
+    return labels[status] || status;
+  };
 
+  const renderAICoachStats = (isOverlay = false) => {
+    const cardClass = isOverlay
+      ? "p-5 rounded-2xl bg-white/5 border border-white/10 text-white shadow-xl"
+      : "p-5 rounded-2xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-lg overflow-y-auto max-h-[52vh]";
+
+    const headingClass = isOverlay
+      ? "font-black text-xs text-white/50 mb-4 uppercase tracking-[0.2em]"
+      : "font-black text-xs text-[var(--color-on-surface-variant)] mb-6 uppercase tracking-[0.2em]";
+
+    const textClass = isOverlay ? "text-white" : "text-[var(--color-on-surface)]";
+    const primaryTextClass = isOverlay ? "text-white" : "text-[var(--color-primary)]";
+    const fillBgClass = isOverlay ? "bg-white/10" : "bg-[var(--color-surface-container-high)]";
+    const fillPrimaryGradient = isOverlay 
+      ? "bg-gradient-to-r from-emerald-400 to-blue-400" 
+      : "bg-gradient-to-r from-[var(--color-primary)] to-blue-400";
+
+    const itemBgClass = (type: "red" | "yellow" | "orange") => {
+      if (type === "red") {
+        return isOverlay ? "bg-red-500/10 border-red-500/20 text-red-200" : "bg-red-500/5 border-red-500/10 text-red-500";
+      }
+      if (type === "yellow") {
+        return isOverlay ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-200" : "bg-yellow-500/5 border-yellow-500/10 text-yellow-500";
+      }
+      return isOverlay ? "bg-orange-500/10 border-orange-500/20 text-orange-200" : "bg-orange-500/5 border-orange-500/10 text-orange-500";
+    };
+
+    return (
+      <div className={cardClass}>
+        <h3 className={headingClass}>AI Coach</h3>
+
+        <div className="space-y-6">
+          <div className="relative">
+            <div className="flex justify-between items-end mb-2">
+              <span className={`text-sm font-bold uppercase tracking-wider ${isOverlay ? "text-white/70" : "opacity-80"}`}>Điểm tập trung</span>
+              <span className={`text-3xl font-black ${primaryTextClass}`}>{focusScore}%</span>
+            </div>
+            <div className={`w-full h-4 ${fillBgClass} rounded-full overflow-hidden p-1 shadow-inner`}>
+              <div className={`h-full ${fillPrimaryGradient} rounded-full transition-all duration-1000 ease-out`} style={{ width: `${focusScore}%` }}></div>
+            </div>
+            {focusScore < 70 && <p className="text-[10px] text-red-400 font-bold mt-2 animate-pulse">Mức độ tập trung đang thấp!</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="flex justify-between items-end mb-1">
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${isOverlay ? "text-white/50" : "opacity-70"}`}>Hiện diện</span>
+                <span className="text-sm font-black">{presenceScore}%</span>
+              </div>
+              <div className={`w-full h-1.5 ${fillBgClass} rounded-full overflow-hidden shadow-inner`}>
+                <div className="h-full bg-blue-400 transition-all duration-1000" style={{ width: `${presenceScore}%` }}></div>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between items-end mb-1">
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${isOverlay ? "text-white/50" : "opacity-70"}`}>Chú ý</span>
+                <span className="text-sm font-black">{attentionScore}%</span>
+              </div>
+              <div className={`w-full h-1.5 ${fillBgClass} rounded-full overflow-hidden shadow-inner`}>
+                <div className="h-full bg-green-400 transition-all duration-1000" style={{ width: `${attentionScore}%` }}></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <div className={`flex justify-between items-center p-3 rounded-2xl border ${itemBgClass("red")}`}>
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-80">Rời chỗ</span>
+              <span className="text-xl font-black">{awayCount}</span>
+            </div>
+            <div className={`flex justify-between items-center p-3 rounded-2xl border ${itemBgClass("yellow")}`}>
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-80">Nhìn ra ngoài</span>
+              <span className="text-xl font-black">{lookingAwayCount}</span>
+            </div>
+            <div className={`flex justify-between items-center p-3 rounded-2xl border ${itemBgClass("orange")}`}>
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-80">Cúi đầu</span>
+              <span className="text-xl font-black">{headDownCount}</span>
+            </div>
+          </div>
+
+          <div>
+             <div className="flex justify-between items-end mb-1">
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${isOverlay ? "text-white/50" : "opacity-70"}`}>Độ tin cậy AI</span>
+              <span className="text-sm font-black">{aiConfidence}%</span>
+            </div>
+            <div className={`w-full h-1.5 ${fillBgClass} rounded-full overflow-hidden shadow-inner`}>
+              <div className="h-full bg-indigo-400 transition-all duration-1000" style={{ width: `${aiConfidence}%` }}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPartnerStats = (isOverlay = false) => {
+    const cardClass = isOverlay
+      ? "p-5 rounded-2xl bg-white/5 border border-white/10 text-white shadow-xl flex flex-col gap-4"
+      : "p-5 rounded-2xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-lg flex flex-col gap-4 max-h-[52vh]";
+
+    const headingClass = isOverlay
+      ? "font-black text-xs text-white/50 uppercase tracking-[0.2em]"
+      : "font-black text-xs text-[var(--color-on-surface-variant)] mb-4 uppercase tracking-[0.2em]";
+
+    const itemBg = isOverlay
+      ? "bg-white/5 border border-white/10"
+      : "bg-[var(--color-surface)] border border-[var(--border-subtle)]";
+
+    const labelClass = isOverlay
+      ? "text-[9px] font-bold text-white/50 uppercase mb-1"
+      : "text-[9px] font-bold text-[var(--color-on-surface-variant)] uppercase mb-1";
+
+    return (
+      <div className={cardClass}>
+        <div>
+          <h3 className={headingClass}>Camera partner</h3>
+          <div className={`flex items-center gap-4 p-3 rounded-2xl ${itemBg} mt-3 mb-4`}>
+            <div className="w-14 h-14 overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-white text-xl shadow-lg shadow-blue-500/20 shrink-0">
+              {partnerFrame ? (
+                <img src={partnerFrame} alt="Partner preview" className="h-full w-full object-cover scale-x-[-1]" />
+              ) : (
+                "P"
+              )}
+            </div>
+            <div className="overflow-hidden w-full">
+              <div className="font-bold truncate text-lg">Partner</div>
+              <div className={`text-[10px] font-black flex items-center gap-1 uppercase tracking-tighter ${
+                partnerStatus === "Camera Off" ? (isOverlay ? "text-white/40" : "text-gray-500") : 
+                partnerStatus === "Away" ? "text-red-500" : 
+                partnerStatus === "Focused" || partnerStatus === "Reading/Writing" ? "text-green-500" : "text-yellow-500"}`}>
+                <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                  partnerStatus === "Camera Off" ? (isOverlay ? "bg-white/40" : "bg-gray-500") : 
+                  partnerStatus === "Away" ? "bg-red-500" : 
+                  partnerStatus === "Focused" || partnerStatus === "Reading/Writing" ? "bg-green-500" : "bg-yellow-500"}`}></div>
+                {partnerFrame ? getStatusLabel(partnerStatus) : "Đang chờ camera"}
+              </div>
+            </div>
+          </div>
+
+          {/* Partner Stats Overlay/Grid */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className={`${itemBg} rounded-xl p-2 text-center`}>
+              <div className={labelClass}>Tập trung</div>
+              <div className={`text-sm font-black ${partnerFocusScore >= 80 ? "text-green-500" : partnerFocusScore >= 50 ? "text-yellow-500" : "text-red-500"}`}>{partnerFocusScore}%</div>
+            </div>
+            <div className={`${itemBg} rounded-xl p-2 text-center`}>
+              <div className={labelClass}>Hiện diện</div>
+              <div className="text-sm font-black text-blue-500">{partnerPresenceScore}%</div>
+            </div>
+            <div className={`${itemBg} rounded-xl p-2 text-center`}>
+              <div className={labelClass}>Rời chỗ</div>
+              <div className="text-sm font-black text-red-500">{partnerAwayCount}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const getDisplayMessage = (message: string) => {
+    if (!message) return "";
+    if (message.includes('đã đặt mục tiêu: ""')) return "";
+    if (message.includes('?? tham gia') || (message.includes('Partner') && message.includes('tham gia ph'))) {
+      return "Partner đã tham gia phòng. Hãy trao đổi mục tiêu trước khi bắt đầu phiên.";
+    }
+    return message;
+  };
+
+  const renderChatBox = (isOverlay = false) => {
+    const containerClass = isOverlay
+      ? "h-[300px] flex flex-col bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-inner shrink-0"
+      : "h-[240px] flex flex-col bg-[var(--color-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-inner shrink-0";
+
+    const headerClass = isOverlay
+      ? "bg-white/5 px-4 py-2 border-b border-white/10 flex items-center justify-between cursor-pointer text-white"
+      : "bg-[var(--color-surface-container-high)] px-4 py-2 border-b border-[var(--border-subtle)] flex items-center justify-between cursor-pointer text-[var(--color-on-surface)]";
+
+    const titleClass = isOverlay
+      ? "text-xs font-bold uppercase tracking-wider text-white/70"
+      : "text-xs font-bold uppercase tracking-wider text-[var(--color-on-surface-variant)]";
+
+    const chatBg = isOverlay
+      ? "flex-1 overflow-y-auto p-3 space-y-3 bg-black/45"
+      : "flex-1 overflow-y-auto p-3 space-y-3 bg-[var(--color-surface)]/50";
+
+    const inputFormClass = isOverlay
+      ? "p-2 border-t border-white/10 bg-white/5 flex items-center gap-2"
+      : "p-2 border-t border-[var(--border-subtle)] bg-[var(--color-surface-container)] flex items-center gap-2";
+
+    const inputClass = isOverlay
+      ? "flex-1 bg-black/40 text-white placeholder-white/40 text-sm px-3 py-2 rounded-xl outline-none border border-white/10 focus:border-[var(--color-primary)] transition-all"
+      : "flex-1 bg-[var(--color-surface)] text-sm px-3 py-2 rounded-xl outline-none border border-[var(--border-subtle)] focus:border-[var(--color-primary)] transition-all";
+
+    const systemMsgClass = isOverlay
+      ? "text-[10px] px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded-full font-bold shadow-sm"
+      : "text-[10px] px-3 py-1 bg-yellow-500/10 text-yellow-600 rounded-full font-bold shadow-sm";
+
+    const userMsgClass = isOverlay
+      ? "bg-white/10 px-3 py-2 rounded-2xl rounded-tl-sm max-w-[90%] shadow-sm border border-white/5 text-white"
+      : "bg-[var(--color-surface-container-high)] px-3 py-2 rounded-2xl rounded-tl-sm max-w-[90%] shadow-sm border border-[var(--border-subtle)]";
+
+    const senderNameClass = isOverlay
+      ? "text-[9px] font-black text-white/50 mb-0.5"
+      : "text-[9px] font-black text-[var(--color-on-surface-variant)] mb-0.5";
+
+    return (
+      <div className={containerClass}>
+        <div 
+          className={headerClass}
+          onClick={() => {
+             setIsChatOpen(!isChatOpen);
+             if (!isChatOpen) setUnreadCount(0);
+          }}
+        >
+          <span className={titleClass}>Trò chuyện</span>
+          <div className="flex items-center gap-2">
+            {!isChatOpen && unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
+            )}
+            <span className="text-xs opacity-50">{isChatOpen ? '▼' : '▲'}</span>
+          </div>
+        </div>
+        
+        {isChatOpen && (
+          <>
+            <div ref={chatScrollRef} className={chatBg}>
+              {messages.length === 0 ? (
+                <div className={`text-center text-xs italic mt-4 ${isOverlay ? 'text-white/45' : 'text-[var(--color-on-surface-variant)]'}`}>Chưa có tin nhắn nào.</div>
+              ) : (
+                messages.map(msg => {
+                  const displayMessage = getDisplayMessage(msg.message);
+                  if (!displayMessage) return null;
+
+                  return (
+                    <div key={msg.id} className={`flex flex-col ${msg.type === 'SYSTEM' ? 'items-center' : 'items-start'}`}>
+                      {msg.type === 'SYSTEM' ? (
+                        <span className={systemMsgClass}>{displayMessage}</span>
+                      ) : (
+                        <div className={userMsgClass}>
+                          <div className={senderNameClass}>{msg.senderName || 'Unknown'}</div>
+                          <div className="text-sm leading-snug">{displayMessage}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <form onSubmit={handleSendChat} className={inputFormClass}>
+              <input 
+                type="text" 
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                placeholder="Nhập tin nhắn..."
+                maxLength={200}
+                className={inputClass}
+              />
+              <button 
+                type="submit" 
+                disabled={!chatInput.trim()}
+                className="p-2 bg-[var(--color-primary)] text-[var(--color-on-primary)] rounded-xl disabled:opacity-50 transition-all hover:bg-[var(--color-primary)]/90"
+              >
+                <ArrowRight size={16} />
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderLobby = () => {
+    return (
+      <div className="max-w-[1200px] mx-auto mt-6 px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
+          <div className="p-8 rounded-3xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-2xl relative">
+            {showTimeoutWarning && (
+              <div className="absolute inset-0 bg-[var(--color-surface-container)]/95 backdrop-blur-md rounded-3xl z-50 flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+                <div className="p-4 bg-yellow-500/10 text-yellow-500 rounded-full mb-4 animate-bounce">
+                  <Clock size={40} />
+                </div>
+                <h3 className="text-xl font-bold mb-2 text-yellow-500">Chờ hơi lâu rồi</h3>
+                <p className="text-sm text-[var(--color-on-surface-variant)] mb-6 max-w-sm">
+                  Bạn đã ở sảnh hơn 2 phút. Hãy nhắn partner chuẩn bị hoặc rời phòng nếu cần tạo phiên khác.
+                </p>
+                <div className="flex gap-4 w-full max-w-xs">
+                  <button onClick={() => { setReadyCheckStartTime(Date.now()); setShowTimeoutWarning(false); }} className="flex-1 py-3 bg-[var(--color-surface-container-high)] border border-[var(--border-subtle)] text-sm font-bold rounded-2xl hover:bg-[var(--color-surface-container-highest)] transition-all active:scale-95">
+                    Tiếp tục chờ
+                  </button>
+                  <button onClick={handleLeaveRoom} className="flex-1 py-3 bg-red-500 text-white text-sm font-bold rounded-2xl hover:bg-red-600 transition-all shadow-lg shadow-red-500/20 active:scale-95">
+                    Rời phòng
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6 pb-6 border-b border-[var(--border-subtle)]">
+              <div>
+                <h2 className="text-2xl font-black mb-1">Sảnh trao đổi trước phiên</h2>
+                <p className="text-sm text-[var(--color-on-surface-variant)] max-w-2xl">
+                  Cả hai đã vào phòng. Hãy thống nhất mục tiêu, chuẩn bị tài liệu và chỉ bấm xác nhận khi đã hiểu rằng camera AI sẽ bắt đầu sau bước này.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface-container-high)] border border-[var(--border-subtle)] rounded-2xl text-xs font-bold shrink-0">
+                <Users size={14} className="text-[var(--color-primary)]" />
+                <span>2/2 người tham gia</span>
+              </div>
+            </div>
+
+            <div className="mb-8 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 text-blue-500">
+              <div className="flex items-start gap-3">
+                <Info size={20} className="shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-black text-sm">Thông báo bắt đầu phiên</div>
+                  <p className="text-sm mt-1 leading-relaxed">Khi cả hai bấm “Tôi đã hiểu và sẵn sàng”, hệ thống mới đếm ngược và bật camera AI. Trước đó hai bạn có thể trao đổi thoải mái trong chat.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-8">
+              <h3 className="text-xs font-black uppercase tracking-widest text-[var(--color-on-surface-variant)] mb-4">Checklist gợi ý</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {["Thống nhất mục tiêu của phiên", "Chuẩn bị tài liệu học tập hoặc công việc", "Đặt điện thoại ở chế độ im lặng", "Kiểm tra ánh sáng và vị trí camera"].map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-3 rounded-2xl bg-[var(--color-surface)] border border-[var(--border-subtle)]">
+                    <div className="w-5 h-5 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</div>
+                    <span className="text-xs font-medium leading-relaxed">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6 mb-8 p-6 bg-[var(--color-surface)] rounded-2xl border border-[var(--border-subtle)]">
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-[var(--color-on-surface-variant)] mb-2">Mục tiêu phiên của bạn</label>
+                <input
+                  type="text"
+                  maxLength={100}
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--color-surface-container-high)] text-sm font-semibold outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)] transition-all"
+                  placeholder="Ví dụ: Hoàn thành US-31 hoặc học React 25 phút"
+                  value={localGoal}
+                  onFocus={() => {
+                    isGoalInputFocusedRef.current = true;
+                  }}
+                  onChange={(e) => setLocalGoal(e.target.value)}
+                  onBlur={() => {
+                    void handleUpdateGoal(localGoal).finally(() => {
+                      isGoalInputFocusedRef.current = false;
+                    });
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-[var(--color-on-surface-variant)] mb-2">Mục tiêu của {partnerName || "Partner"}</label>
+                <div className="px-4 py-3 rounded-xl bg-[var(--color-surface-container-high)] text-sm font-semibold text-[var(--color-on-surface-variant)] italic border border-[var(--border-subtle)]">{partnerGoal ? '"' + partnerGoal + '"' : "Partner chưa nhập mục tiêu."}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className={`p-4 rounded-2xl border text-center ${localReady ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-[var(--color-surface)] border-[var(--border-subtle)]'}`}>
+                <div className="text-[10px] font-black uppercase tracking-wider opacity-60">Bạn</div>
+                <div className="text-sm font-bold mt-1">{localReady ? "Đã xác nhận" : "Đang trao đổi"}</div>
+              </div>
+              <div className={`p-4 rounded-2xl border text-center ${partnerReady ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-[var(--color-surface)] border-[var(--border-subtle)]'}`}>
+                <div className="text-[10px] font-black uppercase tracking-wider opacity-60">{partnerName || "Partner"}</div>
+                <div className="text-sm font-bold mt-1">{partnerReady ? "Đã xác nhận" : "Đang trao đổi"}</div>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-4">
+              <button onClick={handleToggleReady} className={`w-full py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 shadow-xl ${localReady ? 'bg-amber-500 text-white shadow-amber-500/25 hover:opacity-90 active:scale-95' : 'bg-[var(--color-primary)] text-[var(--color-on-primary)] shadow-[var(--color-primary)]/25 hover:opacity-90 active:scale-95'}`}>
+                {localReady ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
+                {localReady ? "Đã xác nhận, đang chờ partner" : "Tôi đã hiểu và sẵn sàng"}
+              </button>
+              <div className="text-xs font-bold text-center">
+                {!localReady && !partnerReady && <span className="text-[var(--color-on-surface-variant)]">Hãy trao đổi mục tiêu trước. Camera AI chưa chạy ở bước này.</span>}
+                {localReady && !partnerReady && <span className="text-green-500">Bạn đã xác nhận. Đang chờ partner xác nhận đã hiểu...</span>}
+                {!localReady && partnerReady && <span className="text-amber-500 animate-pulse">Partner đã xác nhận. Hãy bấm xác nhận nếu bạn cũng đã chuẩn bị xong.</span>}
+                {localReady && partnerReady && <span className="text-green-500 animate-bounce">Cả hai đã xác nhận. Phiên sẽ bắt đầu sau ít giây...</span>}
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-[var(--border-subtle)] flex justify-end">
+              <button onClick={handleLeaveRoom} className="px-5 py-2.5 rounded-xl text-xs font-bold bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Rời phòng</button>
+            </div>
+          </div>
+
+          <div className="space-y-4 xl:sticky xl:top-4 self-start">
+            <div className="p-4 rounded-2xl bg-[var(--color-surface-container-high)] border border-[var(--border-subtle)] shadow">
+              <h3 className="text-xs font-black uppercase tracking-widest text-[var(--color-on-surface-variant)] mb-2">Thông tin phòng</h3>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between gap-3"><span className="opacity-60">Phòng:</span><span className="font-bold text-right">{title}</span></div>
+                <div className="flex justify-between"><span className="opacity-60">Chế độ:</span><span className="font-bold text-[var(--color-primary)]">{mode}</span></div>
+                <div className="flex justify-between"><span className="opacity-60">Thời lượng:</span><span className="font-bold">{duration} phút</span></div>
+              </div>
+            </div>
+            {renderChatBox(false)}
+          </div>
+        </div>
+      </div>
+    );
+  };
   const renderActive = () => (
-    <div className="max-w-6xl mx-auto mt-4 p-4 md:p-6">
+    <div className="max-w-[1360px] mx-auto mt-2 p-3 md:p-5">
       {countdown !== null ? (
         <div className="flex flex-col items-center justify-center h-[70vh]">
           <div className="relative">
@@ -604,32 +1694,60 @@ export function DisciplineRoomPage() {
           <h2 className="text-3xl font-bold text-[var(--color-on-surface-variant)] mt-8 animate-bounce">Tập trung nào!</h2>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-3 space-y-6">
+        <div className={`grid grid-cols-1 gap-5 ${isMaximized ? '' : 'xl:grid-cols-[minmax(0,1fr)_320px]'}`}>
+          <div className={`${isMaximized ? 'w-full' : ''} space-y-4`}>
             {/* Header Card */}
-            <div className="p-6 rounded-3xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-[var(--color-primary-container)] rounded-2xl">
-                  <Target size={32} className="text-[var(--color-primary)]" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">{title}</h2>
-                  <div className="flex gap-2 mt-1">
-                    <span className="text-xs px-2 py-0.5 bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-bold rounded-md uppercase tracking-wider">{mode}</span>
-                    <span className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-500 font-bold rounded-md uppercase tracking-wider">AI Coach Active</span>
+            {!isMaximized && (
+              <div className="p-4 md:p-5 rounded-2xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-[var(--color-primary-container)] rounded-2xl">
+                    <Target size={28} className="text-[var(--color-primary)]" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold">{title}</h2>
+                    <div className="flex gap-2 mt-1">
+                      <span className="text-xs px-2 py-0.5 bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-bold rounded-md uppercase tracking-wider">{mode}</span>
+                      <span className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-500 font-bold rounded-md uppercase tracking-wider">AI đang theo dõi</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex flex-col items-end">
-                <div className="text-6xl font-mono font-black tracking-tighter text-[var(--color-primary)]">
-                  {formatTime(timeLeft)}
+                <div className="flex flex-col items-end">
+                  <div className="text-4xl md:text-5xl font-mono font-black tracking-tighter text-[var(--color-primary)]">
+                    {formatTime(timeLeft)}
+                  </div>
+                  <span className="text-[10px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1 mr-1">Thời gian còn lại</span>
                 </div>
-                <span className="text-[10px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1 mr-1">Time Remaining</span>
               </div>
-            </div>
+            )}
+
+            {!isMaximized && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--color-surface-container)] p-4">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-[var(--color-on-surface-variant)]">Trạng thái</div>
+                  <div className="mt-1 text-sm font-black text-[var(--color-primary)]">{getStatusLabel(cameraStatus)}</div>
+                </div>
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--color-surface-container)] p-4">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-[var(--color-on-surface-variant)]">Tập trung</div>
+                  <div className="mt-1 text-2xl font-black">{focusScore}%</div>
+                </div>
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--color-surface-container)] p-4">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-[var(--color-on-surface-variant)]">Partner</div>
+                  <div className="mt-1 text-sm font-black">{partnerFrame ? getStatusLabel(partnerStatus) : "Đang chờ"}</div>
+                </div>
+                <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--color-surface-container)] p-4">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-[var(--color-on-surface-variant)]">Cảnh báo</div>
+                  <div className="mt-1 text-2xl font-black text-red-500">{awayCount + lookingAwayCount + headDownCount}</div>
+                </div>
+              </div>
+            )}
 
             {/* Camera View */}
-            <div className="relative rounded-[2.5rem] overflow-hidden bg-black aspect-video border-4 border-[var(--border-subtle)] shadow-2xl flex items-center justify-center">
+            <div className={`overflow-hidden bg-black transition-all duration-300 flex items-center justify-center
+              ${isMaximized 
+                ? 'fixed inset-0 z-[100] w-screen h-screen rounded-none border-none' 
+                : 'relative rounded-3xl aspect-video border-2 border-[var(--border-subtle)] shadow-xl'
+              }`}
+            >
               <video
                 ref={videoRef}
                 autoPlay
@@ -637,6 +1755,127 @@ export function DisciplineRoomPage() {
                 muted
                 className={`w-full h-full object-cover scale-x-[-1] ${cameraError ? 'hidden' : 'block'}`}
               />
+
+              {/* Maximize toggle button when NOT maximized */}
+              {!isMaximized && (
+                <button
+                  onClick={() => {
+                    setIsMaximized(true);
+                    setIsSidebarOpen(true);
+                  }}
+                  className="absolute top-6 right-6 z-50 p-2.5 bg-black/50 hover:bg-black/75 backdrop-blur-md border border-white/10 text-white rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center"
+                  title="Phóng to màn hình"
+                >
+                  <Maximize2 size={18} />
+                </button>
+              )}
+
+              {/* Timer & Room Title Overlay when Maximized */}
+              {isMaximized && (
+                <div className="absolute top-6 left-6 z-50 flex items-center gap-4 bg-black/60 backdrop-blur-md px-5 py-2.5 rounded-3xl border border-white/20 text-white shadow-2xl animate-fade-in">
+                  <div className="p-2 bg-[var(--color-primary)]/20 rounded-xl">
+                    <Target size={18} className="text-[var(--color-primary)]" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold text-xs truncate max-w-[120px]">{title}</div>
+                    <div className="text-[9px] opacity-65 font-bold uppercase tracking-wider">{mode}</div>
+                  </div>
+                  <div className="h-6 w-[1px] bg-white/20"></div>
+                  <div className="text-2xl font-mono font-black text-[var(--color-primary)]">
+                    {formatTime(timeLeft)}
+                  </div>
+                  <div className="h-6 w-[1px] bg-white/20"></div>
+                  <button
+                    onClick={() => setIsMaximized(false)}
+                    className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-white/80 hover:text-white flex items-center justify-center cursor-pointer"
+                    title="Thu nhỏ"
+                  >
+                    <Minimize2 size={16} />
+                  </button>
+                </div>
+              )}
+
+              {/* Sidebar toggle tab when maximized and sidebar is closed */}
+              {isMaximized && !isSidebarOpen && (
+                <button
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-[55] p-3 bg-black/60 hover:bg-black/80 backdrop-blur-md border-y border-l border-white/20 text-white rounded-l-2xl transition-all shadow-2xl flex items-center justify-center animate-pulse"
+                  title="Mở thanh thông số"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              )}
+
+              {/* Maximized Overlay Sidebar */}
+              {isMaximized && (
+                <div 
+                  className={`absolute right-4 top-4 bottom-4 w-[360px] z-50 flex flex-col gap-4 overflow-y-auto p-4 rounded-3xl bg-black/70 border border-white/10 text-white backdrop-blur-md transition-all duration-300 shadow-2xl custom-scrollbar
+                    ${isSidebarOpen ? 'translate-x-0 opacity-100' : 'translate-x-[400px] opacity-0 pointer-events-none'}`}
+                >
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-xs font-black uppercase tracking-[0.2em] text-white/60">Bảng điều khiển</span>
+                    <button
+                      onClick={() => setIsSidebarOpen(false)}
+                      className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-white/60 hover:text-white flex items-center justify-center cursor-pointer"
+                      title="Thu gọn"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                  <div className="flex-1 space-y-4 overflow-y-auto pr-1 custom-scrollbar">
+                    {renderChatBox(true)}
+                    {renderAICoachStats(true)}
+                    {renderPartnerStats(true)}
+                  </div>
+                  <button
+                    onClick={handleEndSession}
+                    disabled={isActionLoading}
+                    className="w-full py-3.5 rounded-2xl font-black text-sm bg-red-500/20 hover:bg-red-500 text-red-200 hover:text-white border border-red-500/30 hover:border-red-500 transition-all shadow-lg active:scale-95"
+                  >
+                    {isActionLoading ? <Loader2 size={18} className="animate-spin mx-auto" /> : "Kết thúc sớm"}
+                  </button>
+                </div>
+              )}
+
+              {/* Smart Alert Notification */}
+              {activeAlert && (
+                <div className={`absolute ${isMaximized ? 'top-28' : 'top-20'} left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-bounce border-2 backdrop-blur-md
+                  ${activeAlert.severity === 'strong' ? 'bg-red-500/90 text-white border-red-400' : 'bg-yellow-500/90 text-black border-yellow-400'}`}
+                >
+                  <Zap size={24} className={activeAlert.severity === 'strong' ? 'text-white' : 'text-black'} />
+                  <span className="font-bold">{activeAlert.message}</span>
+                </div>
+              )}
+
+              {/* Manual Checkpoint Overlay */}
+              {checkpoint && (
+                <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+                  <div className="bg-[var(--color-surface)] p-8 rounded-[2.5rem] border-2 border-[var(--color-primary)] shadow-2xl max-w-sm w-full text-center">
+                    <div className="w-16 h-16 bg-[var(--color-primary-container)] rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Brain size={32} className="text-[var(--color-primary)]" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-6">{checkpoint.question}</h3>
+                    <div className="grid grid-cols-1 gap-3">
+                      {checkpoint.options.map((opt) => (
+                        <button
+                          key={opt}
+                          onClick={() => {
+                            addTimelineEvent("Manual Checkpoint", `User selected: ${opt}`);
+                            manualCheckpointCountRef.current++;
+                            if (opt === "Đang học bài" || opt === "Đang đọc sách" || opt === "Đang tập trung") {
+                              checkpointBypassTimerRef.current = Date.now() + 180000; // 3 min bypass
+                            }
+                            setCheckpoint(null);
+                          }}
+                          className="py-3 px-4 bg-[var(--color-surface-container-high)] hover:bg-[var(--color-primary)] hover:text-[var(--color-on-primary)] rounded-2xl font-bold transition-all"
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {isCameraLoading && (
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black">
@@ -650,33 +1889,51 @@ export function DisciplineRoomPage() {
                   <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mb-6">
                     <CameraOff size={40} className="text-red-500" />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Lỗi Camera</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">Lỗi camera</h3>
                   <p className="text-white/60 text-sm mb-6">{cameraError}</p>
                   <button onClick={startTracking} className="px-6 py-2 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors">Thử lại</button>
                 </div>
               )}
 
               {/* Status HUD */}
-              <div className="absolute top-6 left-6 flex flex-col gap-3">
-                <div className={`px-5 py-2 rounded-2xl text-sm font-black backdrop-blur-xl flex items-center gap-3 border-2 transition-all duration-300
+              <div className={`absolute ${isMaximized ? 'top-28 left-6' : 'top-6 left-6'} flex flex-col gap-3 z-50 transition-all duration-300`}>
+                <div className={`px-5 py-2 rounded-2xl text-sm font-black backdrop-blur-xl flex flex-col gap-1 border-2 transition-all duration-300
                   ${cameraStatus === 'Focused' ? 'bg-green-500/20 text-green-400 border-green-500/40 shadow-lg shadow-green-500/20' :
+                    cameraStatus === 'Reading/Writing' ? 'bg-blue-500/20 text-blue-400 border-blue-500/40 shadow-lg shadow-blue-500/20' :
                     cameraStatus === 'Away' ? 'bg-red-500/40 text-red-200 border-red-500/60 shadow-2xl shadow-red-500/40 scale-110' :
+                    cameraStatus === 'Looking Away' || cameraStatus === 'Head Down' ? 'bg-yellow-500/30 text-yellow-200 border-yellow-500/60 shadow-xl' :
                     cameraStatus === 'Detecting' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40' :
+                    cameraStatus === 'Low Confidence' ? 'bg-orange-500/20 text-orange-400 border-orange-500/40' :
                     'bg-gray-500/20 text-gray-400 border-gray-500/40'}`}
                 >
-                  <div className={`w-3 h-3 rounded-full ${cameraStatus === 'Focused' ? 'bg-green-400' : cameraStatus === 'Away' ? 'bg-red-400' : cameraStatus === 'Detecting' ? 'bg-yellow-400' : 'bg-gray-400'} animate-pulse`}></div>
-                  <span className="uppercase tracking-widest">{cameraStatus}</span>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${
+                      cameraStatus === 'Focused' || cameraStatus === 'Reading/Writing' ? 'bg-green-400' : 
+                      cameraStatus === 'Away' ? 'bg-red-400' : 
+                      cameraStatus === 'Detecting' || cameraStatus === 'Looking Away' || cameraStatus === 'Head Down' ? 'bg-yellow-400' : 
+                      cameraStatus === 'Low Confidence' ? 'bg-orange-400' :
+                      'bg-gray-400'} animate-pulse`}></div>
+                    <span className="uppercase tracking-widest">{getStatusLabel(cameraStatus)}</span>
+                  </div>
+                  {cameraStatus === 'Reading/Writing' && <span className="text-[10px] opacity-80 font-medium">Đang đọc hoặc ghi chép hợp lệ</span>}
+                  {cameraStatus === 'Low Confidence' && <span className="text-[10px] opacity-80 font-medium">Hãy điều chỉnh ánh sáng</span>}
                 </div>
 
                 {cameraStatus === 'Away' && (
-                  <div className="bg-red-500 text-white px-4 py-1.5 rounded-xl text-xs font-bold animate-bounce shadow-xl">
-                    ⚠️ HÃY QUAY LẠI LÀM VIỆC!
-                  </div>
+                  <div className="bg-red-500 text-white px-4 py-1.5 rounded-xl text-xs font-bold animate-bounce shadow-xl">Hãy quay lại làm việc</div>
+                )}
+                {(cameraStatus === 'Looking Away' || cameraStatus === 'Head Down') && (
+                  <div className="bg-yellow-500 text-black px-4 py-1.5 rounded-xl text-xs font-bold animate-pulse shadow-xl">Hãy tập trung lại nào</div>
                 )}
               </div>
 
               {/* Partner mini overlay */}
-              <div className="absolute bottom-6 right-6 w-32 md:w-48 aspect-video bg-black/40 backdrop-blur-md rounded-2xl border border-white/20 overflow-hidden shadow-2xl">
+              <div className={`absolute bottom-6 aspect-video bg-black/40 backdrop-blur-md rounded-2xl border border-white/20 overflow-hidden shadow-2xl transition-all duration-300
+                ${isMaximized 
+                  ? (isSidebarOpen ? 'right-[392px] w-48' : 'right-6 w-48') 
+                  : 'right-6 w-32 md:w-48'
+                }`}
+              >
                  {partnerFrame ? (
                    <img src={partnerFrame} alt="Partner camera" className="h-full w-full object-cover scale-x-[-1]" />
                  ) : (
@@ -685,109 +1942,87 @@ export function DisciplineRoomPage() {
                      <span className="px-2 text-center text-[9px] font-bold uppercase leading-tight">Đang chờ camera partner</span>
                    </div>
                  )}
-                 <div className="absolute bottom-2 left-2 flex items-center gap-1">
-                   <div className={`w-2 h-2 rounded-full animate-pulse ${partnerStatus === "Camera Off" ? "bg-gray-400" : partnerStatus === "Away" ? "bg-red-500" : "bg-green-500"}`}></div>
-                   <span className="text-[10px] font-bold text-white uppercase tracking-tighter">
-                     {partnerStatus === "Camera Off" ? "Partner Offline" : partnerStatus === "Away" ? "Partner Away" : "Partner Focused"}
-                   </span>
+                 <div className="absolute bottom-2 left-2 flex flex-col gap-0.5">
+                   <div className="flex items-center gap-1">
+                     <div className={`w-2 h-2 rounded-full animate-pulse ${
+                       partnerStatus === "Camera Off" ? "bg-gray-400" : 
+                       partnerStatus === "Away" ? "bg-red-500" : 
+                       partnerStatus === "Focused" || partnerStatus === "Reading/Writing" ? "bg-green-500" : "bg-yellow-500"}`}></div>
+                     <span className="text-[10px] font-bold text-white uppercase tracking-tighter">
+                        {getStatusLabel(partnerStatus)}
+                     </span>
+                   </div>
+                   {partnerStatus !== "Camera Off" && (
+                     <div className="flex items-center gap-1">
+                       <span className="text-[8px] font-black text-white/60 uppercase">Tập trung:</span>
+                       <span className={`text-[9px] font-black ${partnerFocusScore >= 80 ? "text-green-400" : partnerFocusScore >= 50 ? "text-yellow-400" : "text-red-400"}`}>{partnerFocusScore}%</span>
+                     </div>
+                   )}
                  </div>
               </div>
             </div>
 
-            <div className="flex items-start gap-4 p-5 bg-blue-500/10 text-blue-400 rounded-3xl border border-blue-500/20 text-sm shadow-inner">
-              <div className="p-2 bg-blue-500/20 rounded-xl">
-                <Info size={20} className="shrink-0" />
+            {!isMaximized && (
+              <div className="flex items-start gap-4 p-5 bg-blue-500/10 text-blue-400 rounded-3xl border border-blue-500/20 text-sm shadow-inner">
+                <div className="p-2 bg-blue-500/20 rounded-xl">
+                  <Info size={20} className="shrink-0" />
+                </div>
+                <p className="leading-relaxed font-medium">Camera AI chỉ xử lý dữ liệu tại chỗ để nhắc bạn tập trung. Không có video nào được ghi lại hoặc gửi đi.</p>
               </div>
-              <p className="leading-relaxed font-medium">Camera AI chỉ xử lý dữ liệu tại chỗ để nhắc nhở bạn tập trung. Không có video nào được ghi lại hoặc gửi đi.</p>
-            </div>
+            )}
           </div>
 
-          <div className="space-y-6">
-            {/* Stats Sidebar */}
-            <div className="p-6 rounded-[2rem] bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-xl">
-              <h3 className="font-black text-xs text-[var(--color-on-surface-variant)] mb-6 uppercase tracking-[0.2em]">AI Coach Intelligence</h3>
-
-              <div className="space-y-8">
-                <div className="relative">
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-sm font-bold opacity-80 uppercase tracking-wider">Focus Score</span>
-                    <span className="text-3xl font-black text-[var(--color-primary)]">{focusScore}%</span>
-                  </div>
-                  <div className="w-full h-4 bg-[var(--color-surface-container-high)] rounded-full overflow-hidden p-1 shadow-inner">
-                    <div className="h-full bg-gradient-to-r from-[var(--color-primary)] to-blue-400 rounded-full transition-all duration-1000 ease-out" style={{ width: `${focusScore}%` }}></div>
-                  </div>
-                  {focusScore < 70 && <p className="text-[10px] text-red-400 font-bold mt-2 animate-pulse">Mức độ tập trung đang thấp!</p>}
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-sm font-bold opacity-80 uppercase tracking-wider">Presence</span>
-                    <span className="text-2xl font-black text-blue-400">{presenceScore}%</span>
-                  </div>
-                  <div className="w-full h-2.5 bg-[var(--color-surface-container-high)] rounded-full overflow-hidden shadow-inner">
-                    <div className="h-full bg-blue-400 transition-all duration-1000" style={{ width: `${presenceScore}%` }}></div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center p-4 bg-red-500/5 rounded-2xl border border-red-500/10 transition-all">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-red-400 uppercase tracking-widest">Lần rời đi</span>
-                    <span className="text-xs text-[var(--color-on-surface-variant)] font-medium mt-0.5">Away count</span>
-                  </div>
-                  <span className={`text-4xl font-black ${awayCount > 0 ? 'text-red-500' : 'text-gray-400'}`}>{awayCount}</span>
-                </div>
-              </div>
+          {!isMaximized && (
+            <div className="space-y-4 xl:sticky xl:top-4 self-start">
+              {renderChatBox(false)}
+              {renderAICoachStats(false)}
+              {renderPartnerStats(false)}
+              <button
+                onClick={handleEndSession}
+                disabled={isActionLoading}
+                className="w-full py-3 rounded-2xl font-black text-sm bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 hover:border-red-500 transition-all shadow-lg shadow-red-500/5 active:scale-95"
+              >
+                {isActionLoading ? <Loader2 size={24} className="animate-spin" /> : "Kết thúc sớm"}
+              </button>
             </div>
-
-            {/* Partner Sidebar */}
-            <div className="p-6 rounded-[2rem] bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-xl">
-              <h3 className="font-black text-xs text-[var(--color-on-surface-variant)] mb-4 uppercase tracking-[0.2em]">Partner Room</h3>
-              <div className="flex items-center gap-4 p-3 bg-[var(--color-surface)] rounded-2xl border border-[var(--border-subtle)]">
-                <div className="w-14 h-14 overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-white text-xl shadow-lg shadow-blue-500/20">
-                  {partnerFrame ? (
-                    <img src={partnerFrame} alt="Partner preview" className="h-full w-full object-cover scale-x-[-1]" />
-                  ) : (
-                    "P"
-                  )}
-                </div>
-                <div className="overflow-hidden">
-                  <div className="font-bold truncate text-lg">Partner</div>
-                  <div className={`text-[10px] font-black flex items-center gap-1 uppercase tracking-tighter ${partnerStatus === "Camera Off" ? "text-gray-500" : partnerStatus === "Away" ? "text-red-500" : "text-green-500"}`}>
-                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${partnerStatus === "Camera Off" ? "bg-gray-500" : partnerStatus === "Away" ? "bg-red-500" : "bg-green-500"}`}></div>
-                    {partnerFrame ? partnerStatus : "Waiting for camera"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleEndSession}
-              disabled={isActionLoading}
-              className="w-full py-4 rounded-2xl font-black text-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border-2 border-red-500/20 hover:border-red-500 transition-all shadow-lg shadow-red-500/5 active:scale-95"
-            >
-              {isActionLoading ? <Loader2 size={24} className="animate-spin" /> : "Kết thúc sớm"}
-            </button>
-          </div>
+          )}
         </div>
       )}
     </div>
   );
 
   const renderReport = () => {
-    const report = serverReport || {
+    const report: SessionReport = serverReport || {
       xp_earned: 30,
       focus_score: focusScore,
       presence_score: presenceScore,
+      attention_score: attentionScore,
       away_count: awayCount,
-      duration_seconds: duration * 60 - timeLeft,
-      ai_insight: "Dữ liệu báo cáo local (Server fallback)."
+      looking_away_count: lookingAwayCount,
+      head_down_count: headDownCount,
+      duration_seconds: totalSeconds,
+      ai_insight: "Dữ liệu báo cáo local (Server fallback).",
+      ai_confidence: aiConfidence,
+      reading_writing_time: totalReadingWritingSecondsRef.current,
+      total_away_time: totalAwaySecondsRef.current,
+      metadata: {
+        timeline: timelineEventsRef.current,
+        total_focused_time: totalFocusedSecondsRef.current,
+        total_reading_writing_time: totalReadingWritingSecondsRef.current,
+        total_looking_away_time: totalLookingAwaySecondsRef.current,
+        total_head_down_time: totalHeadDownSecondsRef.current,
+        total_away_time: totalAwaySecondsRef.current,
+        low_confidence_time: lowConfidenceSecondsRef.current,
+        manual_checkpoint_count: manualCheckpointCountRef.current,
+        mode: modeRef.current
+      }
     };
 
     const timeSpent = report.duration_seconds;
     const sessionDurationText = `${Math.floor(timeSpent / 60)} phút ${(timeSpent % 60).toString().padStart(2, '0')} giây`;
 
     return (
-      <div className="max-w-2xl mx-auto mt-6 md:mt-10 p-8 md:p-10 rounded-[3rem] bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-2xl shadow-black/20">
+      <div className="max-w-4xl mx-auto mt-6 md:mt-10 p-8 md:p-10 rounded-[3rem] bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-2xl shadow-black/20 overflow-y-auto max-h-[90vh]">
         <div className="text-center mb-10">
           <div className="relative inline-flex mb-6">
             <div className="absolute inset-0 bg-[var(--color-primary)] rounded-3xl blur-2xl opacity-30 animate-pulse"></div>
@@ -796,40 +2031,63 @@ export function DisciplineRoomPage() {
             </div>
           </div>
           <h2 className="text-4xl font-black mb-2 tracking-tight">Session Complete!</h2>
-          <p className="text-[var(--color-on-surface-variant)] font-medium text-lg">{title}</p>
+          <p className="text-[var(--color-on-surface-variant)] font-medium text-lg">{title} ({report.metadata?.mode})</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <div className="p-6 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center shadow-sm">
-            <div className="p-3 bg-gray-500/10 rounded-2xl mb-3">
-              <Clock size={28} className="text-[var(--color-on-surface-variant)]" />
-            </div>
-            <span className="text-3xl font-black tracking-tighter">{sessionDurationText}</span>
-            <span className="text-[10px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-2">Duration</span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="p-4 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
+            <span className="text-2xl font-black tracking-tighter">{sessionDurationText}</span>
+            <span className="text-[8px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1">Duration</span>
           </div>
-          <div className="p-6 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center shadow-sm">
-            <div className="p-3 bg-yellow-500/10 rounded-2xl mb-3">
-              <Zap size={28} className="text-yellow-500" />
-            </div>
-            <span className="text-3xl font-black text-yellow-500 tracking-tighter">+{report.xp_earned} XP</span>
-            <span className="text-[10px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-2">Exp Earned</span>
+          <div className="p-4 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
+            <span className="text-2xl font-black text-yellow-500 tracking-tighter">+{report.xp_earned} XP</span>
+            <span className="text-[8px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1">Exp Earned</span>
           </div>
-          <div className="p-6 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center shadow-sm">
-            <div className="p-3 bg-[var(--color-primary)]/10 rounded-2xl mb-3">
-              <Target size={28} className="text-[var(--color-primary)]" />
-            </div>
-            <span className="text-4xl font-black text-[var(--color-primary)] tracking-tighter">{report.focus_score}%</span>
-            <span className="text-[10px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-2">Avg Focus Score</span>
+          <div className="p-4 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
+            <span className="text-2xl font-black text-[var(--color-primary)] tracking-tighter">{report.focus_score}%</span>
+            <span className="text-[8px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1">Focus Score</span>
           </div>
-          <div className="p-6 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center shadow-sm">
-            <div className="p-3 bg-red-500/10 rounded-2xl mb-3">
-              <Users size={28} className="text-red-400" />
-            </div>
-            <span className="text-4xl font-black text-red-400 tracking-tighter">{report.away_count}</span>
-            <span className="text-[10px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-2">Times Away</span>
+          <div className="p-4 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
+            <span className="text-2xl font-black text-green-500 tracking-tighter">{report.attention_score}%</span>
+            <span className="text-[8px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1">Attention</span>
           </div>
         </div>
 
+        {/* Duration Breakdown */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+          <div className="space-y-4">
+            <h4 className="font-black uppercase tracking-widest text-xs text-[var(--color-on-surface-variant)]">Time Breakdown</h4>
+            <div className="space-y-3">
+              {[
+                { label: 'Focused', value: report.metadata?.total_focused_time || 0, color: 'bg-green-500' },
+                { label: 'Reading/Writing', value: report.metadata?.total_reading_writing_time || 0, color: 'bg-blue-500' },
+                { label: 'Looking Away', value: report.metadata?.total_looking_away_time || 0, color: 'bg-yellow-500' },
+                { label: 'Head Down', value: report.metadata?.total_head_down_time || 0, color: 'bg-orange-500' },
+                { label: 'Away', value: report.metadata?.total_away_time || 0, color: 'bg-red-500' },
+              ].map(item => (
+                <div key={item.label}>
+                  <div className="flex justify-between text-[10px] font-bold uppercase mb-1">
+                    <span>{item.label}</span>
+                    <span>{item.value}s</span>
+                  </div>
+                  <div className="w-full h-2 bg-[var(--color-surface-container-high)] rounded-full overflow-hidden">
+                    <div className={`h-full ${item.color}`} style={{ width: `${(item.value / timeSpent) * 100}%` }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] shadow-inner">
+             <h4 className="font-black uppercase tracking-widest text-xs mb-4 text-[var(--color-on-surface-variant)]">Checkpoints</h4>
+             <div className="flex items-center justify-center h-32 flex-col gap-2">
+                <span className="text-5xl font-black text-[var(--color-primary)]">{report.metadata?.manual_checkpoint_count || 0}</span>
+                <span className="text-[10px] font-bold uppercase opacity-60">Xác nhận thủ công</span>
+             </div>
+          </div>
+        </div>
+
+        {/* AI Insight */}
         <div className="p-8 rounded-[2rem] border bg-[var(--color-primary-container)]/30 border-[var(--color-primary)]/20 mb-10 shadow-inner">
           <div className="flex items-start gap-4">
             <div className="p-3 rounded-2xl bg-[var(--color-primary-container)]/50">
@@ -841,6 +2099,37 @@ export function DisciplineRoomPage() {
             </div>
           </div>
         </div>
+
+        {/* Timeline Section */}
+        <div className="mb-10">
+          <h4 className="font-black uppercase tracking-widest text-xs mb-4 text-[var(--color-on-surface-variant)]">Session Timeline</h4>
+          <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+            {report.metadata?.timeline.map((ev, idx) => (
+              <div key={idx} className="flex items-center gap-4 p-3 bg-[var(--color-surface)] border border-[var(--border-subtle)] rounded-2xl">
+                <div className="text-[10px] font-mono opacity-50 w-12">
+                  {ev.startTime ? new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "--:--:--"}
+                </div>
+                <div className={`w-2 h-2 rounded-full ${
+                  ev.type === 'Focused' ? 'bg-green-500' :
+                  ev.type === 'Reading/Writing' ? 'bg-blue-500' :
+                  ev.type === 'Away' ? 'bg-red-500' :
+                  ev.type === 'Manual Checkpoint' ? 'bg-purple-500' : 'bg-yellow-500'
+                }`}></div>
+                <div className="flex-1">
+                  <div className="text-sm font-bold">{ev.type}</div>
+                  {ev.note && <div className="text-[10px] opacity-70 italic">{ev.note}</div>}
+                </div>
+                {ev.durationSeconds !== undefined && <div className="text-[10px] font-bold opacity-60">{ev.durationSeconds}s</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <style>{`
+          .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 10px; }
+        `}</style>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button
@@ -863,11 +2152,19 @@ export function DisciplineRoomPage() {
   return (
     <div className="min-h-screen bg-[var(--color-surface)] text-[var(--color-on-surface)] pb-20">
       <div className="max-w-7xl mx-auto px-4 py-8 md:p-6">
-        {phase === "CREATE" && renderCreate()}
+        {phase === "CREATE" && (
+          <>
+            {renderCreate()}
+            {renderWaitingRoomList()}
+          </>
+        )}
         {phase === "WAITING" && renderWaiting()}
+        {phase === "LOBBY" && renderLobby()}
         {phase === "ACTIVE" && renderActive()}
         {phase === "REPORT" && renderReport()}
       </div>
     </div>
   );
 }
+
+

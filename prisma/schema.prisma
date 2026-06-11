@@ -37,6 +37,7 @@ model User {
   created_discipline_rooms DisciplineRoom[] @relation("RoomCreator")
   room_memberships         RoomParticipant[]
   session_reports          SessionReport[]
+  room_messages            RoomMessage[]
 }
 
 model DisciplineRoom {
@@ -44,8 +45,10 @@ model DisciplineRoom {
   title            String
   mode             String            // STUDY, DEEP_WORK
   duration_minutes Int               @default(15)
-  status           String            @default("WAITING") // WAITING, ACTIVE, COMPLETED, CANCELLED
+  status           String            @default("WAITING_PARTNER") // WAITING_PARTNER, LOBBY, START_CONFIRM, ACTIVE, COMPLETED, CANCELLED
   invite_code      String            @unique
+  is_public        Boolean           @default(false)
+  expires_at       DateTime?
   creator_id       String
   creator          User              @relation("RoomCreator", fields: [creator_id], references: [id], onDelete: Cascade)
   started_at       DateTime?
@@ -54,6 +57,7 @@ model DisciplineRoom {
   updated_at       DateTime          @updatedAt
   participants     RoomParticipant[]
   reports          SessionReport[]
+  messages         RoomMessage[]
 
   @@index([creator_id])
 }
@@ -69,6 +73,9 @@ model RoomParticipant {
   left_at           DateTime?
   final_focus_score Int?
   xp_earned         Int?
+  goal              String?        // Session goal (100 characters max)
+  is_ready          Boolean        @default(false)
+  ready_at          DateTime?
 
   @@unique([room_id, user_id])
   @@index([room_id])
@@ -84,9 +91,16 @@ model SessionReport {
   duration_seconds Int
   presence_score   Int
   focus_score      Int
+  attention_score  Int?
   away_count       Int
+  looking_away_count Int?
+  head_down_count  Int?
+  reading_writing_time Int?
+  total_away_time  Int?
+  ai_confidence    Int?
   xp_earned        Int
   ai_insight       String?
+  metadata         Json?          // Stores event timeline, checkpoints, etc.
   created_at       DateTime       @default(now())
 
   @@index([room_id])
@@ -264,5 +278,21 @@ model GroupChatNotificationLog {
   created_at DateTime @default(now())
 
   @@index([user_id, created_at])
+}
+
+model RoomMessage {
+  id        String   @id @default(uuid())
+  room_id   String
+  sender_id String?
+  type      String   // USER, SYSTEM
+  event_type String?
+  message   String
+  created_at DateTime @default(now())
+
+  room      DisciplineRoom @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  sender    User?          @relation(fields: [sender_id], references: [id], onDelete: SetNull)
+
+  @@index([room_id, created_at])
+  @@index([sender_id])
 }
 

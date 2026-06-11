@@ -96,6 +96,7 @@ function mapDisciplineRoom(r: any) {
     ...r,
     started_at: r.started_at ? r.started_at.toISOString() : null,
     ended_at: r.ended_at ? r.ended_at.toISOString() : null,
+    expires_at: r.expires_at ? r.expires_at.toISOString() : null,
     created_at: r.created_at.toISOString(),
     updated_at: r.updated_at.toISOString(),
     participants: r.participants ? r.participants.map(mapRoomParticipant) : [],
@@ -108,6 +109,7 @@ function mapRoomParticipant(p: any) {
     ...p,
     joined_at: p.joined_at.toISOString(),
     left_at: p.left_at ? p.left_at.toISOString() : null,
+    ready_at: p.ready_at ? p.ready_at.toISOString() : null,
     user: p.user ? {
       id: p.user.id,
       name: p.user.name,
@@ -121,6 +123,7 @@ function mapSessionReport(r: any) {
   return {
     ...r,
     created_at: r.created_at.toISOString(),
+    metadata: r.metadata ? (typeof r.metadata === 'string' ? JSON.parse(r.metadata) : r.metadata) : null,
   };
 }
 
@@ -817,11 +820,51 @@ class PrismaDB {
       });
       return mapDisciplineRoom(room);
     },
-    create: async (data: { title: string; mode: string; duration_minutes: number; invite_code: string; creator_id: string; status: string }) => {
-      const created = await prisma.disciplineRoom.create({ data });
+    findWaitingPublic: async () => {
+      const now = new Date();
+      const rooms = await prisma.disciplineRoom.findMany({
+        where: {
+          status: "WAITING_PARTNER",
+          is_public: true,
+          OR: [
+            { expires_at: null },
+            { expires_at: { gt: now } }
+          ]
+        },
+        include: { 
+          participants: { include: { user: true } },
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              level: true,
+              total_xp: true
+            }
+          }
+        },
+        orderBy: { created_at: "desc" }
+      });
+      return rooms.map(mapDisciplineRoom);
+    },
+    create: async (data: { 
+      title: string; 
+      mode: string; 
+      duration_minutes: number; 
+      invite_code: string; 
+      creator_id: string; 
+      status: string;
+      is_public?: boolean;
+      expires_at?: string | null;
+    }) => {
+      const prismaData: any = { ...data };
+      if (data.expires_at) prismaData.expires_at = new Date(data.expires_at);
+      const created = await prisma.disciplineRoom.create({
+        data: prismaData,
+        include: { participants: { include: { user: true } } }
+      });
       return mapDisciplineRoom(created);
     },
-    update: async (id: string, data: { status?: string; started_at?: string; ended_at?: string }) => {
+    update: async (id: string, data: { status?: string; started_at?: string; ended_at?: string; is_public?: boolean }) => {
       const prismaData: any = { ...data };
       if (data.started_at) prismaData.started_at = new Date(data.started_at);
       if (data.ended_at) prismaData.ended_at = new Date(data.ended_at);
@@ -845,19 +888,83 @@ class PrismaDB {
       const created = await prisma.roomParticipant.create({ data });
       return mapRoomParticipant(created);
     },
-    updateByRoomAndUser: async (roomId: string, userId: string, data: { left_at?: string; final_focus_score?: number; xp_earned?: number }) => {
+    updateByRoomAndUser: async (
+      roomId: string, 
+      userId: string, 
+      data: { 
+        left_at?: string; 
+        final_focus_score?: number; 
+        xp_earned?: number; 
+        goal?: string | null; 
+        is_ready?: boolean;
+        ready_at?: string | null;
+      }
+    ) => {
       const prismaData: any = { ...data };
       if (data.left_at) prismaData.left_at = new Date(data.left_at);
+      if (data.ready_at) prismaData.ready_at = new Date(data.ready_at);
       const updated = await prisma.roomParticipant.update({
         where: { room_id_user_id: { room_id: roomId, user_id: userId } },
         data: prismaData,
       });
       return mapRoomParticipant(updated);
+    },
+    deleteByRoomAndUser: async (roomId: string, userId: string) => {
+      const deleted = await prisma.roomParticipant.delete({
+        where: { room_id_user_id: { room_id: roomId, user_id: userId } }
+      });
+      return mapRoomParticipant(deleted);
+    }
+  };
+
+  public roomMessages = {
+    findManyByRoomId: async (roomId: string, afterDate?: string) => {
+      let whereClause: any = { room_id: roomId };
+      if (afterDate) {
+        whereClause.created_at = { gt: new Date(afterDate) };
+      }
+      const messages = await prisma.roomMessage.findMany({
+        where: whereClause,
+        orderBy: { created_at: 'asc' },
+        include: { sender: { select: { id: true, name: true } } }
+      });
+      return messages.map(m => ({
+        ...m,
+        created_at: m.created_at.toISOString(),
+        senderName: m.sender?.name || null
+      }));
+    },
+    create: async (data: { room_id: string; sender_id?: string; type: string; event_type?: string; message: string }) => {
+      const created = await prisma.roomMessage.create({
+        data,
+        include: { sender: { select: { id: true, name: true } } }
+      });
+      return {
+        ...created,
+        created_at: created.created_at.toISOString(),
+        senderName: created.sender?.name || null
+      };
     }
   };
 
   public sessionReports = {
-    create: async (data: { room_id: string; user_id: string; duration_seconds: number; presence_score: number; focus_score: number; away_count: number; xp_earned: number; ai_insight: string }) => {
+    create: async (data: { 
+      room_id: string; 
+      user_id: string; 
+      duration_seconds: number; 
+      presence_score: number; 
+      focus_score: number; 
+      attention_score?: number;
+      away_count: number; 
+      looking_away_count?: number;
+      head_down_count?: number;
+      reading_writing_time?: number;
+      total_away_time?: number;
+      ai_confidence?: number;
+      xp_earned: number; 
+      ai_insight: string;
+      metadata?: any;
+    }) => {
       const created = await prisma.sessionReport.create({ data });
       return mapSessionReport(created);
     },

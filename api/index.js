@@ -93,6 +93,7 @@ function mapDisciplineRoom(r) {
     ...r,
     started_at: r.started_at ? r.started_at.toISOString() : null,
     ended_at: r.ended_at ? r.ended_at.toISOString() : null,
+    expires_at: r.expires_at ? r.expires_at.toISOString() : null,
     created_at: r.created_at.toISOString(),
     updated_at: r.updated_at.toISOString(),
     participants: r.participants ? r.participants.map(mapRoomParticipant) : []
@@ -104,6 +105,7 @@ function mapRoomParticipant(p) {
     ...p,
     joined_at: p.joined_at.toISOString(),
     left_at: p.left_at ? p.left_at.toISOString() : null,
+    ready_at: p.ready_at ? p.ready_at.toISOString() : null,
     user: p.user ? {
       id: p.user.id,
       name: p.user.name,
@@ -115,7 +117,8 @@ function mapSessionReport(r) {
   if (!r) return null;
   return {
     ...r,
-    created_at: r.created_at.toISOString()
+    created_at: r.created_at.toISOString(),
+    metadata: r.metadata ? typeof r.metadata === "string" ? JSON.parse(r.metadata) : r.metadata : null
   };
 }
 var PrismaDB = class {
@@ -731,8 +734,39 @@ var PrismaDB = class {
         });
         return mapDisciplineRoom(room);
       },
+      findWaitingPublic: async () => {
+        const now = /* @__PURE__ */ new Date();
+        const rooms = await prisma.disciplineRoom.findMany({
+          where: {
+            status: "WAITING_PARTNER",
+            is_public: true,
+            OR: [
+              { expires_at: null },
+              { expires_at: { gt: now } }
+            ]
+          },
+          include: {
+            participants: { include: { user: true } },
+            creator: {
+              select: {
+                id: true,
+                name: true,
+                level: true,
+                total_xp: true
+              }
+            }
+          },
+          orderBy: { created_at: "desc" }
+        });
+        return rooms.map(mapDisciplineRoom);
+      },
       create: async (data) => {
-        const created = await prisma.disciplineRoom.create({ data });
+        const prismaData = { ...data };
+        if (data.expires_at) prismaData.expires_at = new Date(data.expires_at);
+        const created = await prisma.disciplineRoom.create({
+          data: prismaData,
+          include: { participants: { include: { user: true } } }
+        });
         return mapDisciplineRoom(created);
       },
       update: async (id, data) => {
@@ -761,11 +795,47 @@ var PrismaDB = class {
       updateByRoomAndUser: async (roomId, userId, data) => {
         const prismaData = { ...data };
         if (data.left_at) prismaData.left_at = new Date(data.left_at);
+        if (data.ready_at) prismaData.ready_at = new Date(data.ready_at);
         const updated = await prisma.roomParticipant.update({
           where: { room_id_user_id: { room_id: roomId, user_id: userId } },
           data: prismaData
         });
         return mapRoomParticipant(updated);
+      },
+      deleteByRoomAndUser: async (roomId, userId) => {
+        const deleted = await prisma.roomParticipant.delete({
+          where: { room_id_user_id: { room_id: roomId, user_id: userId } }
+        });
+        return mapRoomParticipant(deleted);
+      }
+    };
+    this.roomMessages = {
+      findManyByRoomId: async (roomId, afterDate) => {
+        let whereClause = { room_id: roomId };
+        if (afterDate) {
+          whereClause.created_at = { gt: new Date(afterDate) };
+        }
+        const messages = await prisma.roomMessage.findMany({
+          where: whereClause,
+          orderBy: { created_at: "asc" },
+          include: { sender: { select: { id: true, name: true } } }
+        });
+        return messages.map((m) => ({
+          ...m,
+          created_at: m.created_at.toISOString(),
+          senderName: m.sender?.name || null
+        }));
+      },
+      create: async (data) => {
+        const created = await prisma.roomMessage.create({
+          data,
+          include: { sender: { select: { id: true, name: true } } }
+        });
+        return {
+          ...created,
+          created_at: created.created_at.toISOString(),
+          senderName: created.sender?.name || null
+        };
       }
     };
     this.sessionReports = {
@@ -3106,40 +3176,104 @@ var xp_default = router8;
 import { Router as Router9 } from "express";
 
 // src/controllers/disciplineRoomController.ts
-var getAIInsight = (focusScore) => {
-  if (focusScore >= 90) {
-    return "Tuy\u1EC7t v\u1EDDi! B\u1EA1n \u0111\xE3 duy tr\xEC s\u1EF1 t\u1EADp trung c\u1EF1c k\u1EF3 \u1EA5n t\u01B0\u1EE3ng trong su\u1ED1t phi\xEAn. Phong \u0111\u1ED9 \u0111\u1EC9nh cao!";
-  } else if (focusScore >= 70) {
+var frameStore = /* @__PURE__ */ new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [roomId, clients] of frameStore.entries()) {
+    for (const [cid, data] of clients.entries()) {
+      if (now - data.ts > 2 * 60 * 60 * 1e3) clients.delete(cid);
+    }
+    if (clients.size === 0) frameStore.delete(roomId);
+  }
+}, 10 * 60 * 1e3);
+var getAIInsight = (report, mode) => {
+  const { focus_score, presence_score, attention_score, away_count, looking_away_count, head_down_count, reading_writing_time, total_away_time, metadata } = report;
+  const totalLookingAwayTime = metadata?.total_looking_away_time || 0;
+  const totalHeadDownTime = metadata?.total_head_down_time || 0;
+  const lowConfidenceTime = metadata?.low_confidence_time || 0;
+  if (focus_score >= 90) {
+    let msg = "Tuy\u1EC7t v\u1EDDi! B\u1EA1n \u0111\xE3 duy tr\xEC s\u1EF1 t\u1EADp trung c\u1EF1c k\u1EF3 \u1EA5n t\u01B0\u1EE3ng.";
+    if (mode === "Study" && (reading_writing_time || 0) > 300) {
+      msg += " B\u1EA1n \u0111\xE3 d\xE0nh nhi\u1EC1u th\u1EDDi gian \u0111\u1ECDc v\xE0 ghi ch\xE9p r\u1EA5t hi\u1EC7u qu\u1EA3.";
+    }
+    return msg + " Phong \u0111\u1ED9 \u0111\u1EC9nh cao!";
+  }
+  if (lowConfidenceTime > report.duration_seconds * 0.3) {
+    return "AI g\u1EB7p kh\xF3 kh\u0103n khi ph\xE2n t\xEDch do \xE1nh s\xE1ng ho\u1EB7c g\xF3c camera. H\xE3y \u0111i\u1EC1u ch\u1EC9nh camera \u0111\u1EC3 nh\u1EADn \u0111\u01B0\u1EE3c b\xE1o c\xE1o ch\xEDnh x\xE1c h\u01A1n nh\xE9.";
+  }
+  if (mode === "Study") {
+    if ((reading_writing_time || 0) > report.duration_seconds * 0.5) {
+      return "B\u1EA1n \u0111\xE3 d\xE0nh ph\u1EA7n l\u1EDBn th\u1EDDi gian \u0111\u1EC3 \u0111\u1ECDc v\xE0 ghi ch\xE9p. \u0110\xE2y l\xE0 h\xE0nh vi ph\xF9 h\u1EE3p v\u1EDBi Study Mode, h\xE3y ti\u1EBFp t\u1EE5c duy tr\xEC nh\xE9!";
+    }
+    if (total_away_time > 60) {
+      return "B\u1EA1n r\u1EDDi kh\u1ECFi camera kh\xE1 nhi\u1EC1u l\u1EA7n. L\u1EA7n sau h\xE3y chu\u1EA9n b\u1ECB t\xE0i li\u1EC7u v\xE0 n\u01B0\u1EDBc u\u1ED1ng tr\u01B0\u1EDBc khi b\u1EAFt \u0111\u1EA7u \u0111\u1EC3 tr\xE1nh ng\u1EAFt qu\xE3ng nh\xE9.";
+    }
+  }
+  if (mode === "Deep Work") {
+    if (totalLookingAwayTime > 30) {
+      return "B\u1EA1n th\u01B0\u1EDDng xuy\xEAn nh\xECn ra ngo\xE0i m\xE0n h\xECnh trong phi\xEAn Deep Work. H\xE3y th\u1EED t\u1EAFt th\xF4ng b\xE1o ho\u1EB7c ch\u1ECDn m\xF4i tr\u01B0\u1EDDng \xEDt xao nh\xE3ng h\u01A1n.";
+    }
+    if (totalHeadDownTime > 30) {
+      return "B\u1EA1n c\xFAi xu\u1ED1ng kh\xE1 l\xE2u trong phi\xEAn Deep Work. N\u1EBFu \u0111ang d\xF9ng \u0111i\u1EC7n tho\u1EA1i, h\xE3y \u0111\u1EB7t \u0111i\u1EC7n tho\u1EA1i xa b\xE0n l\xE0m vi\u1EC7c \u0111\u1EC3 t\u1EADp trung t\u1ED1t h\u01A1n.";
+    }
+  }
+  if (presence_score < 70) {
+    return "M\u1EE9c \u0111\u1ED9 hi\u1EC7n di\u1EC7n c\u1EE7a b\u1EA1n kh\xE1 th\u1EA5p. S\u1EF1 hi\u1EC7n di\u1EC7n li\xEAn t\u1EE5c tr\u01B0\u1EDBc camera gi\xFAp AI h\u1ED7 tr\u1EE3 b\u1EA1n duy tr\xEC k\u1EF7 lu\u1EADt t\u1ED1t h\u01A1n.";
+  }
+  if (focus_score >= 70) {
     return "Kh\xE1 \u1ED5n! B\u1EA1n c\xF3 m\u1ED9t v\xE0i l\u1EA7n m\u1EA5t t\u1EADp trung nh\u1ECF, nh\u01B0ng t\u1ED5ng th\u1EC3 v\u1EABn r\u1EA5t hi\u1EC7u qu\u1EA3. Ti\u1EBFp t\u1EE5c ph\xE1t huy nh\xE9!";
-  } else if (focusScore >= 50) {
-    return "Phi\xEAn l\xE0m vi\u1EC7c c\xF3 kh\xE1 nhi\u1EC1u xao nh\xE3ng. H\xE3y th\u1EED d\u1ECDn d\u1EB9p kh\xF4ng gian v\xE0 ch\u1ECDn phi\xEAn ng\u1EAFn h\u01A1n nh\xE9!";
+  } else if (focus_score >= 50) {
+    return "Phi\xEAn l\xE0m vi\u1EC7c c\xF3 kh\xE1 nhi\u1EC1u xao nh\xE3ng. H\xE3y th\u1EED d\u1ECDn d\u1EB9p kh\xF4ng gian v\xE0 ch\u1ECDn phi\xEAn ng\u1EAFn h\u01A1n \u0111\u1EC3 r\xE8n luy\u1EC7n s\u1EF1 t\u1EADp trung.";
   } else {
-    return "M\u1EE9c \u0111\u1ED9 t\u1EADp trung kh\xE1 th\u1EA5p. \u0110\u1EEBng qu\xE1 kh\u1EAFt khe v\u1EDBi b\u1EA3n th\xE2n, h\xE3y ngh\u1EC9 ng\u01A1i m\u1ED9t ch\xFAt v\xE0 th\u1EED l\u1EA1i sau nh\xE9.";
+    return "M\u1EE9c \u0111\u1ED9 t\u1EADp trung kh\xE1 th\u1EA5p. \u0110\u1EEBng qu\xE1 kh\u1EAFt khe v\u1EDBi b\u1EA3n th\xE2n, h\xE3y ngh\u1EC9 ng\u01A1i m\u1ED9t ch\xFAt v\xE0 th\u1EED l\u1EA1i v\u1EDBi t\xE2m th\u1EBF tho\u1EA3i m\xE1i h\u01A1n nh\xE9.";
   }
 };
-var calculateXP = (focusScore) => {
-  if (focusScore >= 90) return 180;
-  if (focusScore >= 70) return 120;
-  if (focusScore >= 50) return 80;
-  return 30;
+var calculateXP = (report) => {
+  const { focus_score, presence_score, attention_score, away_count } = report;
+  let xp = 30;
+  if (focus_score >= 90) xp = 200;
+  else if (focus_score >= 80) xp = 160;
+  else if (focus_score >= 70) xp = 120;
+  else if (focus_score >= 50) xp = 80;
+  if (presence_score >= 90 && attention_score >= 80) xp += 30;
+  if (away_count === 0) xp += 20;
+  return Math.min(xp, 250);
 };
 var createRoom = async (req, res, next) => {
   try {
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
-    const { title, mode, durationMinutes } = req.body;
+    const { title, mode, durationMinutes, isPublic } = req.body;
     if (!title || !mode || !durationMinutes) {
       throw new AppError("Title, mode, and duration are required.", 400);
     }
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const room = await db.disciplineRooms.create({
-      title,
-      mode,
-      duration_minutes: durationMinutes,
-      invite_code: inviteCode,
-      creator_id: userId,
-      status: "WAITING"
-    });
+    const expiresAt = new Date(Date.now() + (durationMinutes + 10) * 60 * 1e3).toISOString();
+    let room = null;
+    let lastError = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      try {
+        room = await db.disciplineRooms.create({
+          title,
+          mode,
+          duration_minutes: durationMinutes,
+          invite_code: inviteCode,
+          creator_id: userId,
+          status: "WAITING_PARTNER",
+          is_public: !!isPublic,
+          expires_at: expiresAt
+        });
+        break;
+      } catch (error) {
+        lastError = error;
+        if (error?.code !== "P2002") {
+          throw error;
+        }
+      }
+    }
+    if (!room) {
+      throw lastError || new AppError("Could not create a unique invite code. Please try again.", 500);
+    }
     await db.roomParticipants.create({
       room_id: room.id,
       user_id: userId,
@@ -3154,11 +3288,16 @@ var joinRoom = async (req, res, next) => {
   try {
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
-    const { inviteCode } = req.body;
-    if (!inviteCode) throw new AppError("Invite code is required.", 400);
-    const room = await db.disciplineRooms.findByInviteCode(inviteCode);
+    const { inviteCode, roomId } = req.body;
+    if (!inviteCode && !roomId) throw new AppError("Invite code or Room ID is required.", 400);
+    let room;
+    if (inviteCode) {
+      room = await db.disciplineRooms.findByInviteCode(inviteCode.toUpperCase());
+    } else {
+      room = await db.disciplineRooms.findUnique(roomId);
+    }
     if (!room) throw new AppError("Room not found.", 404);
-    if (room.status !== "WAITING") {
+    if (room.status !== "WAITING_PARTNER") {
       throw new AppError("Room is no longer waiting for participants.", 400);
     }
     const participants = await db.roomParticipants.findManyByRoomId(room.id);
@@ -3175,7 +3314,30 @@ var joinRoom = async (req, res, next) => {
       user_id: userId,
       role: "PARTNER"
     });
-    res.status(200).json({ success: true, room });
+    const updatedRoom = await db.disciplineRooms.update(room.id, {
+      status: "LOBBY"
+    });
+    await db.roomMessages.create({
+      room_id: room.id,
+      sender_id: null,
+      type: "SYSTEM",
+      event_type: null,
+      message: "Partner \u0111\xE3 tham gia ph\xF2ng. H\xE3y trao \u0111\u1ED5i m\u1EE5c ti\xEAu tr\u01B0\u1EDBc khi b\u1EAFt \u0111\u1EA7u phi\xEAn."
+    });
+    res.status(200).json({ success: true, room: updatedRoom });
+  } catch (error) {
+    next(error);
+  }
+};
+var getWaitingRooms = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const rooms = await db.disciplineRooms.findWaitingPublic();
+    const filteredRooms = rooms.filter((room) => {
+      return !room.participants.some((p) => p.user_id === userId);
+    });
+    res.status(200).json({ success: true, data: filteredRooms });
   } catch (error) {
     next(error);
   }
@@ -3202,9 +3364,12 @@ var startRoom = async (req, res, next) => {
     if (room.creator_id !== userId) {
       throw new AppError("Only the creator can start the room.", 403);
     }
+    const participants = await db.roomParticipants.findManyByRoomId(id);
+    if (participants.length < 2) {
+      throw new AppError("Please wait for your partner before opening the lobby.", 400);
+    }
     const updatedRoom = await db.disciplineRooms.update(id, {
-      status: "ACTIVE",
-      started_at: (/* @__PURE__ */ new Date()).toISOString()
+      status: "LOBBY"
     });
     res.status(200).json({ success: true, room: updatedRoom });
   } catch (error) {
@@ -3228,18 +3393,40 @@ var endRoom = async (req, res, next) => {
     const userId = req.user?.id;
     if (!userId) throw new AppError("Unauthorized access.", 401);
     const { id } = req.params;
-    const { durationSeconds, presenceScore, focusScore, awayCount } = req.body;
+    const {
+      durationSeconds,
+      presenceScore,
+      focusScore,
+      attentionScore,
+      awayCount,
+      lookingAwayCount,
+      headDownCount,
+      readingWritingTime,
+      totalAwayTime,
+      aiConfidence,
+      metadata
+    } = req.body;
     const room = await db.disciplineRooms.findUnique(id);
     if (!room) throw new AppError("Room not found.", 404);
-    const xpEarned = calculateXP(focusScore);
-    const aiInsight = getAIInsight(focusScore);
-    const report = await db.sessionReports.create({
-      room_id: id,
-      user_id: userId,
+    const reportData = {
       duration_seconds: durationSeconds,
       presence_score: presenceScore,
       focus_score: focusScore,
+      attention_score: attentionScore,
       away_count: awayCount,
+      looking_away_count: lookingAwayCount,
+      head_down_count: headDownCount,
+      reading_writing_time: readingWritingTime,
+      total_away_time: totalAwayTime,
+      ai_confidence: aiConfidence,
+      metadata: metadata || null
+    };
+    const xpEarned = calculateXP(reportData);
+    const aiInsight = getAIInsight(reportData, room.mode);
+    const report = await db.sessionReports.create({
+      room_id: id,
+      user_id: userId,
+      ...reportData,
       xp_earned: xpEarned,
       ai_insight: aiInsight
     });
@@ -3269,6 +3456,105 @@ var endRoom = async (req, res, next) => {
     next(error);
   }
 };
+var uploadFrame = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false });
+      return;
+    }
+    const { id } = req.params;
+    const {
+      frame,
+      status,
+      focusScore,
+      attentionScore,
+      presenceScore,
+      totalFocusedTime,
+      totalReadingWritingTime,
+      totalAwayTime,
+      currentAlertType,
+      lastEventType,
+      aiConfidence,
+      clientId
+    } = req.body;
+    if (!frame) {
+      res.status(400).json({ success: false, message: "frame required" });
+      return;
+    }
+    const key = clientId || userId;
+    if (!frameStore.has(id)) frameStore.set(id, /* @__PURE__ */ new Map());
+    frameStore.get(id).set(key, {
+      frame,
+      status: status || "Focused",
+      focusScore: focusScore || 100,
+      attentionScore: attentionScore || 100,
+      presenceScore: presenceScore || 100,
+      totalFocusedTime,
+      totalReadingWritingTime,
+      totalAwayTime,
+      currentAlertType,
+      lastEventType,
+      aiConfidence,
+      userId,
+      ts: Date.now()
+    });
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+var getPartnerFrame = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false });
+      return;
+    }
+    const { id } = req.params;
+    const myClientId = req.query.clientId || "";
+    const roomFrames = frameStore.get(id);
+    if (!roomFrames) {
+      res.status(200).json({ success: true, frame: null, status: "Camera Off", focusScore: 100 });
+      return;
+    }
+    for (const [cid, data] of roomFrames.entries()) {
+      if (cid !== myClientId) {
+        const age = Date.now() - data.ts;
+        if (age > 4e3) {
+          res.status(200).json({
+            success: true,
+            frame: null,
+            status: "Camera Off",
+            focusScore: data.focusScore,
+            presenceScore: data.presenceScore,
+            awayCount: data.awayCount
+          });
+        } else {
+          res.status(200).json({
+            success: true,
+            frame: data.frame,
+            status: data.status,
+            focusScore: data.focusScore,
+            attentionScore: data.attentionScore,
+            presenceScore: data.presenceScore,
+            totalFocusedTime: data.totalFocusedTime,
+            totalReadingWritingTime: data.totalReadingWritingTime,
+            totalAwayTime: data.totalAwayTime,
+            awayCount: data.awayCount,
+            currentAlertType: data.currentAlertType,
+            lastEventType: data.lastEventType,
+            aiConfidence: data.aiConfidence
+          });
+        }
+        return;
+      }
+    }
+    res.status(200).json({ success: true, frame: null, status: "Camera Off", focusScore: 100 });
+  } catch (error) {
+    next(error);
+  }
+};
 var getReport = async (req, res, next) => {
   try {
     const userId = req.user?.id;
@@ -3281,22 +3567,213 @@ var getReport = async (req, res, next) => {
     next(error);
   }
 };
+var getMessages = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const { after } = req.query;
+    const messages = await db.roomMessages.findManyByRoomId(id, after);
+    res.status(200).json({ success: true, messages });
+  } catch (error) {
+    next(error);
+  }
+};
+var postMessage = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const { message, type, eventType } = req.body;
+    if (!message) {
+      throw new AppError("Message content is required.", 400);
+    }
+    const roomMessage = await db.roomMessages.create({
+      room_id: id,
+      sender_id: type === "SYSTEM" ? null : userId,
+      type: type || "USER",
+      event_type: eventType || null,
+      message
+    });
+    res.status(201).json({ success: true, message: roomMessage });
+  } catch (error) {
+    next(error);
+  }
+};
+var setGoal = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const { goal } = req.body;
+    if (goal === void 0 || goal === null) {
+      throw new AppError("Goal is required.", 400);
+    }
+    const trimmedGoal = String(goal).trim().substring(0, 100);
+    if (String(goal).length > 100) {
+      throw new AppError("Goal must be 100 characters or less.", 400);
+    }
+    const room = await db.disciplineRooms.findUnique(id);
+    if (!room) throw new AppError("Room not found.", 404);
+    const participants = await db.roomParticipants.findManyByRoomId(id);
+    const userParticipant = participants.find((p) => p.user_id === userId);
+    if (!userParticipant) {
+      throw new AppError("You are not a participant in this room.", 403);
+    }
+    await db.roomParticipants.updateByRoomAndUser(id, userId, { goal: trimmedGoal });
+    const user = await db.users.findUnique({ id: userId });
+    const userName = user?.name || "User";
+    if (trimmedGoal) {
+      await db.roomMessages.create({
+        room_id: id,
+        sender_id: null,
+        type: "SYSTEM",
+        event_type: null,
+        message: `\u{1F3AF} ${userName} \u0111\xE3 \u0111\u1EB7t m\u1EE5c ti\xEAu: "${trimmedGoal}"`
+      });
+    }
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+var setReady = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const { ready } = req.body;
+    if (ready === void 0) {
+      throw new AppError("Ready state is required.", 400);
+    }
+    const room = await db.disciplineRooms.findUnique(id);
+    if (!room) throw new AppError("Room not found.", 404);
+    if (room.status !== "LOBBY" && room.status !== "START_CONFIRM") {
+      throw new AppError("Room is not in lobby phase.", 400);
+    }
+    const participants = await db.roomParticipants.findManyByRoomId(id);
+    const userParticipant = participants.find((p) => p.user_id === userId);
+    if (!userParticipant) {
+      throw new AppError("You are not a participant in this room.", 403);
+    }
+    await db.roomParticipants.updateByRoomAndUser(id, userId, {
+      is_ready: !!ready,
+      ready_at: ready ? (/* @__PURE__ */ new Date()).toISOString() : null
+    });
+    const user = await db.users.findUnique({ id: userId });
+    const userName = user?.name || "User";
+    if (ready) {
+      await db.roomMessages.create({
+        room_id: id,
+        sender_id: null,
+        type: "SYSTEM",
+        event_type: "START_REQUESTED",
+        message: `${userName} \u0111\xE3 x\xE1c nh\u1EADn b\u1EAFt \u0111\u1EA7u phi\xEAn.`
+      });
+    } else {
+      await db.roomMessages.create({
+        room_id: id,
+        sender_id: null,
+        type: "SYSTEM",
+        event_type: "START_CANCELLED",
+        message: `${userName} mu\u1ED1n ch\u1EDD th\xEAm m\u1ED9t ch\xFAt.`
+      });
+    }
+    const updatedParticipants = await db.roomParticipants.findManyByRoomId(id);
+    const readyCount = updatedParticipants.filter((p) => p.is_ready).length;
+    if (readyCount === 2) {
+      await db.disciplineRooms.update(id, {
+        status: "ACTIVE",
+        started_at: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      await db.roomMessages.create({
+        room_id: id,
+        sender_id: null,
+        type: "SYSTEM",
+        event_type: "SESSION_STARTED",
+        message: "C\u1EA3 hai \u0111\xE3 x\xE1c nh\u1EADn. Phi\xEAn t\u1EADp trung s\u1EBD b\u1EAFt \u0111\u1EA7u sau v\xE0i gi\xE2y..."
+      });
+    } else if (readyCount === 1) {
+      await db.disciplineRooms.update(id, {
+        status: "START_CONFIRM"
+      });
+    } else {
+      await db.disciplineRooms.update(id, {
+        status: "LOBBY"
+      });
+    }
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+var leaveRoom = async (req, res, next) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) throw new AppError("Unauthorized access.", 401);
+    const { id } = req.params;
+    const room = await db.disciplineRooms.findUnique(id);
+    if (!room) throw new AppError("Room not found.", 404);
+    const participants = await db.roomParticipants.findManyByRoomId(id);
+    const userParticipant = participants.find((p) => p.user_id === userId);
+    if (!userParticipant) {
+      throw new AppError("You are not a participant in this room.", 403);
+    }
+    if (userParticipant.role === "CREATOR") {
+      await db.disciplineRooms.update(id, { status: "CANCELLED" });
+      await db.roomMessages.create({
+        room_id: id,
+        sender_id: null,
+        type: "SYSTEM",
+        event_type: null,
+        message: "\u26A0\uFE0F Ch\u1EE7 ph\xF2ng \u0111\xE3 r\u1EDDi ph\xF2ng. Ph\xF2ng h\u1ECDc \u0111\xE3 b\u1ECB h\u1EE7y."
+      });
+    } else {
+      await db.roomParticipants.deleteByRoomAndUser(id, userId);
+      await db.disciplineRooms.update(id, { status: "WAITING_PARTNER" });
+      const creatorParticipant = participants.find((p) => p.role === "CREATOR");
+      if (creatorParticipant) {
+        await db.roomParticipants.updateByRoomAndUser(id, creatorParticipant.user_id, {
+          is_ready: false
+        });
+      }
+      await db.roomMessages.create({
+        room_id: id,
+        sender_id: null,
+        type: "SYSTEM",
+        event_type: null,
+        message: `\u26A0\uFE0F Partner \u0111\xE3 r\u1EDDi kh\u1ECFi ph\xF2ng. B\u1EA1n c\xF3 th\u1EC3 ch\u1EDD ng\u01B0\u1EDDi kh\xE1c tham gia ho\u1EB7c t\u1EA1o ph\xF2ng m\u1EDBi.`
+      });
+    }
+    res.status(200).json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // src/routes/disciplineRoom.ts
 var router9 = Router9();
 router9.use(authMiddleware);
 router9.post("/create", createRoom);
 router9.post("/join", joinRoom);
+router9.get("/waiting", getWaitingRooms);
 router9.get("/:id", getRoom);
 router9.post("/:id/start", startRoom);
 router9.post("/:id/heartbeat", heartbeat);
 router9.post("/:id/end", endRoom);
 router9.get("/:id/report", getReport);
+router9.post("/:id/goal", setGoal);
+router9.post("/:id/ready", setReady);
+router9.post("/:id/leave", leaveRoom);
+router9.get("/:id/messages", getMessages);
+router9.post("/:id/messages", postMessage);
+router9.post("/:id/frame", uploadFrame);
+router9.get("/:id/partner-frame", getPartnerFrame);
 var disciplineRoom_default = router9;
 
 // src/express-app.ts
 var app = express();
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 app.use("/api/auth", auth_default);
 app.use("/api/friends", friends_default);
 app.use("/api/goals", goals_default);
