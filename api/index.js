@@ -848,6 +848,25 @@ var PrismaDB = class {
           where: { room_id: roomId, user_id: userId }
         });
         return mapSessionReport(report);
+      },
+      findManyByRoomId: async (roomId) => {
+        const reports = await prisma.sessionReport.findMany({
+          where: { room_id: roomId },
+          orderBy: { created_at: "asc" }
+        });
+        const userIds = Array.from(new Set(reports.map((report) => report.user_id)));
+        const users = await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true }
+        });
+        const usersById = new Map(users.map((user) => [user.id, user]));
+        return reports.map((report) => {
+          const mapped = mapSessionReport(report);
+          return mapped ? {
+            ...mapped,
+            user: usersById.get(report.user_id) || null
+          } : null;
+        }).filter(Boolean);
       }
     };
   }

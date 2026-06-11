@@ -822,15 +822,16 @@ class PrismaDB {
     },
     findWaitingPublic: async () => {
       const now = new Date();
-      const rooms = await prisma.disciplineRoom.findMany({
-        where: {
+      const whereClause: any = {
           status: "WAITING_PARTNER",
           is_public: true,
           OR: [
             { expires_at: null },
             { expires_at: { gt: now } }
           ]
-        },
+        };
+      const rooms = await prisma.disciplineRoom.findMany({
+        where: whereClause,
         include: { 
           participants: { include: { user: true } },
           creator: {
@@ -923,7 +924,7 @@ class PrismaDB {
       if (afterDate) {
         whereClause.created_at = { gt: new Date(afterDate) };
       }
-      const messages = await prisma.roomMessage.findMany({
+      const messages = await (prisma as any).roomMessage.findMany({
         where: whereClause,
         orderBy: { created_at: 'asc' },
         include: { sender: { select: { id: true, name: true } } }
@@ -935,7 +936,7 @@ class PrismaDB {
       }));
     },
     create: async (data: { room_id: string; sender_id?: string; type: string; event_type?: string; message: string }) => {
-      const created = await prisma.roomMessage.create({
+      const created = await (prisma as any).roomMessage.create({
         data,
         include: { sender: { select: { id: true, name: true } } }
       });
@@ -977,21 +978,22 @@ class PrismaDB {
     findManyByRoomId: async (roomId: string) => {
       const reports = await prisma.sessionReport.findMany({
         where: { room_id: roomId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        },
         orderBy: { created_at: "asc" }
       });
-      return reports.map((report: any) => ({
-        ...mapSessionReport(report),
-        user: report.user
-      }));
+      const userIds = Array.from(new Set(reports.map((report: any) => report.user_id)));
+      const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true }
+      });
+      const usersById = new Map(users.map((user: any) => [user.id, user]));
+
+      return reports.map((report: any) => {
+        const mapped = mapSessionReport(report);
+        return mapped ? {
+          ...mapped,
+          user: usersById.get(report.user_id) || null
+        } : null;
+      }).filter(Boolean);
     }
   };
 }
