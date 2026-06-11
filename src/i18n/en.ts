@@ -11,6 +11,16 @@ export const en = {
     stats: 'Stats',
     groups: 'Groups',
   },
+  guest: {
+    login: 'Login',
+    registerFree: 'Register for free',
+    banner: 'You are using guest mode. Data is stored only on this device.',
+    backupLogin: 'Log in to back up',
+    continueWithoutLogin: 'Continue without logging in →',
+    friends: 'Friends',
+    disciplineRoom: 'Discipline Room',
+    disciplineShort: 'Discipline',
+  },
 
   // ── Common / Shared ──
   common: {

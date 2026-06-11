@@ -3,6 +3,23 @@
 
 # Changelog
 
+## [Sprint 12] - 2026-06-11
+
+### Guest-first Flow & Local Goals
+
+### Đã thêm
+* Cho phép người dùng guest vào thẳng workspace chính mà không bắt buộc đăng nhập ngay khi mở app.
+* Thêm `GuestAuthModal` để nhắc đăng nhập theo từng ngữ cảnh như tạo mục tiêu, đồng bộ, nhóm, phòng kỷ luật, bạn bè, thống kê và AI Coach.
+* Hỗ trợ guest tạo mục tiêu cơ bản và lưu local trên thiết bị bằng IndexedDB.
+* Thêm trạng thái quản lý modal guest auth trong `goalStore`.
+* Thêm cơ chế redirect khỏi trang `/login` nếu người dùng đã đăng nhập.
+
+### Cải tiến
+* Giữ `/onboarding` là route được bảo vệ bằng đăng nhập, nhưng bỏ bảo vệ khỏi `AppLayout` để hỗ trợ trải nghiệm guest-first.
+* Dashboard và Goals Page có thể đọc mục tiêu local của guest từ IndexedDB.
+* Các tính năng yêu cầu tài khoản sẽ mở modal giải thích lợi ích đăng nhập thay vì chuyển thẳng về login.
+* Chặn auto sync khi người dùng chưa đăng nhập để tránh gọi API yêu cầu tài khoản.
+
 ## [Sprint 11] - 2026-06-11
 
 ### 🚀 Discipline Room - Nâng cấp trải nghiệm học tập & làm việc cùng nhau

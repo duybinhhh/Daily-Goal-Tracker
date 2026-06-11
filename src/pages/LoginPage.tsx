@@ -1,6 +1,6 @@
 // src/pages/LoginPage.tsx
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -11,10 +11,18 @@ export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
   const { login, register, isAuthenticated, loading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [isRegister, setIsRegister] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "", name: "" });
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab === "register") setIsRegister(true);
+    if (tab === "login") setIsRegister(false);
+  }, [location.search]);
 
   useEffect(() => {
     clearError();
@@ -314,6 +322,21 @@ export const LoginPage: React.FC = () => {
               </button>
             </p>
           )}
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            style={{
+              marginTop: "14px",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--color-on-surface-variant)",
+              fontWeight: 700,
+              fontSize: "12px",
+            }}
+          >
+            Tiếp tục không đăng nhập →
+          </button>
         </div>
       </div>
     </div>

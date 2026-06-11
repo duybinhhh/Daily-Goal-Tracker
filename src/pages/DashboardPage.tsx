@@ -307,7 +307,7 @@ const UpcomingMilestones: React.FC<MilestoneProps> = ({
 /* ─── Main Dashboard Page ─── */
 export const DashboardPage: React.FC = () => {
   const { t, language } = useTranslation();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { isOffline, isSyncing } = useGoalStore();
   const {
     filteredGoals,
@@ -330,6 +330,9 @@ export const DashboardPage: React.FC = () => {
       logId: string;
     };
   }>({});
+  const [showGuestBanner, setShowGuestBanner] = useState(() => {
+    return localStorage.getItem("guest_banner_dismissed") !== "true";
+  });
   const disappearingTimersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
   useEffect(() => {
@@ -547,6 +550,42 @@ export const DashboardPage: React.FC = () => {
       <main
         className="flex-1 flex flex-col gap-5 py-5 px-4 md:p-6"
       >
+        {!isAuthenticated && showGuestBanner && (
+          <div
+            className="flex flex-col gap-3 rounded-2xl border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+            style={{
+              background: "var(--color-surface-container)",
+              borderColor: "var(--border-subtle)",
+              color: "var(--color-on-surface)",
+            }}
+          >
+            <div className="flex items-start gap-2">
+              <span className="material-symbols-outlined" style={{ fontSize: "20px", color: "var(--color-primary)" }}>
+                tips_and_updates
+              </span>
+              <p>
+                Bạn đang dùng chế độ khách. Dữ liệu chỉ lưu trên thiết bị này.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 sm:shrink-0">
+              <Link to="/login?tab=login" className="font-bold text-primary">
+                Đăng nhập để sao lưu
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.setItem("guest_banner_dismissed", "true");
+                  setShowGuestBanner(false);
+                }}
+                className="rounded-full px-2 text-lg leading-none opacity-60 hover:opacity-100"
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Error Banner */}
         {error && (
           <div
@@ -1117,7 +1156,7 @@ export const DashboardPage: React.FC = () => {
               totalActCount={totalActCount}
               goals={goals}
             />
-            <FriendsTodayCard />
+            {isAuthenticated && <FriendsTodayCard />}
           </div>
         </div>
       </main>

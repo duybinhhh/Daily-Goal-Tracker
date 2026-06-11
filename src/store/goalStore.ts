@@ -1,6 +1,7 @@
 // src/store/goalStore.ts
 import { create } from "zustand";
 import api from "../services/api";
+import { useAuthStore } from "./authStore";
 import { Goal, GoalLog, DashboardStats, HistoryData } from "../types";
 import {
   getCachedMetadata,
@@ -10,6 +11,15 @@ import {
   removeFromSyncQueue,
   getSyncAction,
 } from "../services/indexedDb";
+
+export type GuestAuthTrigger =
+  | "create_goal"
+  | "sync"
+  | "groups"
+  | "discipline_room"
+  | "friends"
+  | "stats"
+  | "ai_coach";
 
 function generateUUID(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -106,8 +116,11 @@ interface GoalState {
   error: string | null;
   isOffline: boolean;
   isSyncing: boolean;
+  showGuestAuthModal: boolean;
+  guestAuthTrigger: GuestAuthTrigger;
   setIsOffline: (isOffline: boolean) => void;
   setIsSyncing: (isSyncing: boolean) => void;
+  setShowGuestAuthModal: (show: boolean, trigger?: GuestAuthTrigger) => void;
   clearError: () => void;
   fetchGoals: () => Promise<void>;
   fetchStats: () => Promise<void>;
@@ -142,13 +155,17 @@ export const useGoalStore = create<GoalState>((set, get) => ({
   error: null,
   isOffline: typeof navigator !== "undefined" ? !navigator.onLine : false,
   isSyncing: false,
+  showGuestAuthModal: false,
+  guestAuthTrigger: "create_goal",
 
   setIsOffline: (isOffline) => set({ isOffline }),
   setIsSyncing: (isSyncing) => set({ isSyncing }),
+  setShowGuestAuthModal: (show, trigger = "create_goal") => set({ showGuestAuthModal: show, guestAuthTrigger: trigger }),
   clearError: () => set({ error: null }),
 
   fetchGoals: async () => {
     set({ loading: true, error: null });
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
 
     const mergePending = async (fetchedGoals: Goal[]) => {
       const pending = await getPendingQueue();
@@ -169,7 +186,8 @@ export const useGoalStore = create<GoalState>((set, get) => ({
     };
 
     const loadCachedGoals = async () => {
-      const cached = await getCachedMetadata("goals");
+      const cacheKey = useAuthStore.getState().isAuthenticated ? "goals" : "guest_goals";
+      const cached = await getCachedMetadata(cacheKey);
       if (cached) {
         const goalsWithPending = await mergePending(cached);
         set({ goals: goalsWithPending, loading: false });
@@ -177,6 +195,13 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       }
       return false;
     };
+
+    if (!isAuthenticated) {
+      const loaded = await loadCachedGoals();
+      set({ loading: false });
+      if (!loaded) set({ goals: [] });
+      return;
+    }
 
     if (!navigator.onLine) {
       const loaded = await loadCachedGoals();
@@ -212,6 +237,24 @@ export const useGoalStore = create<GoalState>((set, get) => ({
   },
 
   fetchStats: async () => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      const guestGoals = await getCachedMetadata("guest_goals");
+      const activeGoals = Array.isArray(guestGoals) ? guestGoals.filter((goal: Goal) => !goal.is_archived && goal.status !== "paused") : [];
+      const completedToday = activeGoals.filter((goal: Goal) => goal.current_count >= goal.target_count).length;
+      const totalProgress = activeGoals.reduce((sum: number, goal: Goal) => sum + Math.min(1, goal.current_count / Math.max(1, goal.target_count)), 0);
+      set({
+        stats: {
+          totalGoals: Array.isArray(guestGoals) ? guestGoals.length : 0,
+          activeGoals: activeGoals.length,
+          completedGoalsToday: completedToday,
+          overallCompletionRate: activeGoals.length ? Math.round((totalProgress / activeGoals.length) * 100) : 0,
+          bestCurrentStreak: 0,
+          bestLongestStreak: 0,
+        },
+      });
+      return;
+    }
+
     const loadCachedStats = async () => {
       const cached = await getCachedMetadata("stats");
       if (cached) {
@@ -242,6 +285,11 @@ export const useGoalStore = create<GoalState>((set, get) => ({
   },
 
   fetchHistory: async (from, to) => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      set({ history: [] });
+      return;
+    }
+
     if (from !== undefined) lastHistoryFrom = from;
     if (to !== undefined) lastHistoryTo = to;
 

@@ -736,15 +736,16 @@ var PrismaDB = class {
       },
       findWaitingPublic: async () => {
         const now = /* @__PURE__ */ new Date();
+        const whereClause = {
+          status: "WAITING_PARTNER",
+          is_public: true,
+          OR: [
+            { expires_at: null },
+            { expires_at: { gt: now } }
+          ]
+        };
         const rooms = await prisma.disciplineRoom.findMany({
-          where: {
-            status: "WAITING_PARTNER",
-            is_public: true,
-            OR: [
-              { expires_at: null },
-              { expires_at: { gt: now } }
-            ]
-          },
+          where: whereClause,
           include: {
             participants: { include: { user: true } },
             creator: {

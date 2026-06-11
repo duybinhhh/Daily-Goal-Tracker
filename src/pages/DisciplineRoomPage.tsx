@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 import api from "../services/api";
 import { useAuthStore } from "../store/authStore";
+import { useGoalStore } from "../store/goalStore";
 
 type AIStatus = "Camera Off" | "Detecting" | "Focused" | "Reading/Writing" | "Looking Away" | "Head Down" | "Away" | "Low Confidence";
 type Phase = "CREATE" | "WAITING" | "LOBBY" | "ACTIVE" | "REPORT";
@@ -36,6 +37,23 @@ interface SessionReport {
 }
 
 export function DisciplineRoomPage() {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
+  const { setShowGuestAuthModal } = useGoalStore();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setShowGuestAuthModal(true, "discipline_room");
+      navigate("/");
+    }
+  }, [isAuthenticated, navigate, setShowGuestAuthModal]);
+
+  if (!isAuthenticated) return null;
+
+  return <DisciplineRoomContent />;
+}
+
+function DisciplineRoomContent() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [phase, setPhase] = useState<Phase>("CREATE");

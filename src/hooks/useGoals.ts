@@ -31,6 +31,8 @@ export const useGoals = (filterCategory: string = "All") => {
       fetchGoals();
       fetchStats();
       fetchHistory();
+    } else {
+      fetchGoals();
     }
   }, [isAuthenticated, fetchGoals, fetchStats, fetchHistory]);
 
@@ -60,6 +62,10 @@ export const useGoals = (filterCategory: string = "All") => {
     loading,
     error,
     refreshAll: async () => {
+      if (!isAuthenticated) {
+        await fetchGoals();
+        return;
+      }
       await syncOfflineData();
       await Promise.all([fetchGoals(), fetchStats(), fetchHistory()]);
     },
