@@ -29,7 +29,7 @@
 6. **Trục thời gian hoạt động (`/timeline`)**: Lưới ô hiệu năng tháng (Performance Grid) tích hợp chấm xanh/sao vàng, feed hoạt động lọc động, nút xóa log lịch sử (Delete log) và xuất báo cáo CSV.
 7. **Cài đặt (`/settings`)**: Hồ sơ cá nhân (Múi giờ, Tên), công tắc bật hiệu ứng chúc mừng (Confetti) và Danger Zone (Xóa dữ liệu). *Cập nhật:* Mặc định khởi tạo giao diện Light Theme và thiết kế thanh tác vụ Lưu/Hủy dưới dạng Sticky Floating Bar nổi cố định ở cuối trang. Tích hợp công tắc bật/tắt **Nhắc nhở chủ động (Active Reminders)** chống đứt chuỗi (xin quyền thông báo của trình duyệt và đồng bộ subscription lên DB).
 8. **Đồng đội giám sát & Nhóm thói quen (`/groups`)**: Hiển thị danh sách các nhóm thói quen đang tham gia (My Groups) và danh sách nhóm có sẵn để khám phá (Discover). Hỗ trợ form tạo nhóm thói quen chung. Bảng chi tiết nhóm hiển thị thông tin mục tiêu chung và **Bảng tiến trình thành viên (Leaderboard)** thể hiện tiến độ hôm nay, trạng thái hoàn thành và chuỗi ngày Streak của từng thành viên. Hỗ trợ nút Check-in nhanh, sao chép link mời và nút Share khoe thành tích nhóm. Tích hợp **Section Chat nhóm** dưới Leaderboard cho phép thành viên thảo luận, thả reaction và nhận thông báo đẩy.
-10. **Phòng Kỷ Luật AI (`/discipline-room`)**: Không gian tập trung cao độ tích hợp **AI Face Detection** (MediaPipe). Giao diện 4 bước chuyên nghiệp, HUD camera hiện đại, tính toán Focus/Presence Score realtime và báo cáo thưởng XP.
+10. **Phòng Kỷ Luật AI (`/discipline-room`)**: Không gian tập trung cao độ tích hợp **AI Face Detection** (MediaPipe). Tích hợp **Pre-Session Lobby (Ready Room)** để 2 người tham gia trao đổi mục tiêu (tối đa 100 ký tự) và xác nhận sẵn sàng (Ready Check). Khi cả hai sẵn sàng, kích hoạt đếm ngược 3-2-1 trước khi bật Camera AI và đồng hồ phiên. Giao diện HUD camera hiện đại, tính toán Focus/Presence Score realtime, chat lobby và báo cáo thưởng XP.
 11. **Check-in nhanh tối giản (`/quick-checkin`)**: Màn hình check-in tối giản bằng 1 chạm, thiết kế nút bấm lớn cho di động, tích hợp rung phản hồi haptic, đếm ngược hoàn tác 5 giây và đồng bộ offline tự động.
 
 ### 3.2. Giao diện API Endpoints (MVP Scope)
@@ -38,6 +38,8 @@
 - **Stats**: `GET /api/stats/dashboard` (bento data), `GET /api/stats/history?from=&to=` (heatmap data), `GET /api/stats/trend?period=day|week|month&goalId=` (dữ liệu Trend Comparison realtime, có lọc mục tiêu).
 - **Groups**: `GET /api/groups` (danh sách tất cả nhóm), `POST /api/groups` (tạo nhóm thói quen), `GET /api/groups/:id` (lấy chi tiết nhóm và bảng tiến độ thành viên), `POST /api/groups/:id/join` (gia nhập nhóm), `POST /api/groups/:id/leave` (rời nhóm), `DELETE /api/groups/:id` (xóa nhóm).
 - **Group Chat**: `GET /api/groups/:groupId/messages` (lấy tin nhắn), `POST /api/groups/:groupId/messages` (gửi tin), `POST /api/groups/:groupId/messages/:messageId/reactions` (phản ứng emoji), `DELETE /api/groups/:groupId/messages/:messageId` (xóa tin).
+- **Discipline Room**: `GET /api/discipline-room/waiting` (lấy danh sách phòng công khai), `POST /api/discipline-room/create` (tạo phòng, hỗ trợ `isPublic`), `POST /api/discipline-room/join` (tham gia bằng `inviteCode` hoặc `roomId`), `GET /api/discipline-room/:id` (chi tiết phòng), `POST /api/discipline-room/:id/start` (bắt đầu), `POST /api/discipline-room/:id/end` (kết thúc), `POST /api/discipline-room/:id/goal` (đặt mục tiêu), `POST /api/discipline-room/:id/ready` (yêu cầu/xác nhận sẵn sàng), `POST /api/discipline-room/:id/leave` (rời/hủy phòng).
+
 ### Bổ sung 2026-06-09: Việc đã làm và việc còn thiếu
 
 ### Đã làm
@@ -48,13 +50,17 @@
 - **Hệ thống Mẫu mục tiêu (Goal Templates)**: Thư viện mẫu mục tiêu giúp tạo thói quen nhanh chóng.
 - **Hẹn giờ Pomodoro (Pomodoro Timer)**: Tích hợp bộ hẹn giờ tập trung, widget nổi, chu kỳ Focus/Break, thông báo âm thanh và thống kê hàng ngày.
 - **Bình luận & Chat nhóm (Group Chat - US-26)**: Triển khai hệ thống thảo luận trong nhóm, reactions emoji, optimistic update, moderation quyền xóa và push notification giới hạn 3/ngày.
+- **Danh sách phòng chờ Discipline Room công khai (US-30)**: Thêm tính năng phòng Public/Private, hiển thị danh sách phòng chờ với bộ lọc Mode/Thời lượng, polling cập nhật 10s/lần và tham gia nhanh bằng roomId.
+- **Discipline Room - Ready Check & Pre-Session Lobby**: Thêm giai đoạn phòng chờ Ready Room, đồng bộ mục tiêu cá nhân (<100 ký tự) và trạng thái sẵn sàng, đếm ngược đồng bộ 3-2-1 khởi chạy Camera AI, tự động gửi tin nhắn hệ thống khi đổi trạng thái, cảnh báo chờ lâu sau 2 phút, xử lý rời phòng/hủy phòng.
 - Sửa lỗi AI Coach bấm không mở bằng cách render drawer ở layout và mở bằng state/event.
 - Sửa lỗi trắng trang bằng cách parse `localStorage.user` an toàn.
 - Tắt service worker cache trên localhost để tránh dùng JS/app shell cũ.
 - Đồng bộ thủ công DB Supabase cho các phần còn thiếu của Freeze Token.
 - Thực hiện migration database cho Group Chat models.
+- Cập nhật schema Prisma cho Discipline Room (`is_public`, `expires_at`).
 
 ### Còn thiếu / cần làm tiếp
+- Tạo migration chính thức cho Discipline Room fields (`is_public`, `expires_at`).
 - Tạo migration chính thức cho Streak Freeze trong `prisma/migrations`.
 - Enforce giờ mở Freeze Token ở backend nếu muốn tránh bypass bằng API.
 - Đưa toàn bộ copy Freeze Token và fallback AI Coach vào i18n.
@@ -62,3 +68,4 @@
 - Test Streak Freeze đầy đủ các case: hết token, reset token tháng mới, đóng băng trùng ngày, goal đã hoàn thành, goal streak = 0.
 - Rotate secret nếu `DATABASE_URL`, `GEMINI_API_KEY`, `VAPID_PRIVATE_KEY` đã từng lộ ra ngoài.
 - Kiểm tra deploy mới từ DB rỗng để chắc schema không thiếu bảng/cột.
+

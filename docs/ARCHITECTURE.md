@@ -239,7 +239,94 @@ model GroupChatNotificationLog {
     *   **Activity Feed:** API `GET /api/friends/feed` lấy 5 hoạt động mới nhất từ bạn bè, tôn trọng thiết lập quyền riêng tư (`show_activity_in_feed`).
     *   **Thống kê:** API `GET /api/friends/stats` cung cấp số lượng following/followers.
     *   **Privacy:** API `PATCH /api/friends/privacy` cập nhật trạng thái hiển thị hoạt động cá nhân.
+14. **Phòng Kỷ Luật (Discipline Room) - AI Camera Coach** [NEW]:
+    *   **AI Engine:** Sử dụng **MediaPipe FaceLandmarker** (WASM) chạy hoàn toàn tại Client để phân tích 3D khuôn mặt.
+    *   **Head Pose Estimation:** Tính toán góc Pitch/Yaw từ các landmark (mũi, mắt, cằm) để xác định trạng thái `Reading/Writing`, `Looking Away` và `Head Down`.
+    *   **Mode-Aware State Machine:** Hệ thống máy trạng thái có độ trễ (debouncing) và ngưỡng thay đổi theo Mode (Study vs Deep Work) để giảm False Positive.
+    *   **Real-time Synchronization (Frame Relay & Stats)**: Trạng thái AI (`aiStatus`), Focus Score, Presence Score và Away Count được gửi qua API `uploadFrame` (server-side frame relay in-memory) mỗi 500ms để partner có thể theo dõi realtime (cập nhật bằng Polling 1.2s/lần). Dữ liệu này giúp giao diện không cần truyền tải video stream nặng nề.
+    *   **Mini Chat & System Message Engine**: Cung cấp hộp thoại trò chuyện theo cơ chế Short-Polling (2 giây/lần) đi kèm tính năng gửi tin nhắn tự động từ frontend (System Message) khi phát hiện sự thay đổi bất thường trong Heartbeat trạng thái của partner.
+    *   **Privacy Guard:** Tuyệt đối không lưu trữ hoặc truyền tải dữ liệu hình ảnh/video lên Server. Chỉ có dữ liệu phân tích (scores, counts) được lưu vào `SessionReport`.
+    *   **Session Reporting:** Lưu trữ báo cáo chi tiết vào bảng `SessionReport` sau khi kết thúc phiên.
+
 ## Bổ sung 2026-06-09: Ghi chú kiến trúc AI Coach, Streak Freeze và local dev
+...
+### Discipline Room Database Schema
+```prisma
+model DisciplineRoom {
+  id               String            @id @default(uuid())
+  title            String
+  mode             String            @default("Study")
+  duration_minutes Int               @default(25)
+  status           String            @default("WAITING_PARTNER") // WAITING_PARTNER, LOBBY, START_CONFIRM, ACTIVE, COMPLETED, CANCELLED
+  invite_code      String            @unique
+  creator_id       String
+  is_public        Boolean           @default(false)
+  expires_at       DateTime?
+  participants     RoomParticipant[]
+  reports          SessionReport[]
+  messages         RoomMessage[]
+  created_at       DateTime          @default(now())
+  started_at       DateTime?
+  ended_at         DateTime?
+}
+
+model RoomMessage {
+  id        String   @id @default(uuid())
+  room_id   String
+  room      DisciplineRoom @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  sender_id String?
+  sender    User?          @relation(fields: [sender_id], references: [id], onDelete: SetNull)
+  type      String   // USER, SYSTEM
+  event_type String?
+  message   String
+  created_at DateTime @default(now())
+
+  @@index([room_id, created_at])
+  @@index([sender_id])
+}
+
+model RoomParticipant {
+  id                String         @id @default(uuid())
+  room_id           String
+  room              DisciplineRoom @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user_id           String
+  user              User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role              String         @default("PARTNER") // CREATOR, PARTNER
+  joined_at         DateTime       @default(now())
+  left_at           DateTime?
+  final_focus_score Int?
+  xp_earned         Int?
+  goal              String?
+  is_ready          Boolean        @default(false)
+  ready_at          DateTime?
+
+  @@unique([room_id, user_id])
+}
+
+model SessionReport {
+  id               String         @id @default(uuid())
+  room_id          String
+  room             DisciplineRoom @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user_id          String
+  user             User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  duration_seconds Int
+  presence_score   Int
+  focus_score      Int
+  attention_score  Int?
+  away_count       Int
+  looking_away_count Int?
+  head_down_count  Int?
+  reading_writing_time Int?
+  total_away_time  Int?
+  ai_confidence    Int?
+  xp_earned        Int
+  ai_insight       String?
+  created_at       DateTime       @default(now())
+
+  @@index([room_id])
+  @@index([user_id])
+}
+```
 
 ### AI Coach
 Frontend:
