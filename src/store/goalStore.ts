@@ -408,6 +408,25 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
   updateGoal: async (id, goalData) => {
     set({ loading: true, error: null });
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+    if (!isAuthenticated) {
+      let updatedGoal: Goal | null = null;
+      set((state) => {
+        const newGoals = state.goals.map((g) => {
+          if (g.id === id) {
+            updatedGoal = { ...g, ...goalData, updated_at: new Date().toISOString() };
+            return updatedGoal;
+          }
+          return g;
+        });
+        return { goals: newGoals, loading: false };
+      });
+      await setCachedMetadata("guest_goals", get().goals);
+      get().fetchStats();
+      return;
+    }
+
     try {
       const response = await api.put(`/api/goals/${id}`, goalData);
       const updatedGoal = response.data.goal;
@@ -427,6 +446,18 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
   deleteGoal: async (id) => {
     set({ loading: true, error: null });
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+    if (!isAuthenticated) {
+      set((state) => ({
+        goals: state.goals.filter((g) => g.id !== id),
+        loading: false,
+      }));
+      await setCachedMetadata("guest_goals", get().goals);
+      get().fetchStats();
+      return;
+    }
+
     try {
       await api.delete(`/api/goals/${id}`);
       set((state) => ({
@@ -443,6 +474,18 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
   archiveGoal: async (id) => {
     set({ loading: true, error: null });
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+    if (!isAuthenticated) {
+      set((state) => ({
+        goals: state.goals.map((g) => (g.id === id ? { ...g, is_archived: true, archived_at: new Date().toISOString() } : g)),
+        loading: false,
+      }));
+      await setCachedMetadata("guest_goals", get().goals);
+      get().fetchStats();
+      return;
+    }
+
     try {
       const response = await api.put(`/api/goals/${id}`, { is_archived: true });
       const updatedGoal = response.data.goal;
@@ -460,6 +503,18 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
   restoreGoal: async (id) => {
     set({ loading: true, error: null });
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+    if (!isAuthenticated) {
+      set((state) => ({
+        goals: state.goals.map((g) => (g.id === id ? { ...g, is_archived: false, archived_at: null } : g)),
+        loading: false,
+      }));
+      await setCachedMetadata("guest_goals", get().goals);
+      get().fetchStats();
+      return;
+    }
+
     try {
       const response = await api.put(`/api/goals/${id}`, { is_archived: false });
       const updatedGoal = response.data.goal;
@@ -477,6 +532,18 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
   bulkArchiveGoals: async (ids) => {
     set({ loading: true, error: null });
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+    if (!isAuthenticated) {
+      set((state) => ({
+        goals: state.goals.map((g) => (ids.includes(g.id) ? { ...g, is_archived: true, archived_at: new Date().toISOString() } : g)),
+        loading: false,
+      }));
+      await setCachedMetadata("guest_goals", get().goals);
+      get().fetchStats();
+      return;
+    }
+
     try {
       await api.put(`/api/goals/bulk/archive`, { goalIds: ids });
       set((state) => ({
@@ -493,6 +560,18 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
   bulkPauseGoals: async (ids) => {
     set({ loading: true, error: null });
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+    if (!isAuthenticated) {
+      set((state) => ({
+        goals: state.goals.map((g) => (ids.includes(g.id) ? { ...g, status: "paused" } : g)),
+        loading: false,
+      }));
+      await setCachedMetadata("guest_goals", get().goals);
+      get().fetchStats();
+      return;
+    }
+
     try {
       await api.put(`/api/goals/bulk/pause`, { goalIds: ids });
       set((state) => ({
@@ -509,6 +588,18 @@ export const useGoalStore = create<GoalState>((set, get) => ({
 
   bulkDeleteGoals: async (ids) => {
     set({ loading: true, error: null });
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+    if (!isAuthenticated) {
+      set((state) => ({
+        goals: state.goals.filter((g) => !ids.includes(g.id)),
+        loading: false,
+      }));
+      await setCachedMetadata("guest_goals", get().goals);
+      get().fetchStats();
+      return;
+    }
+
     try {
       await api.post(`/api/goals/bulk/delete`, { goalIds: ids });
       set((state) => ({
@@ -524,9 +615,54 @@ export const useGoalStore = create<GoalState>((set, get) => ({
   },
 
   completeGoalProgress: async (id, note) => {
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
     const isOffline = !navigator.onLine;
     const logId = generateUUID();
     const completedAt = new Date().toISOString();
+
+    if (!isAuthenticated) {
+      // Update local state in memory immediately
+      let updatedGoal: Goal | null = null;
+      set((state) => {
+        const newGoals = state.goals.map((g) => {
+          if (g.id === id) {
+            const nextCount = g.current_count + 1;
+            updatedGoal = {
+              ...g,
+              current_count: nextCount,
+              status: nextCount >= g.target_count ? "completed" : "active",
+            };
+            return updatedGoal;
+          }
+          return g;
+        });
+        return { goals: newGoals };
+      });
+
+      // Save updated guest goals to IndexedDB
+      await setCachedMetadata("guest_goals", get().goals);
+
+      // Refresh local stats
+      get().fetchStats();
+
+      // Show guest auth prompt
+      get().setShowGuestAuthModal(true, "sync");
+
+      // Return simulated response
+      return {
+        success: true,
+        message: "Guest progress updated locally.",
+        goal: updatedGoal!,
+        log: {
+          id: logId,
+          goal_id: id,
+          user_id: "guest",
+          completed_at: completedAt,
+          note: note || null,
+          created_at: completedAt,
+        },
+      };
+    }
 
     if (isOffline) {
       // Save to syncQueue in IndexedDB
@@ -626,6 +762,34 @@ export const useGoalStore = create<GoalState>((set, get) => ({
   },
 
   deleteLogProgress: async (logId, goalId) => {
+    const isAuthenticated = useAuthStore.getState().isAuthenticated;
+
+    if (!isAuthenticated) {
+      if (goalId) {
+        set((state) => {
+          const newGoals = state.goals.map((g) => {
+            if (g.id === goalId) {
+              const nextCount = Math.max(0, g.current_count - 1);
+              return {
+                ...g,
+                current_count: nextCount,
+                status: nextCount >= g.target_count ? "completed" : "active",
+              };
+            }
+            return g;
+          });
+          return { goals: newGoals };
+        });
+
+        // Save updated guest goals to IndexedDB
+        await setCachedMetadata("guest_goals", get().goals);
+        
+        // Refresh local stats
+        get().fetchStats();
+      }
+      return;
+    }
+
     const pendingAction = await getSyncAction(logId);
     if (pendingAction) {
       const targetGoalId = goalId || pendingAction.goalId;

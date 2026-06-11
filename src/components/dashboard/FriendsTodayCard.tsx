@@ -39,7 +39,7 @@ const FriendsTodayCard: React.FC = () => {
   return (
     <Card className="h-full">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: "var(--color-on-surface)" }}>
           <span>👥</span> Bạn bè hôm nay
         </h2>
       </div>
@@ -51,21 +51,30 @@ const FriendsTodayCard: React.FC = () => {
           </div>
         ) : activities.length === 0 ? (
           <div className="text-center py-6">
-            <p className="text-gray-500 text-sm">Chưa có hoạt động mới từ bạn bè.</p>
+            <p className="text-sm" style={{ color: "var(--color-on-surface-variant)" }}>
+              Chưa có hoạt động mới từ bạn bè.
+            </p>
           </div>
         ) : (
           activities.map((activity) => (
-            <div key={activity.id} className="flex gap-3 items-start p-2 rounded-lg hover:bg-white/5 transition-colors">
+            <div
+              key={activity.id}
+              className="flex gap-3 items-start p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
+            >
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
                 {activity.avatarInitials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-200 leading-tight">
-                  <span className="font-semibold text-white">{activity.userName}</span>
+                <p className="text-sm leading-tight" style={{ color: "var(--color-on-surface-variant)" }}>
+                  <span className="font-semibold" style={{ color: "var(--color-on-surface)" }}>
+                    {activity.userName}
+                  </span>
                   {" vừa check-in "}
-                  <span className="font-medium text-indigo-400">"{activity.goalTitle}"</span>
+                  <span className="font-medium" style={{ color: "var(--color-primary)" }}>
+                    "{activity.goalTitle}"
+                  </span>
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs mt-1" style={{ color: "var(--color-outline)" }}>
                   {getRelativeTime(activity.createdAt)}
                 </p>
               </div>

@@ -404,7 +404,7 @@ export const DashboardPage: React.FC = () => {
     clearDisappearingTimer(goalId);
 
     try {
-      await deleteLogProgress(disappearing.logId);
+      await deleteLogProgress(disappearing.logId, goalId);
 
       setDisappearingGoals((prev) => {
         const next = { ...prev };
