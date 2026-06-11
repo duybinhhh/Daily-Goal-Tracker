@@ -3,7 +3,7 @@
 
 # Changelog
 
-## [Sprint 11-12] - 2026-06-11
+## [Sprint 11] - 2026-06-11
 
 ### 🚀 Discipline Room - Nâng cấp trải nghiệm học tập & làm việc cùng nhau
 
@@ -77,6 +77,19 @@
 * Tối ưu khu vực chat, bảng thống kê và thông tin partner để dễ theo dõi hơn.
 * Việt hóa giao diện và cải thiện khả năng hiển thị trên màn hình desktop.
 * Bổ sung các chỉ số nhanh giúp người dùng nắm được trạng thái phiên tập trung ngay lập tức.
+* Bổ sung tùy chọn thời gian **1 phút** khi tạo phòng ký luật (và trong bộ lọc danh sách phòng chờ công khai) để người dùng dễ dàng thử nghiệm nhanh hoặc tham gia các phiên tập trung siêu ngắn.
+
+#### 📊 Tối ưu Báo cáo Phiên (Session Report UX & Partner Comparison)
+
+* **Thiết kế giao diện 2 cột tinh tế**: Chuyển đổi giao diện báo cáo từ một cột kéo dài ("phình to") sang dạng Dashboard 2 cột trên desktop. Cột trái dành cho các chỉ số tổng hợp, biểu đồ phân bổ thời gian học tập, và nhận xét AI Coach; Cột phải dành cho phân tích chi tiết hành vi và so sánh đối phương.
+* **Đánh giá điểm mạnh/cải thiện thông minh**: Tự động phân tích sâu dữ liệu camera thực tế (ví dụ: tư thế cúi đầu, hướng chú ý của mắt, thời gian vắng mặt, sự tập trung liên tục, thời gian đọc sách/ghi chép) để xuất ra danh sách điểm tốt và điểm cần cải thiện cụ thể, thực tế.
+* **Bảng so sánh đối kháng/đồng hành (Partner Comparison)**:
+  * Huy hiệu phân định kết quả thắng, thua hoặc hòa dựa trên Focus Score.
+  * Hiển thị song song mục tiêu học tập (Session Goals) của bạn và partner đặt ra trước phiên.
+  * Biểu đồ thanh so sánh kép (Focus Score & Sự hiện diện) hiển thị trực quan tỷ lệ tương quan giữa hai thành viên.
+  * So sánh đối chiếu số lần rời camera (Away Count) trực tiếp.
+* **Dòng thời gian thu gọn**: Giới hạn chiều cao và bọc dòng thời gian sự kiện bằng thanh cuộn mượt mà để tránh đẩy trang xuống quá dài.
+* **Khắc phục lỗi biên dịch**: Sửa các lỗi cú pháp JSX lồng nhau bị lỗi trước đó trong hàm renderReport, đảm bảo dự án chạy ổn định 100%.
 
 ---
 
@@ -92,9 +105,6 @@ Discipline Room đã được nâng cấp từ một phòng tập trung đơn gi
 * Nhận báo cáo và đánh giá chi tiết sau mỗi phiên.
 
 
-
-
-
 ## [Sprint 10] - 2026-06-10
 
 ### Discipline Room — Full-stack Integration & AI Camera Breakthrough
@@ -104,7 +114,6 @@ Discipline Room đã được nâng cấp từ một phòng tập trung đơn gi
 ## Đã thêm
 
 ### Discipline Room — Phòng Kỷ Luật
-
 * Nâng cấp **Discipline Room** từ bản demo local thành một tính năng có dữ liệu thật, API thật và được tích hợp trực tiếp vào hệ thống **Daily Goal Tracker**.
 * Người dùng có thể tạo phòng kỷ luật, mời partner bằng mã phòng, bắt đầu phiên tập trung, theo dõi trạng thái trong phiên và nhận báo cáo sau khi hoàn thành.
 * Discipline Room giúp sản phẩm không chỉ dừng lại ở việc tạo mục tiêu, tick hoàn thành, streak và XP, mà mở rộng thành trải nghiệm **cam kết tập trung có AI hỗ trợ giám sát và phản hồi**.

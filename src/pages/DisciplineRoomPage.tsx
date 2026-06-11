@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Camera, CameraOff, Users, Clock, Zap, Target, Award, Copy, Check, Info, Brain, Loader2, ArrowRight, Maximize2, Minimize2, ChevronRight, ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
@@ -145,6 +145,11 @@ export function DisciplineRoomPage() {
 
   const aiConfidenceRef = useRef(100);
   useEffect(() => { aiConfidenceRef.current = aiConfidence; }, [aiConfidence]);
+  useEffect(() => { focusScoreRef.current = focusScore; }, [focusScore]);
+  useEffect(() => { attentionScoreRef.current = attentionScore; }, [attentionScore]);
+  useEffect(() => { presenceScoreRef.current = presenceScore; }, [presenceScore]);
+  useEffect(() => { awayCountStateRef.current = awayCount; }, [awayCount]);
+  useEffect(() => { activeAlertRef.current = activeAlert; }, [activeAlert]);
 
   const [isDetectorLoading, setIsDetectorLoading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -168,6 +173,12 @@ export function DisciplineRoomPage() {
 
   // Report State
   const [serverReport, setServerReport] = useState<SessionReport | null>(null);
+  // Partner final snapshot (saved before session ends for report comparison)
+  const [reportPartnerName, setReportPartnerName] = useState("");
+  const [reportPartnerFocusScore, setReportPartnerFocusScore] = useState<number | null>(null);
+  const [reportPartnerPresenceScore, setReportPartnerPresenceScore] = useState<number | null>(null);
+  const [reportPartnerAwayCount, setReportPartnerAwayCount] = useState<number | null>(null);
+  const [reportPartnerGoal, setReportPartnerGoal] = useState("");
 
   // ─── Fetch Waiting Rooms ──────────────────────────────────────────────────
   const fetchWaitingRooms = async (silent = false) => {
@@ -201,6 +212,11 @@ export function DisciplineRoomPage() {
   const frameBroadcastIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const partnerPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const cameraStatusRef = useRef<AIStatus>("Detecting");
+  const focusScoreRef = useRef(100);
+  const attentionScoreRef = useRef(100);
+  const presenceScoreRef = useRef(100);
+  const awayCountStateRef = useRef(0);
+  const activeAlertRef = useRef<{ type: string; message: string; severity: 'light' | 'strong' } | null>(null);
   // Unique per browser tab — lets the server distinguish two tabs of the same account
   const clientIdRef = useRef(`tab-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
@@ -267,11 +283,14 @@ export function DisciplineRoomPage() {
         if (res.data.frame) {
           setPartnerFrame(res.data.frame);
           setPartnerStatus(res.data.status || "Focused");
-          setPartnerFocusScore(res.data.focusScore || 100);
-          setPartnerPresenceScore(res.data.presenceScore || 100);
-          setPartnerAwayCount(res.data.awayCount || 0);
+          setPartnerFocusScore(res.data.focusScore ?? 100);
+          setPartnerPresenceScore(res.data.presenceScore ?? 100);
+          setPartnerAwayCount(res.data.awayCount ?? 0);
         } else {
           setPartnerStatus("Camera Off");
+          if (res.data.focusScore !== undefined) setPartnerFocusScore(res.data.focusScore);
+          if (res.data.presenceScore !== undefined) setPartnerPresenceScore(res.data.presenceScore);
+          if (res.data.awayCount !== undefined) setPartnerAwayCount(res.data.awayCount);
         }
       } catch {
         // Silently ignore network errors during polling
@@ -466,7 +485,15 @@ export function DisciplineRoomPage() {
     setTotalSeconds(0);
     setFocusScore(100);
     setPresenceScore(100);
+    setAttentionScore(100);
+    setAiConfidence(100);
     setAwayCount(0);
+    focusScoreRef.current = 100;
+    presenceScoreRef.current = 100;
+    attentionScoreRef.current = 100;
+    awayCountStateRef.current = 0;
+    aiConfidenceRef.current = 100;
+    activeAlertRef.current = null;
     setTimelineEvents([]);
     timelineEventsRef.current = [];
     addTimelineEvent("Session Started");
@@ -562,16 +589,16 @@ export function DisciplineRoomPage() {
     api.post(`/api/discipline-room/${roomId}/frame`, {
       frame: frameData,
       status: cameraStatusRef.current,
-      focusScore,
-      attentionScore,
-      presenceScore,
+      focusScore: focusScoreRef.current,
+      attentionScore: attentionScoreRef.current,
+      presenceScore: presenceScoreRef.current,
       totalFocusedTime: totalFocusedSecondsRef.current,
       totalReadingWritingTime: totalReadingWritingSecondsRef.current,
       totalAwayTime: totalAwaySecondsRef.current,
-      awayCount,
-      currentAlertType: activeAlert?.type || null,
+      awayCount: awayCountStateRef.current,
+      currentAlertType: activeAlertRef.current?.type || null,
       lastEventType: timelineEventsRef.current[timelineEventsRef.current.length - 1]?.type || null,
-      aiConfidence,
+      aiConfidence: aiConfidenceRef.current,
       clientId: clientIdRef.current,
     }).catch(() => {});
   };
@@ -735,12 +762,18 @@ export function DisciplineRoomPage() {
       
       const avgConfidence = Math.round(confidenceSumRef.current / totalTicksRef.current);
 
+      const nextAttention = Math.min(100, attention);
+      const nextAwayCount = awayCountRef.current;
       setPresenceScore(presence);
-      setAttentionScore(Math.min(100, attention));
+      setAttentionScore(nextAttention);
       setAiConfidence(avgConfidence);
-      setAwayCount(awayCountRef.current);
+      setAwayCount(nextAwayCount);
       setLookingAwayCount(lookingAwayCountRef.current);
       setHeadDownCount(headDownCountRef.current);
+      presenceScoreRef.current = presence;
+      attentionScoreRef.current = nextAttention;
+      awayCountStateRef.current = nextAwayCount;
+      aiConfidenceRef.current = avgConfidence;
 
       // Focus Score Logic (V2 improved)
       let focus = 100;
@@ -751,15 +784,21 @@ export function DisciplineRoomPage() {
         (awayCountRef.current * 5);
       
       focus = 100 - (penalty / totalTicksRef.current * 100);
-      setFocusScore(Math.max(0, Math.min(100, Math.round(focus))));
-
+      const nextFocusScore = Math.max(0, Math.min(100, Math.round(focus)));
+      setFocusScore(nextFocusScore);
+      focusScoreRef.current = nextFocusScore;
     } catch (err) {
-      console.warn("Face detection error:", err);
+      console.error("Detection error:", err);
     }
   };
 
-  // ─── End session ─────────────────────────────────────────────────────────────
   const handleEndSession = async () => {
+    setReportPartnerName(partnerName);
+    setReportPartnerFocusScore(partnerFocusScore);
+    setReportPartnerPresenceScore(partnerPresenceScore);
+    setReportPartnerAwayCount(partnerAwayCount);
+    setReportPartnerGoal(partnerGoal);
+
     cleanupSession();
     setIsActionLoading(true);
     addTimelineEvent("Session Ended");
@@ -780,15 +819,15 @@ export function DisciplineRoomPage() {
 
       const response = await api.post(`/api/discipline-room/${roomId}/end`, {
         durationSeconds: timeSpent,
-        presenceScore,
-        focusScore,
-        attentionScore,
-        awayCount,
-        lookingAwayCount,
-        headDownCount,
+        presenceScore: presenceScoreRef.current,
+        focusScore: focusScoreRef.current,
+        attentionScore: attentionScoreRef.current,
+        awayCount: awayCountStateRef.current,
+        lookingAwayCount: lookingAwayCountRef.current,
+        headDownCount: headDownCountRef.current,
         readingWritingTime: totalReadingWritingSecondsRef.current,
         totalAwayTime: totalAwaySecondsRef.current,
-        aiConfidence,
+        aiConfidence: aiConfidenceRef.current,
         metadata
       });
       setServerReport(response.data.report);
@@ -810,6 +849,11 @@ export function DisciplineRoomPage() {
     setInviteCode("");
     setInviteCodeInput("");
     setServerReport(null);
+    setReportPartnerName("");
+    setReportPartnerFocusScore(null);
+    setReportPartnerPresenceScore(null);
+    setReportPartnerAwayCount(null);
+    setReportPartnerGoal("");
     setIsMaximized(false);
     setIsSidebarOpen(true);
   };
@@ -970,8 +1014,8 @@ export function DisciplineRoomPage() {
 
       <div>
         <label className="block text-sm font-semibold mb-2 ml-1">Thời gian</label>
-        <div className="grid grid-cols-3 gap-3">
-          {[5, 15, 25].map(d => (
+        <div className="grid grid-cols-4 gap-2">
+          {[1, 5, 15, 25].map(d => (
             <button
               key={d}
               onClick={() => setDuration(d)}
@@ -1072,6 +1116,7 @@ export function DisciplineRoomPage() {
             className="px-4 py-2 rounded-xl bg-[var(--color-surface-container-high)] border border-[var(--border-subtle)] text-xs font-bold outline-none flex-1"
           >
             <option value="All">Mọi thời lượng</option>
+            <option value="1">1 phút</option>
             <option value="5">5 phút</option>
             <option value="15">15 phút</option>
             <option value="25">25 phút</option>
@@ -1992,17 +2037,45 @@ export function DisciplineRoomPage() {
   );
 
   const renderReport = () => {
+    const localXp = (() => {
+      let xp = 30;
+      if (focusScore >= 90) xp = 200;
+      else if (focusScore >= 80) xp = 160;
+      else if (focusScore >= 70) xp = 120;
+      else if (focusScore >= 50) xp = 80;
+
+      if (presenceScore >= 90 && attentionScore >= 80) xp += 30;
+      if (awayCount === 0) xp += 20;
+      return Math.min(xp, 250);
+    })();
+
+    const localAiInsight = (() => {
+      if (focusScore >= 90) {
+        return "Tuyệt vời! Bạn đã duy trì sự tập trung cực kỳ ấn tượng. Phong độ đỉnh cao!";
+      }
+      if (presenceScore < 70) {
+        return "Mức độ hiện diện của bạn khá thấp. Sự hiện diện liên tục trước camera giúp AI hỗ trợ bạn duy trì kỷ luật tốt hơn.";
+      }
+      if (focusScore >= 70) {
+        return "Khá ổn! Bạn có một vài lần mất tập trung nhỏ, nhưng tổng thể vẫn rất hiệu quả. Tiếp tục phát huy nhé!";
+      } else if (focusScore >= 50) {
+        return "Phiên làm việc có khá nhiều xao nhãng. Hãy thử dọn dẹp không gian và chọn phiên ngắn hơn để rèn luyện sự tập trung.";
+      } else {
+        return "Mức độ tập trung khá thấp. Đừng quá khắt khe với bản thân, hãy nghỉ ngơi một chút và thử lại với tâm thế thoải mái hơn nhé.";
+      }
+    })();
+
     const report: SessionReport = serverReport || {
-      xp_earned: 30,
-      focus_score: focusScore,
-      presence_score: presenceScore,
-      attention_score: attentionScore,
-      away_count: awayCount,
-      looking_away_count: lookingAwayCount,
-      head_down_count: headDownCount,
+      xp_earned: localXp,
+      focus_score: focusScoreRef.current,
+      presence_score: presenceScoreRef.current,
+      attention_score: attentionScoreRef.current,
+      away_count: awayCountStateRef.current,
+      looking_away_count: lookingAwayCountRef.current,
+      head_down_count: headDownCountRef.current,
       duration_seconds: totalSeconds,
-      ai_insight: "Dữ liệu báo cáo local (Server fallback).",
-      ai_confidence: aiConfidence,
+      ai_insight: localAiInsight,
+      ai_confidence: aiConfidenceRef.current,
       reading_writing_time: totalReadingWritingSecondsRef.current,
       total_away_time: totalAwaySecondsRef.current,
       metadata: {
@@ -2018,132 +2091,355 @@ export function DisciplineRoomPage() {
       }
     };
 
-    const timeSpent = report.duration_seconds;
-    const sessionDurationText = `${Math.floor(timeSpent / 60)} phút ${(timeSpent % 60).toString().padStart(2, '0')} giây`;
+    const t = report.duration_seconds;
+    const mins = Math.floor(t / 60);
+    const secs = (t % 60).toString().padStart(2, '0');
+    const focusedPct = t > 0 ? Math.round(((report.metadata?.total_focused_time || 0) + (report.metadata?.total_reading_writing_time || 0)) / t * 100) : 0;
+
+    // Strengths & Improvements
+    const strengths: string[] = [];
+    const improvements: string[] = [];
+
+    // Focus Score Rules
+    if (report.focus_score >= 90) {
+      strengths.push(`Duy trì hiệu suất tập trung xuất sắc ({report.focus_score}%)`);
+    } else if (report.focus_score >= 75) {
+      strengths.push(`Duy trì sự tập trung khá tốt ({report.focus_score}%)`);
+    } else {
+      improvements.push(`Tập trung chưa liên tục ({report.focus_score}%) - Hãy thử loại bỏ điện thoại khỏi tầm mắt`);
+    }
+
+    // Attention Score Rules
+    if (report.attention_score >= 85) {
+      strengths.push(`Khả năng chú ý cao (${report.attention_score}%), rất ít bị phân tâm xung quanh`);
+    } else {
+      improvements.push(`Hay nhìn ra ngoài (${report.attention_score}% chú ý) - Cố gắng ngồi ở góc yên tĩnh hơn`);
+    }
+
+    // Presence Score Rules
+    if (report.presence_score >= 90) {
+      strengths.push(`Hiện diện đầy đủ trước màn hình (${report.presence_score}% thời gian)`);
+    } else {
+      improvements.push(`Rời khỏi camera khá nhiều (${report.presence_score}% hiện diện) - Hạn chế đi lại tự do`);
+    }
+
+    // Away Count Rules
+    if (report.away_count === 0) {
+      strengths.push("Không rời bàn làm việc một lần nào trong suốt phiên");
+    } else if (report.away_count <= 2) {
+      improvements.push(`Rời bàn ${report.away_count} lần - Chuẩn bị sẵn nước uống và dụng cụ trước khi học`);
+    } else {
+      improvements.push(`Rời bàn quá nhiều (${report.away_count} lần) - Dễ làm gián đoạn luồng tư duy sâu`);
+    }
+
+    // Head Down Rules
+    const headDownTime = report.metadata?.total_head_down_time || 0;
+    if (headDownTime > 30) {
+      improvements.push(`Cúi đầu thấp hoặc che mặt (${headDownTime}s) - Giữ tư thế ngồi thẳng để AI nhận diện tốt hơn`);
+    } else if (headDownTime > 0 && headDownTime <= 30) {
+      strengths.push("Tư thế ngồi chuẩn, ít cúi đầu che khuất khuôn mặt");
+    }
+
+    // Reading / Writing Rules
+    const readWriteTime = report.metadata?.total_reading_writing_time || 0;
+    if (readWriteTime > 0) {
+      strengths.push(`Đã ghi chép / đọc sách học tập tích cực trong ${readWriteTime}s`);
+    }
+
+    // Backup if empty
+    if (strengths.length === 0) {
+      strengths.push("Đã hoàn thành phiên học tập và nỗ lực hết mình");
+    }
+    if (improvements.length === 0) {
+      improvements.push("Không có điểm yếu đáng kể - Phiên học hoàn hảo!");
+    }
+
+    // Partner comparison
+    const hasPartner = reportPartnerFocusScore !== null;
+    const myScore = report.focus_score;
+    const partnerScore = reportPartnerFocusScore ?? 0;
+    const myWins = myScore > partnerScore;
+    const tied = myScore === partnerScore;
 
     return (
-      <div className="max-w-4xl mx-auto mt-6 md:mt-10 p-8 md:p-10 rounded-[3rem] bg-[var(--color-surface-container)] border border-[var(--border-subtle)] shadow-2xl shadow-black/20 overflow-y-auto max-h-[90vh]">
-        <div className="text-center mb-10">
-          <div className="relative inline-flex mb-6">
-            <div className="absolute inset-0 bg-[var(--color-primary)] rounded-3xl blur-2xl opacity-30 animate-pulse"></div>
-            <div className="relative inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-[var(--color-primary)] to-blue-500 text-white shadow-2xl">
-              <Award size={48} />
-            </div>
-          </div>
-          <h2 className="text-4xl font-black mb-2 tracking-tight">Session Complete!</h2>
-          <p className="text-[var(--color-on-surface-variant)] font-medium text-lg">{title} ({report.metadata?.mode})</p>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="p-4 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
-            <span className="text-2xl font-black tracking-tighter">{sessionDurationText}</span>
-            <span className="text-[8px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1">Duration</span>
-          </div>
-          <div className="p-4 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
-            <span className="text-2xl font-black text-yellow-500 tracking-tighter">+{report.xp_earned} XP</span>
-            <span className="text-[8px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1">Exp Earned</span>
-          </div>
-          <div className="p-4 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
-            <span className="text-2xl font-black text-[var(--color-primary)] tracking-tighter">{report.focus_score}%</span>
-            <span className="text-[8px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1">Focus Score</span>
-          </div>
-          <div className="p-4 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
-            <span className="text-2xl font-black text-green-500 tracking-tighter">{report.attention_score}%</span>
-            <span className="text-[8px] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-[0.2em] mt-1">Attention</span>
-          </div>
-        </div>
-
-        {/* Duration Breakdown */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-          <div className="space-y-4">
-            <h4 className="font-black uppercase tracking-widest text-xs text-[var(--color-on-surface-variant)]">Time Breakdown</h4>
-            <div className="space-y-3">
-              {[
-                { label: 'Focused', value: report.metadata?.total_focused_time || 0, color: 'bg-green-500' },
-                { label: 'Reading/Writing', value: report.metadata?.total_reading_writing_time || 0, color: 'bg-blue-500' },
-                { label: 'Looking Away', value: report.metadata?.total_looking_away_time || 0, color: 'bg-yellow-500' },
-                { label: 'Head Down', value: report.metadata?.total_head_down_time || 0, color: 'bg-orange-500' },
-                { label: 'Away', value: report.metadata?.total_away_time || 0, color: 'bg-red-500' },
-              ].map(item => (
-                <div key={item.label}>
-                  <div className="flex justify-between text-[10px] font-bold uppercase mb-1">
-                    <span>{item.label}</span>
-                    <span>{item.value}s</span>
-                  </div>
-                  <div className="w-full h-2 bg-[var(--color-surface-container-high)] rounded-full overflow-hidden">
-                    <div className={`h-full ${item.color}`} style={{ width: `${(item.value / timeSpent) * 100}%` }}></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="p-6 rounded-3xl bg-[var(--color-surface)] border border-[var(--border-subtle)] shadow-inner">
-             <h4 className="font-black uppercase tracking-widest text-xs mb-4 text-[var(--color-on-surface-variant)]">Checkpoints</h4>
-             <div className="flex items-center justify-center h-32 flex-col gap-2">
-                <span className="text-5xl font-black text-[var(--color-primary)]">{report.metadata?.manual_checkpoint_count || 0}</span>
-                <span className="text-[10px] font-bold uppercase opacity-60">Xác nhận thủ công</span>
-             </div>
-          </div>
-        </div>
-
-        {/* AI Insight */}
-        <div className="p-8 rounded-[2rem] border bg-[var(--color-primary-container)]/30 border-[var(--color-primary)]/20 mb-10 shadow-inner">
-          <div className="flex items-start gap-4">
-            <div className="p-3 rounded-2xl bg-[var(--color-primary-container)]/50">
-               <Brain size={32} className="text-[var(--color-primary)]" />
-            </div>
-            <div>
-              <h4 className="font-black uppercase tracking-[0.2em] text-xs mb-2 text-[var(--color-primary)]">AI Coach Insight</h4>
-              <p className="text-lg font-medium leading-relaxed text-[var(--color-on-surface)]">{report.ai_insight}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Timeline Section */}
-        <div className="mb-10">
-          <h4 className="font-black uppercase tracking-widest text-xs mb-4 text-[var(--color-on-surface-variant)]">Session Timeline</h4>
-          <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-            {report.metadata?.timeline.map((ev, idx) => (
-              <div key={idx} className="flex items-center gap-4 p-3 bg-[var(--color-surface)] border border-[var(--border-subtle)] rounded-2xl">
-                <div className="text-[10px] font-mono opacity-50 w-12">
-                  {ev.startTime ? new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "--:--:--"}
-                </div>
-                <div className={`w-2 h-2 rounded-full ${
-                  ev.type === 'Focused' ? 'bg-green-500' :
-                  ev.type === 'Reading/Writing' ? 'bg-blue-500' :
-                  ev.type === 'Away' ? 'bg-red-500' :
-                  ev.type === 'Manual Checkpoint' ? 'bg-purple-500' : 'bg-yellow-500'
-                }`}></div>
-                <div className="flex-1">
-                  <div className="text-sm font-bold">{ev.type}</div>
-                  {ev.note && <div className="text-[10px] opacity-70 italic">{ev.note}</div>}
-                </div>
-                {ev.durationSeconds !== undefined && <div className="text-[10px] font-bold opacity-60">{ev.durationSeconds}s</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-
+      <div className="max-w-5xl mx-auto mt-4 space-y-4 pb-12">
         <style>{`
-          .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-          .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 10px; }
+          .rscroll::-webkit-scrollbar { width: 4px; }
+          .rscroll::-webkit-scrollbar-track { background: transparent; }
+          .rscroll::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 10px; }
         `}</style>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button
-            onClick={resetRoom}
-            className="w-full py-5 rounded-[1.5rem] font-black text-lg bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-95 transition-all shadow-xl shadow-[var(--color-primary)]/30 active:scale-95"
-          >
-            Tạo phòng mới
-          </button>
-          <button
-            onClick={() => navigate("/")}
-            className="w-full py-5 rounded-[1.5rem] font-black text-lg bg-[var(--color-surface-container-high)] text-[var(--color-on-surface)] hover:bg-[var(--color-surface-container-highest)] transition-all active:scale-95"
-          >
-            Về Dashboard
-          </button>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* CỘT TRÁI (6/12): Tóm tắt chung, Phân bổ thời gian, AI Coach, Nút bấm */}
+          <div className="lg:col-span-6 space-y-4">
+            
+            {/* Hero Card */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--color-primary)] via-violet-600 to-blue-600 p-5 text-white shadow-xl">
+              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 20%, white 0%, transparent 60%)' }} />
+              
+              <div className="relative flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0 shadow-inner">
+                    <Award size={24} className="text-yellow-300" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight leading-tight">Phiên hoàn thành!</h2>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-white/80">
+                      <span className="font-bold text-yellow-300">+{report.xp_earned} XP</span>
+                      <span>•</span>
+                      <span>{mins}p {secs}s</span>
+                      <span>•</span>
+                      <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">{report.metadata?.mode}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-4xl font-black tracking-tighter leading-none">{report.focus_score}%</div>
+                  <div className="text-[9px] font-black uppercase tracking-widest opacity-60 mt-0.5">Focus Score</div>
+                </div>
+              </div>
+
+              <div className="relative grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-white/15 text-center">
+                {[
+                  { label: 'Sự hiện diện', val: `${report.presence_score}%`, c: 'text-cyan-200' },
+                  { label: 'Sự chú ý', val: `${report.attention_score}%`, c: 'text-emerald-200' },
+                  { label: 'Tỷ lệ tập trung', val: `${focusedPct}%`, c: 'text-white' },
+                ].map(m => (
+                  <div key={m.label} className="bg-white/5 py-1.5 rounded-xl border border-white/5">
+                    <div className={`text-base font-black ${m.c}`}>{m.val}</div>
+                    <div className="text-[8px] font-black uppercase opacity-60 tracking-wider mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Time Breakdown (stacked bar) */}
+            <div className="rounded-2xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-wider text-[var(--color-on-surface-variant)] mb-3">Phân bổ thời gian</p>
+              <div className="flex gap-0.5 h-5 rounded-lg overflow-hidden mb-3 bg-[var(--border-subtle)]">
+                {[
+                  { val: report.metadata?.total_focused_time || 0, color: 'bg-green-500' },
+                  { val: report.metadata?.total_reading_writing_time || 0, color: 'bg-blue-500' },
+                  { val: report.metadata?.total_looking_away_time || 0, color: 'bg-yellow-400' },
+                  { val: report.metadata?.total_head_down_time || 0, color: 'bg-orange-400' },
+                  { val: report.metadata?.total_away_time || 0, color: 'bg-red-500' },
+                ].filter(i => i.val > 0).map((item, idx) => (
+                  <div key={idx} className={`${item.color} h-full transition-all`} style={{ flex: item.val }} />
+                ))}
+                {t === 0 && <div className="bg-gray-300 h-full flex-1" />}
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {[
+                  { label: 'Tập trung', val: report.metadata?.total_focused_time || 0, dot: 'bg-green-500' },
+                  { label: 'Đọc / Ghi chép', val: report.metadata?.total_reading_writing_time || 0, dot: 'bg-blue-500' },
+                  { label: 'Nhìn xung quanh', val: report.metadata?.total_looking_away_time || 0, dot: 'bg-yellow-400' },
+                  { label: 'Cúi đầu / Lơ đãng', val: report.metadata?.total_head_down_time || 0, dot: 'bg-orange-400' },
+                  { label: 'Vắng mặt', val: report.metadata?.total_away_time || 0, dot: 'bg-red-500' },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center gap-1.5 py-1 px-2 rounded-xl bg-[var(--color-surface)] border border-[var(--border-subtle)]">
+                    <div className={`w-2 h-2 rounded-full ${item.dot} shrink-0`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] text-[var(--color-on-surface-variant)] truncate leading-none">{item.label}</p>
+                      <p className="text-xs font-black mt-0.5 leading-none">{item.val}s</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* AI Coach Insight */}
+            <div className="rounded-2xl bg-[var(--color-primary-container)]/10 border border-[var(--color-primary)]/15 p-4 flex gap-3 items-start shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-[var(--color-primary-container)]/50 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                <Brain size={18} className="text-[var(--color-primary)]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-primary)] mb-1">AI Coach Insights</p>
+                <p className="text-xs font-medium leading-relaxed text-[var(--color-on-surface)] italic">
+                  "{report.ai_insight || "Bạn đã duy trì được tinh thần học tập khá nghiêm túc trong phiên này. Hãy tiếp tục phát huy!"}"
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={resetRoom}
+                className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-sm bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-95 transition-all shadow-md shadow-[var(--color-primary)]/20 active:scale-95"
+              >
+                Tạo phòng mới
+              </button>
+              <button
+                onClick={() => navigate("/")}
+                className="flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-sm bg-[var(--color-surface-container-high)] text-[var(--color-on-surface)] border border-[var(--border-subtle)] hover:bg-[var(--color-surface-container-highest)] transition-all active:scale-95"
+              >
+                Về Dashboard
+              </button>
+            </div>
+
+          </div>
+
+          {/* CỘT PHẢI (6/12): Phân tích chi tiết hành vi, So sánh đối phương, Timeline */}
+          <div className="lg:col-span-6 space-y-4">
+            
+            {/* Phân tích hành vi */}
+            <div className="rounded-2xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] p-4 shadow-sm space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-wider text-[var(--color-on-surface-variant)]">Đánh giá hành vi chi tiết</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Làm tốt */}
+                <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/15 p-3">
+                  <div className="flex items-center gap-1.5 mb-2 text-emerald-600">
+                    <Check size={14} className="stroke-[3]" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">Làm tốt</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {strengths.map((s, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                        <span className="text-[11px] text-[var(--color-on-surface-variant)] leading-tight">{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Cần cải thiện */}
+                <div className="rounded-xl bg-amber-500/5 border border-amber-500/15 p-3">
+                  <div className="flex items-center gap-1.5 mb-2 text-amber-600">
+                    <Target size={14} className="stroke-[3]" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">Cần cải thiện</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {improvements.map((s, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                        <span className="text-[11px] text-[var(--color-on-surface-variant)] leading-tight">{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Partner Comparison */}
+            {hasPartner && (
+              <div className="rounded-2xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
+                  <div className="flex items-center gap-2">
+                    <Users size={16} className="text-[var(--color-primary)]" />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[var(--color-on-surface-variant)]">So sánh với {reportPartnerName || "Partner"}</span>
+                  </div>
+                  
+                  {tied ? (
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-600 flex items-center gap-1">🤝 Hòa nhau</span>
+                  ) : myWins ? (
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center gap-1">🏆 Bạn thắng</span>
+                  ) : (
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 flex items-center gap-1">🥈 {reportPartnerName || 'Partner'} thắng</span>
+                  )}
+                </div>
+
+                {/* Goals Side-by-Side */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--border-subtle)]">
+                    <p className="text-[8px] font-black uppercase tracking-wider text-[var(--color-on-surface-variant)] mb-1">Mục tiêu của bạn</p>
+                    <p className="text-xs font-semibold text-[var(--color-on-surface)] line-clamp-2">{localGoal || "Không đặt mục tiêu"}</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[var(--color-surface)] border border-[var(--border-subtle)]">
+                    <p className="text-[8px] font-black uppercase tracking-wider text-[var(--color-on-surface-variant)] mb-1">Mục tiêu của {reportPartnerName || "Partner"}</p>
+                    <p className="text-xs font-semibold text-[var(--color-on-surface)] line-clamp-2">{reportPartnerGoal || "Không đặt mục tiêu"}</p>
+                  </div>
+                </div>
+
+                {/* Metrics Bars */}
+                <div className="space-y-3 pt-1">
+                  
+                  {/* Focus Score Comparison */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-bold">
+                      <span className="text-[var(--color-on-surface-variant)]">Focus Score</span>
+                      <div>
+                        <span className="text-violet-500 font-black">Bạn: {myScore}%</span>
+                        <span className="text-[var(--color-on-surface-variant)] mx-1">vs</span>
+                        <span className="text-blue-500 font-black">{reportPartnerName || "Partner"}: {partnerScore}%</span>
+                      </div>
+                    </div>
+                    <div className="h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden flex">
+                      <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${(myScore / (myScore + partnerScore || 1)) * 100}%` }} />
+                      <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600" style={{ width: `${(partnerScore / (myScore + partnerScore || 1)) * 100}%` }} />
+                    </div>
+                  </div>
+
+                  {/* Presence Score Comparison */}
+                  {reportPartnerPresenceScore !== null && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span className="text-[var(--color-on-surface-variant)]">Sự Hiện diện</span>
+                        <div>
+                          <span className="text-violet-500 font-black">Bạn: {report.presence_score}%</span>
+                          <span className="text-[var(--color-on-surface-variant)] mx-1">vs</span>
+                          <span className="text-blue-500 font-black">{reportPartnerName || "Partner"}: {reportPartnerPresenceScore}%</span>
+                        </div>
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden flex">
+                        <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${(report.presence_score / (report.presence_score + reportPartnerPresenceScore || 1)) * 100}%` }} />
+                        <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600" style={{ width: `${(reportPartnerPresenceScore / (report.presence_score + reportPartnerPresenceScore || 1)) * 100}%` }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Away Count Comparison */}
+                  {reportPartnerAwayCount !== null && (
+                    <div className="flex items-center justify-between text-[10px] font-bold py-2 bg-[var(--color-surface)] border border-[var(--border-subtle)] px-2.5 rounded-xl">
+                      <span className="text-[var(--color-on-surface-variant)]">Số lần rời camera</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-1.5 py-0.5 rounded font-black ${report.away_count === 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                          Bạn: {report.away_count} lần
+                        </span>
+                        <span className="text-[var(--color-on-surface-variant)]">vs</span>
+                        <span className={`px-1.5 py-0.5 rounded font-black ${reportPartnerAwayCount === 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                          {reportPartnerName || "Partner"}: {reportPartnerAwayCount} lần
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            )}
+
+            {/* Timeline */}
+            <div className="rounded-2xl bg-[var(--color-surface-container)] border border-[var(--border-subtle)] p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-wider text-[var(--color-on-surface-variant)] mb-2">Dòng thời gian phiên</p>
+              <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar rscroll pr-1 text-xs">
+                {(report.metadata?.timeline || []).map((ev: any, idx: number) => {
+                  const dateStr = ev.startTime ? new Date(ev.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+                  return (
+                    <div key={idx} className="flex items-start gap-2 text-[var(--color-on-surface-variant)]">
+                      <span className="text-[9px] opacity-50 font-mono mt-0.5 shrink-0">{dateStr}</span>
+                      <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                        ev.type === 'Focused' ? 'bg-green-500' :
+                        ev.type === 'Reading/Writing' ? 'bg-blue-500' :
+                        ev.type === 'Away' ? 'bg-red-500' :
+                        ev.type === 'Manual Checkpoint' ? 'bg-purple-500' : 'bg-yellow-500'
+                      }`}></div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-bold text-[var(--color-on-surface)] truncate">{ev.type}</span>
+                        {ev.note && <span className="text-[10px] opacity-70 italic ml-1.5">({ev.note})</span>}
+                      </div>
+                      {ev.durationSeconds !== undefined && <span className="text-[10px] font-mono opacity-60 shrink-0">{ev.durationSeconds}s</span>}
+                    </div>
+                  );
+                })}
+                {(report.metadata?.timeline || []).length === 0 && (
+                  <p className="text-xs opacity-50 italic text-center py-2">Không có sự kiện ghi nhận.</p>
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
     );

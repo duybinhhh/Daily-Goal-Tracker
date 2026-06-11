@@ -3476,7 +3476,8 @@ var uploadFrame = async (req, res, next) => {
       currentAlertType,
       lastEventType,
       aiConfidence,
-      clientId
+      clientId,
+      awayCount
     } = req.body;
     if (!frame) {
       res.status(400).json({ success: false, message: "frame required" });
@@ -3487,9 +3488,10 @@ var uploadFrame = async (req, res, next) => {
     frameStore.get(id).set(key, {
       frame,
       status: status || "Focused",
-      focusScore: focusScore || 100,
-      attentionScore: attentionScore || 100,
-      presenceScore: presenceScore || 100,
+      focusScore: focusScore ?? 100,
+      attentionScore: attentionScore ?? 100,
+      presenceScore: presenceScore ?? 100,
+      awayCount: awayCount ?? 0,
       totalFocusedTime,
       totalReadingWritingTime,
       totalAwayTime,
@@ -3515,7 +3517,15 @@ var getPartnerFrame = async (req, res, next) => {
     const myClientId = req.query.clientId || "";
     const roomFrames = frameStore.get(id);
     if (!roomFrames) {
-      res.status(200).json({ success: true, frame: null, status: "Camera Off", focusScore: 100 });
+      res.status(200).json({
+        success: true,
+        frame: null,
+        status: "Camera Off",
+        focusScore: 0,
+        presenceScore: 0,
+        attentionScore: 0,
+        awayCount: 0
+      });
       return;
     }
     for (const [cid, data] of roomFrames.entries()) {
@@ -3527,6 +3537,7 @@ var getPartnerFrame = async (req, res, next) => {
             frame: null,
             status: "Camera Off",
             focusScore: data.focusScore,
+            attentionScore: data.attentionScore,
             presenceScore: data.presenceScore,
             awayCount: data.awayCount
           });
@@ -3550,7 +3561,15 @@ var getPartnerFrame = async (req, res, next) => {
         return;
       }
     }
-    res.status(200).json({ success: true, frame: null, status: "Camera Off", focusScore: 100 });
+    res.status(200).json({
+      success: true,
+      frame: null,
+      status: "Camera Off",
+      focusScore: 0,
+      presenceScore: 0,
+      attentionScore: 0,
+      awayCount: 0
+    });
   } catch (error) {
     next(error);
   }

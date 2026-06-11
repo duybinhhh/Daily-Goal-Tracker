@@ -973,6 +973,25 @@ class PrismaDB {
         where: { room_id: roomId, user_id: userId }
       });
       return mapSessionReport(report);
+    },
+    findManyByRoomId: async (roomId: string) => {
+      const reports = await prisma.sessionReport.findMany({
+        where: { room_id: roomId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+        orderBy: { created_at: "asc" }
+      });
+      return reports.map((report: any) => ({
+        ...mapSessionReport(report),
+        user: report.user
+      }));
     }
   };
 }
