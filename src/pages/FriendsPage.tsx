@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import FriendsSearch from "../components/friends/FriendsSearch";
 import { getFriendFeed, getFriendStats } from "../services/friends";
 import { FriendActivity, FriendStats } from "../types";
+import { useAuthStore } from "../store/authStore";
+import { useGoalStore } from "../store/goalStore";
+import { useNavigate } from "react-router-dom";
 
 const getRelativeTime = (dateStr: string) => {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -16,12 +19,23 @@ const getRelativeTime = (dateStr: string) => {
 };
 
 const FriendsPage: React.FC = () => {
+  const { isAuthenticated } = useAuthStore();
+  const { setShowGuestAuthModal } = useGoalStore();
+  const navigate = useNavigate();
   const [activities, setActivities] = useState<FriendActivity[]>([]);
   const [stats, setStats] = useState<FriendStats>({ followingCount: 0, followersCount: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setShowGuestAuthModal(true, "friends");
+      navigate("/");
+    }
+  }, [isAuthenticated, navigate, setShowGuestAuthModal]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
     let isMounted = true;
 
     const loadFriendsData = async () => {
@@ -59,7 +73,9 @@ const FriendsPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isAuthenticated]);
+
+  if (!isAuthenticated) return null;
 
   return (
     <div className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-5 p-4 md:p-6">

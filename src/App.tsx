@@ -24,6 +24,7 @@ import { useGoalStore } from "./store/goalStore";
 import { syncOfflineData } from "./services/syncManager";
 import { LanguageProvider } from "./i18n";
 import LevelUpModal from "./components/LevelUpModal";
+import { GuestAuthModal } from "./components/GuestAuthModal";
 
 
 // Auth Guard for protected workspace screens
@@ -36,6 +37,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+  return <>{children}</>;
+};
+
+const GuestRedirect: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuthStore();
+  const location = useLocation();
+
+  if (isAuthenticated && location.pathname === "/login") {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 };
 
@@ -74,7 +86,7 @@ const RedirectHandler: React.FC<RedirectHandlerProps> = ({ children }) => {
 };
 
 export default function App() {
-  const { checkAuth } = useAuthStore();
+  const { checkAuth, isAuthenticated } = useAuthStore();
   const { setIsOffline } = useGoalStore();
   const syncInitialized = React.useRef(false);
 
@@ -98,7 +110,9 @@ export default function App() {
       // Debounce: network "online" can fire multiple times in quick succession
       if (onlineDebounceTimer) clearTimeout(onlineDebounceTimer);
       onlineDebounceTimer = setTimeout(() => {
-        syncOfflineData();
+        if (useAuthStore.getState().isAuthenticated) {
+          syncOfflineData();
+        }
       }, 500);
     };
     const handleOffline = () => {
@@ -109,9 +123,9 @@ export default function App() {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // Run initial connectivity verification — only once (guards against StrictMode double-invoke)
+    // Run initial connectivity verification â€” only once (guards against StrictMode double-invoke)
     setIsOffline(!navigator.onLine);
-    if (navigator.onLine && !syncInitialized.current) {
+    if (isAuthenticated && navigator.onLine && !syncInitialized.current) {
       syncInitialized.current = true;
       syncOfflineData();
     }
@@ -121,7 +135,7 @@ export default function App() {
       window.removeEventListener("offline", handleOffline);
       if (onlineDebounceTimer) clearTimeout(onlineDebounceTimer);
     };
-  }, [checkAuth, setIsOffline]);
+  }, [checkAuth, isAuthenticated, setIsOffline]);
 
 
   return (
@@ -129,13 +143,20 @@ export default function App() {
       <HashRouter>
         <RedirectHandler>
           <Routes>
-            {/* Public authentication page — no sidebar */}
-            <Route path="/login" element={<LoginPage />} />
+            {/* Public authentication page â€” no sidebar */}
+            <Route
+              path="/login"
+              element={
+                <GuestRedirect>
+                  <LoginPage />
+                </GuestRedirect>
+              }
+            />
 
-            {/* Join page — handles its own auth logic */}
+            {/* Join page â€” handles its own auth logic */}
             <Route path="/join/:inviteCode" element={<JoinGroupPage />} />
 
-            {/* Onboarding page — no sidebar, but protected */}
+            {/* Onboarding page â€” no sidebar, but protected */}
             <Route
               path="/onboarding"
               element={
@@ -144,16 +165,8 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
-            {/* Protected pages — with persistent sidebar */}
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            />
+            {/* Guest-first workspace pages - with persistent sidebar */}
+            <Route path="/*" element={<AppLayout />} />
           </Routes>
         </RedirectHandler>
       </HashRouter>
@@ -166,9 +179,17 @@ import { PomodoroWidget } from "./components/pomodoro/PomodoroWidget";
 
 function AppLayout() {
   const [isAICoachOpen, setIsAICoachOpen] = React.useState(false);
+  const { isAuthenticated } = useAuthStore();
+  const { showGuestAuthModal, guestAuthTrigger, setShowGuestAuthModal } = useGoalStore();
 
   React.useEffect(() => {
-    const handleOpenAICoach = () => setIsAICoachOpen(true);
+    const handleOpenAICoach = () => {
+      if (!useAuthStore.getState().isAuthenticated) {
+        useGoalStore.getState().setShowGuestAuthModal(true, "ai_coach");
+        return;
+      }
+      setIsAICoachOpen(true);
+    };
     window.addEventListener("open-ai-coach", handleOpenAICoach);
     return () => window.removeEventListener("open-ai-coach", handleOpenAICoach);
   }, []);
@@ -200,7 +221,7 @@ function AppLayout() {
       {/* Persistent Left Sidebar */}
       <Sidebar />
 
-      {/* Scrollable main area — fills remaining width */}
+      {/* Scrollable main area â€” fills remaining width */}
       <div
         id="main-scroll-area"
         className="flex-1 min-h-0 flex flex-col md:h-screen"
@@ -230,9 +251,16 @@ function AppLayout() {
 
       <InAppReminderCenter />
 
-      <AICoachDrawer isOpen={isAICoachOpen} onClose={() => setIsAICoachOpen(false)} />
+      <AICoachDrawer isOpen={isAuthenticated && isAICoachOpen} onClose={() => setIsAICoachOpen(false)} />
+      <GuestAuthModal
+        isOpen={showGuestAuthModal && guestAuthTrigger !== "create_goal"}
+        onClose={() => setShowGuestAuthModal(false)}
+        trigger={guestAuthTrigger}
+      />
 
       <PomodoroWidget />
     </div>
   );
 }
+
+

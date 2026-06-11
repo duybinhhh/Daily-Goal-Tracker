@@ -11,6 +11,16 @@ export const vi = {
     stats: 'Thống kê',
     groups: 'Nhóm',
   },
+  guest: {
+    login: 'Đăng nhập',
+    registerFree: 'Đăng ký miễn phí',
+    banner: 'Bạn đang dùng chế độ khách. Dữ liệu chỉ lưu trên thiết bị này.',
+    backupLogin: 'Đăng nhập để sao lưu',
+    continueWithoutLogin: 'Tiếp tục không đăng nhập →',
+    friends: 'Bạn bè',
+    disciplineRoom: 'Phòng Kỷ Luật',
+    disciplineShort: 'Kỷ luật',
+  },
 
   // ── Common / Shared ──
   common: {

@@ -11,9 +11,10 @@ interface BottomNavItemProps {
   icon: string;
   label: string;
   end?: boolean;
+  locked?: boolean;
 }
 
-const BottomNavItem: React.FC<BottomNavItemProps> = ({ to, icon, label, end }) => (
+const BottomNavItem: React.FC<BottomNavItemProps> = ({ to, icon, label, end, locked }) => (
   <NavLink
     to={to}
     end={end}
@@ -25,8 +26,15 @@ const BottomNavItem: React.FC<BottomNavItemProps> = ({ to, icon, label, end }) =
       }`
     }
   >
-    <span className="material-symbols-outlined ms-filled" style={{ fontSize: "22px" }}>
-      {icon}
+    <span className="relative inline-flex">
+      <span className="material-symbols-outlined ms-filled" style={{ fontSize: "22px" }}>
+        {icon}
+      </span>
+      {locked && (
+        <span className="material-symbols-outlined absolute -right-2 -top-1" style={{ fontSize: "11px" }}>
+          lock
+        </span>
+      )}
     </span>
     <span style={{ fontSize: "9px", marginTop: "2px", letterSpacing: "0.02em" }}>{label}</span>
   </NavLink>
@@ -36,8 +44,6 @@ export default function BottomNav() {
   const { isAuthenticated } = useAuthStore();
   const { openDrawer } = useAICoachStore();
   const { t } = useTranslation();
-
-  if (!isAuthenticated) return null;
 
   const handleOpenAICoach = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -63,9 +69,9 @@ export default function BottomNav() {
       <BottomNavItem to="/" icon="home" label={t("nav.home")} end />
       <BottomNavItem to="/stats" icon="query_stats" label={t("nav.stats")} />
       <BottomNavItem to="/goals" icon="checklist" label={t("nav.goals")} />
-      <BottomNavItem to="/friends" icon="people" label="Bạn bè" />
-      <BottomNavItem to="/discipline-room" icon="video_camera_front" label="Kỷ luật" />
-      <BottomNavItem to="/groups" icon="group" label={t("nav.groups")} />
+      <BottomNavItem to="/friends" icon="people" label="Bạn bè" locked={!isAuthenticated} />
+      <BottomNavItem to="/discipline-room" icon="video_camera_front" label="Kỷ luật" locked={!isAuthenticated} />
+      <BottomNavItem to="/groups" icon="group" label={t("nav.groups")} locked={!isAuthenticated} />
       <BottomNavItem to="/timeline" icon="timeline" label={t("nav.timeline")} />
       <button
         type="button"

@@ -14,9 +14,10 @@ interface NavItemProps {
   icon: string;
   label: string;
   end?: boolean;
+  locked?: boolean;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ to, icon, label, end }) => (
+const NavItem: React.FC<NavItemProps> = ({ to, icon, label, end, locked }) => (
   <NavLink
     to={to}
     end={end}
@@ -28,6 +29,11 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, end }) => (
       {icon}
     </span>
     <span>{label}</span>
+    {locked && (
+      <span className="material-symbols-outlined ml-auto" style={{ fontSize: "15px", opacity: 0.75 }}>
+        lock
+      </span>
+    )}
   </NavLink>
 );
 
@@ -43,8 +49,6 @@ export default function Sidebar() {
   const currentLevelData = getLevelFromXP(totalXP);
   const xpToNext = getXPToNextLevel(totalXP);
   const progressPercent = getLevelProgress(totalXP);
-
-  if (!isAuthenticated) return null;
 
   const handleLogout = async () => {
     await logout();
@@ -153,9 +157,9 @@ export default function Sidebar() {
         <NavItem to="/stats" icon="query_stats" label={t("nav.statistics")} />
         <NavItem to="/goals" icon="checklist" label={t("nav.goals")} />
         <NavItem to="/timeline" icon="timeline" label={t("nav.timeline")} />
-        <NavItem to="/groups" icon="group" label={t("nav.habitGroups")} />
-        <NavItem to="/discipline-room" icon="video_camera_front" label="Phòng Kỷ Luật" />
-        <NavItem to="/friends" icon="people" label="Bạn bè" />
+        <NavItem to="/groups" icon="group" label={t("nav.habitGroups")} locked={!isAuthenticated} />
+        <NavItem to="/discipline-room" icon="video_camera_front" label="Phòng Kỷ Luật" locked={!isAuthenticated} />
+        <NavItem to="/friends" icon="people" label="Bạn bè" locked={!isAuthenticated} />
         <button
           type="button"
           onClick={handleOpenAICoach}
@@ -176,6 +180,13 @@ export default function Sidebar() {
           border: "1px solid var(--border-subtle)",
         }}
       >
+        {!isAuthenticated ? (
+          <div className="space-y-2">
+            <button type="button" onClick={() => navigate("/login?tab=login")} className="btn-primary w-full justify-center">Đăng nhập</button>
+            <button type="button" onClick={() => navigate("/login?tab=register")} className="btn-ghost w-full justify-center">Đăng ký miễn phí</button>
+          </div>
+        ) : (
+          <>
         {/* Row 1: Avatar + Level Badge + Name + Logout */}
         <div className="flex items-center gap-3 mb-2">
           {/* Avatar với ring màu theo level */}
@@ -257,6 +268,8 @@ export default function Sidebar() {
             />
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* New Goal Button */}

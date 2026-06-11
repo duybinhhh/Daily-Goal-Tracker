@@ -6,6 +6,31 @@ import api, {
   clearStoredTokens,
 } from "../services/api";
 import { User } from "../types";
+import { clearCachedMetadata } from "../services/indexedDb";
+
+async function clearSessionGoalData() {
+  await Promise.all([
+    clearCachedMetadata("goals"),
+    clearCachedMetadata("guest_goals"),
+    clearCachedMetadata("stats"),
+    clearCachedMetadata("history"),
+  ]);
+
+  try {
+    const { useGoalStore } = await import("./goalStore");
+    useGoalStore.setState({
+      goals: [],
+      stats: null,
+      history: [],
+      loading: false,
+      error: null,
+      isSyncing: false,
+      showGuestAuthModal: false,
+    });
+  } catch (error) {
+    console.warn("Goal store cleanup skipped:", error);
+  }
+}
 
 interface AuthState {
   user: User | null;
@@ -151,6 +176,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     } finally {
       clearStoredTokens();
       localStorage.removeItem("user");
+      localStorage.removeItem("onboarding_completed");
+      await clearSessionGoalData();
       set({ user: null, isAuthenticated: false, error: null });
     }
   },
@@ -203,6 +230,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       clearStoredTokens();
       localStorage.removeItem("user");
       localStorage.removeItem("onboarding_completed");
+      await clearSessionGoalData();
       set({ user: null, isAuthenticated: false, loading: false });
     } catch (error: any) {
       const msg = error.response?.data?.message || "Failed to delete account.";

@@ -10,14 +10,30 @@ import { useTranslation } from "../i18n";
 import { GoalTemplateModal } from "../components/GoalTemplateModal";
 import type { GoalTemplate } from "../data/goalTemplates";
 import { getActiveSubscription, subscribeToPush } from "../services/pushNotification";
+import { useAuthStore } from "../store/authStore";
+import { getCachedMetadata, setCachedMetadata } from "../services/indexedDb";
+import { GuestAuthModal } from "../components/GuestAuthModal";
+import type { Goal } from "../types";
 
 export const GoalFormPage: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const isEdit = !!id;
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
 
-  const { goals, createGoal, updateGoal, loading, error, isOffline, clearError } = useGoalStore();
+  const {
+    goals,
+    createGoal,
+    updateGoal,
+    loading,
+    error,
+    isOffline,
+    clearError,
+    showGuestAuthModal,
+    guestAuthTrigger,
+    setShowGuestAuthModal,
+  } = useGoalStore();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -56,6 +72,7 @@ export const GoalFormPage: React.FC = () => {
 
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [localSaveToast, setLocalSaveToast] = useState("");
 
   useEffect(() => {
     // Clear any previous store errors when mounting GoalFormPage
@@ -117,9 +134,59 @@ export const GoalFormPage: React.FC = () => {
     return Object.keys(errors).length === 0;
   };
 
+  const createLocalGuestGoal = async () => {
+    const now = new Date().toISOString();
+    const localGoal: Goal = {
+      id: `guest-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString()}`,
+      user_id: "guest",
+      title: formData.title.trim(),
+      description: formData.description.trim() || null,
+      category: formData.category,
+      target_count: Number(formData.target_count),
+      current_count: 0,
+      frequency: formData.frequency,
+      status: "active",
+      is_archived: false,
+      archived_at: null,
+      due_date: formData.due_date || null,
+      reminder_time: formData.reminder_time || null,
+      created_at: now,
+      updated_at: now,
+      streak: {
+        id: `guest-streak-${Date.now()}`,
+        user_id: "guest",
+        goal_id: "",
+        current_streak: 0,
+        longest_streak: 0,
+        last_completed_at: null,
+      },
+    };
+    localGoal.streak = { ...localGoal.streak!, goal_id: localGoal.id };
+
+    const cachedGoals = await getCachedMetadata("guest_goals");
+    const nextGoals = [localGoal, ...(Array.isArray(cachedGoals) ? cachedGoals : goals)];
+    await setCachedMetadata("guest_goals", nextGoals);
+    useGoalStore.setState({ goals: nextGoals, loading: false, error: null });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+
+    if (!isAuthenticated && !isEdit) {
+      try {
+        useGoalStore.setState({ loading: true, error: null });
+        await createLocalGuestGoal();
+        setShowGuestAuthModal(true, "create_goal");
+      } catch (err) {
+        console.error("Failed to save guest goal locally:", err);
+        useGoalStore.setState({
+          loading: false,
+          error: "Không thể lưu mục tiêu trên thiết bị này. Vui lòng thử lại.",
+        });
+      }
+      return;
+    }
 
     if (!navigator.onLine) {
       useGoalStore.setState({ 
@@ -399,6 +466,28 @@ export const GoalFormPage: React.FC = () => {
         isOpen={showTemplateModal}
         onClose={() => setShowTemplateModal(false)}
         onApply={handleApplyTemplate}
+      />
+      {localSaveToast && (
+        <div
+          className="fixed bottom-5 left-1/2 z-[90] -translate-x-1/2 rounded-full px-4 py-2 text-sm font-semibold shadow-xl"
+          style={{
+            background: "var(--color-surface-container-high)",
+            color: "var(--color-on-surface)",
+            border: "1px solid var(--border-subtle)",
+          }}
+        >
+          {localSaveToast}
+        </div>
+      )}
+      <GuestAuthModal
+        isOpen={showGuestAuthModal && guestAuthTrigger === "create_goal"}
+        onClose={() => setShowGuestAuthModal(false)}
+        trigger={guestAuthTrigger}
+        onContinueAsGuest={() => {
+          setShowGuestAuthModal(false);
+          setLocalSaveToast("Đã lưu trên thiết bị này");
+          setTimeout(() => navigate("/goals"), 350);
+        }}
       />
     </div>
   );

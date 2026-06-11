@@ -12,7 +12,7 @@ function getTimelineLogKey(log: { goalId: string; completedAt: string; note: str
 
 export default function TimelinePage() {
   const { t, language } = useTranslation();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { goals, history, stats, fetchHistory, fetchGoals, fetchStats, deleteLogProgress, isOffline } = useGoalStore();
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -26,23 +26,25 @@ export default function TimelinePage() {
   useEffect(() => {
     fetchGoals();
     fetchStats();
+    if (!isAuthenticated) return;
     api.get("/api/freeze/dates?all=true")
       .then((res) => setFrozenDatesSet(new Set<string>(res.data.frozen_dates)))
       .catch(() => {});
-  }, [fetchGoals, fetchStats]);
+  }, [fetchGoals, fetchStats, isAuthenticated]);
 
   // Fetch history when current month/year changes
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     // Get start and end of the selected month
     const fromDate = new Date(year, month, 1).toISOString().split("T")[0];
     const toDate = new Date(year, month + 1, 0).toISOString().split("T")[0];
     fetchHistory(fromDate, toDate);
     // Reset selected day when changing month
     setSelectedDay(null);
-  }, [year, month, fetchHistory]);
+  }, [year, month, fetchHistory, isAuthenticated]);
 
   const monthName = currentDate.toLocaleString(language === "vi" ? "vi-VN" : "en-US", {
     month: "long",

@@ -16,7 +16,7 @@ import {
 
 export function SettingsPage() {
   const { t } = useTranslation();
-  const { user, updateProfile, updatePrivacy, deleteAccount, logout, loading, error, clearError } = useAuthStore();
+  const { user, isAuthenticated, updateProfile, updatePrivacy, deleteAccount, logout, loading, error, clearError } = useAuthStore();
   const { goals, fetchGoals, isOffline } = useGoalStore();
   const { settings: pomodoroSettings, updateSettings: updatePomodoroSettings } = usePomodoroStore();
   const navigate = useNavigate();
@@ -58,6 +58,7 @@ export function SettingsPage() {
 
   // Check active push subscription on mount
   useEffect(() => {
+    if (!isAuthenticated) return;
     async function loadSubscriptionStatus() {
       try {
         const sub = await getActiveSubscription();
@@ -77,7 +78,7 @@ export function SettingsPage() {
       }
     }
     loadFriendStats();
-  }, []);
+  }, [isAuthenticated]);
 
   const handleActiveRemindersChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const checked = e.target.checked;
@@ -140,10 +141,11 @@ export function SettingsPage() {
 
   // Fetch goals if empty so export data has content
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (goals.length === 0) {
       fetchGoals();
     }
-  }, [goals.length, fetchGoals]);
+  }, [goals.length, fetchGoals, isAuthenticated]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

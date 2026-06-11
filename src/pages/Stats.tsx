@@ -60,10 +60,10 @@ export const Stats: React.FC = () => {
 
   // 1. Fetch data on mount & align start date to Sunday for perfect heatmap grid layout
   useEffect(() => {
+    fetchGoals();
+    fetchStats();
+
     if (isAuthenticated) {
-      fetchGoals();
-      fetchStats();
-      
       const now = new Date();
       // 26 weeks ago = 182 days
       const fromDateObj = new Date(now.getTime() - 26 * 7 * 24 * 60 * 60 * 1000);

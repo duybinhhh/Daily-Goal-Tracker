@@ -86,6 +86,26 @@ export async function setCachedMetadata(key: string, value: any): Promise<void> 
   }
 }
 
+export async function clearCachedMetadata(key: string): Promise<void> {
+  try {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction("metadata", "readwrite");
+      const store = transaction.objectStore("metadata");
+      const request = store.delete(key);
+
+      request.onsuccess = () => {
+        resolve();
+      };
+      request.onerror = () => {
+        reject(request.error);
+      };
+    });
+  } catch (err) {
+    console.error("IndexedDB error clearing metadata:", err);
+  }
+}
+
 // Sync Queue helpers
 export async function getPendingQueue(): Promise<OfflineAction[]> {
   try {

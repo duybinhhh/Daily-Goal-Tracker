@@ -7,6 +7,7 @@ import { useAuthStore } from "../store/authStore";
 import { GroupMemberProgress, HabitGroup, useGroupStore } from "../store/groupStore";
 import { useGoalStore } from "../store/goalStore";
 import { useTranslation } from "../i18n";
+import { useNavigate } from "react-router-dom";
 
 type GroupTab = "my-groups" | "discover";
 type PendingAction = "create" | "join" | "leave" | "delete" | "remove" | "checkin" | null;
@@ -41,7 +42,8 @@ const getGroupGoalLabel = (group: Pick<HabitGroup, "goal_title" | "goal_target_c
 
 export const GroupsPage: React.FC = () => {
   const { t } = useTranslation();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
   const {
     groups,
     activeGroup,
@@ -56,7 +58,7 @@ export const GroupsPage: React.FC = () => {
     deleteGroup,
     clearError,
   } = useGroupStore();
-  const { completeGoalProgress, goals, fetchGoals } = useGoalStore();
+  const { completeGoalProgress, goals, fetchGoals, setShowGuestAuthModal } = useGoalStore();
 
   const [activeTab, setActiveTab] = useState<GroupTab>("my-groups");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -78,9 +80,17 @@ export const GroupsPage: React.FC = () => {
   });
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setShowGuestAuthModal(true, "groups");
+      navigate("/");
+    }
+  }, [isAuthenticated, navigate, setShowGuestAuthModal]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
     fetchGroups();
     fetchGoals();
-  }, [fetchGroups, fetchGoals]);
+  }, [fetchGroups, fetchGoals, isAuthenticated]);
 
   const myGroups = useMemo(() => groups.filter((group) => group.isJoined), [groups]);
   const discoverGroups = useMemo(() => groups.filter((group) => !group.isJoined), [groups]);
@@ -340,6 +350,8 @@ export const GroupsPage: React.FC = () => {
       </div>
     );
   };
+
+  if (!isAuthenticated) return null;
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-on-background">
