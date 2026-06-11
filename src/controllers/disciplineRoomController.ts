@@ -14,6 +14,7 @@ const frameStore = new Map<string, Map<string, {
   focusScore: number;
   attentionScore: number;
   presenceScore: number;
+  awayCount: number;
   totalFocusedTime: number;
   totalReadingWritingTime: number;
   totalAwayTime: number;
@@ -387,7 +388,7 @@ export const uploadFrame = async (req: AuthenticatedRequest, res: Response, next
     const { 
       frame, status, focusScore, attentionScore, presenceScore,
       totalFocusedTime, totalReadingWritingTime, totalAwayTime,
-      currentAlertType, lastEventType, aiConfidence, clientId 
+      currentAlertType, lastEventType, aiConfidence, clientId, awayCount
     } = req.body;
     
     if (!frame) { res.status(400).json({ success: false, message: "frame required" }); return; }
@@ -399,9 +400,10 @@ export const uploadFrame = async (req: AuthenticatedRequest, res: Response, next
     frameStore.get(id)!.set(key, { 
       frame, 
       status: status || "Focused", 
-      focusScore: focusScore || 100,
-      attentionScore: attentionScore || 100,
-      presenceScore: presenceScore || 100,
+      focusScore: focusScore ?? 100,
+      attentionScore: attentionScore ?? 100,
+      presenceScore: presenceScore ?? 100,
+      awayCount: awayCount ?? 0,
       totalFocusedTime,
       totalReadingWritingTime,
       totalAwayTime,
@@ -428,7 +430,18 @@ export const getPartnerFrame = async (req: AuthenticatedRequest, res: Response, 
     const myClientId = (req.query.clientId as string) || "";
 
     const roomFrames = frameStore.get(id);
-    if (!roomFrames) { res.status(200).json({ success: true, frame: null, status: "Camera Off", focusScore: 100 }); return; }
+    if (!roomFrames) {
+      res.status(200).json({
+        success: true,
+        frame: null,
+        status: "Camera Off",
+        focusScore: 0,
+        presenceScore: 0,
+        attentionScore: 0,
+        awayCount: 0
+      });
+      return;
+    }
 
     for (const [cid, data] of roomFrames.entries()) {
       if (cid !== myClientId) {
@@ -439,8 +452,9 @@ export const getPartnerFrame = async (req: AuthenticatedRequest, res: Response, 
             frame: null, 
             status: "Camera Off", 
             focusScore: data.focusScore,
-            presenceScore: (data as any).presenceScore,
-            awayCount: (data as any).awayCount
+            attentionScore: data.attentionScore,
+            presenceScore: data.presenceScore,
+            awayCount: data.awayCount
           });
         } else {
           res.status(200).json({ 
@@ -448,12 +462,12 @@ export const getPartnerFrame = async (req: AuthenticatedRequest, res: Response, 
             frame: data.frame, 
             status: data.status, 
             focusScore: data.focusScore,
-            attentionScore: (data as any).attentionScore,
-            presenceScore: (data as any).presenceScore,
+            attentionScore: data.attentionScore,
+            presenceScore: data.presenceScore,
             totalFocusedTime: (data as any).totalFocusedTime,
             totalReadingWritingTime: (data as any).totalReadingWritingTime,
             totalAwayTime: (data as any).totalAwayTime,
-            awayCount: (data as any).awayCount,
+            awayCount: data.awayCount,
             currentAlertType: (data as any).currentAlertType,
             lastEventType: (data as any).lastEventType,
             aiConfidence: (data as any).aiConfidence
@@ -463,7 +477,15 @@ export const getPartnerFrame = async (req: AuthenticatedRequest, res: Response, 
       }
     }
 
-    res.status(200).json({ success: true, frame: null, status: "Camera Off", focusScore: 100 });
+    res.status(200).json({
+      success: true,
+      frame: null,
+      status: "Camera Off",
+      focusScore: 0,
+      presenceScore: 0,
+      attentionScore: 0,
+      awayCount: 0
+    });
   } catch (error) {
     next(error);
   }
