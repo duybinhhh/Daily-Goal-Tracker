@@ -180,6 +180,12 @@ function DisciplineRoomContent() {
   const [partnerFocusScore, setPartnerFocusScore] = useState(100);
   const [partnerPresenceScore, setPartnerPresenceScore] = useState(100);
   const [partnerAwayCount, setPartnerAwayCount] = useState(0);
+  const partnerMetricsRef = useRef<{
+    focusScore: number;
+    presenceScore: number;
+    awayCount: number;
+    updatedAt: number;
+  } | null>(null);
 
   // Chat State
   const [messages, setMessages] = useState<any[]>([]);
@@ -262,6 +268,10 @@ function DisciplineRoomContent() {
   // Time thresholds tracking
   const stateStartTimeRef = useRef<number>(Date.now());
   const lastStatusRef = useRef<AIStatus>("Detecting");
+  const rawStatusCandidateRef = useRef<AIStatus>("Detecting");
+  const rawStatusStreakRef = useRef(0);
+  const stableRawStatusRef = useRef<AIStatus>("Detecting");
+  const smoothedConfidenceRef = useRef(100);
 
   // ─── Assign stream to video element ─────────────────────────────────────────
   useEffect(() => {
@@ -301,14 +311,23 @@ function DisciplineRoomContent() {
         if (res.data.frame) {
           setPartnerFrame(res.data.frame);
           setPartnerStatus(res.data.status || "Focused");
-          setPartnerFocusScore(res.data.focusScore ?? 100);
-          setPartnerPresenceScore(res.data.presenceScore ?? 100);
-          setPartnerAwayCount(res.data.awayCount ?? 0);
         } else {
           setPartnerStatus("Camera Off");
-          if (res.data.focusScore !== undefined) setPartnerFocusScore(res.data.focusScore);
-          if (res.data.presenceScore !== undefined) setPartnerPresenceScore(res.data.presenceScore);
-          if (res.data.awayCount !== undefined) setPartnerAwayCount(res.data.awayCount);
+        }
+
+        if (res.data.hasMetrics) {
+          const nextFocus = Math.max(0, Math.min(100, Math.round(Number(res.data.focusScore ?? 0))));
+          const nextPresence = Math.max(0, Math.min(100, Math.round(Number(res.data.presenceScore ?? 0))));
+          const nextAway = Math.max(0, Math.round(Number(res.data.awayCount ?? 0)));
+          setPartnerFocusScore(nextFocus);
+          setPartnerPresenceScore(nextPresence);
+          setPartnerAwayCount(nextAway);
+          partnerMetricsRef.current = {
+            focusScore: nextFocus,
+            presenceScore: nextPresence,
+            awayCount: nextAway,
+            updatedAt: Date.now()
+          };
         }
       } catch {
         // Silently ignore network errors during polling
@@ -534,7 +553,24 @@ function DisciplineRoomContent() {
     totalTicksRef.current = 0;
     faceDetectedTicksRef.current = 0;
     lastFaceTickRef.current = 0;
+    confidenceSumRef.current = 0;
+    lookingAwayTicksRef.current = 0;
+    headDownTicksRef.current = 0;
+    readingWritingTicksRef.current = 0;
+    totalAwayTicksRef.current = 0;
+    lookingAwayCountRef.current = 0;
+    headDownCountRef.current = 0;
+    awayCountRef.current = 0;
     isCurrentlyAwayRef.current = false;
+    isCurrentlyLookingAwayRef.current = false;
+    isCurrentlyHeadDownRef.current = false;
+    rawStatusCandidateRef.current = "Detecting";
+    rawStatusStreakRef.current = 0;
+    stableRawStatusRef.current = "Detecting";
+    lastStatusRef.current = "Detecting";
+    stateStartTimeRef.current = Date.now();
+    smoothedConfidenceRef.current = 100;
+    partnerMetricsRef.current = null;
     setPartnerFrame(null);
     setPartnerStatus("Detecting");
 
@@ -638,25 +674,65 @@ function DisciplineRoomContent() {
       if (hasFace) {
         faceDetectedTicksRef.current++;
         lastFaceTickRef.current = totalTicksRef.current;
-        confidence = Math.round((result.faceLandmarks[0][0] ? 90 : 0) + (result.faceLandmarks[0][4] ? 10 : 0)); // Simplified confidence
+        const landmarks = result.faceLandmarks[0];
+        const getPoint = (index: number) => landmarks[index] || landmarks[0];
+        const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+        const leftEye = getPoint(33);
+        const rightEye = getPoint(263);
+        const nose = getPoint(4);
+        const chin = getPoint(152);
+        const forehead = getPoint(10);
+        const leftCheek = getPoint(234);
+        const rightCheek = getPoint(454);
+        const leftMouth = getPoint(61);
+        const rightMouth = getPoint(291);
+
+        const eyeCenterY = (leftEye.y + rightEye.y) / 2;
+        const eyeDist = Math.max(0.001, Math.abs(rightEye.x - leftEye.x));
+        const faceHeight = Math.max(0.001, Math.abs(chin.y - forehead.y));
+        const faceWidth = Math.max(0.001, Math.abs(rightCheek.x - leftCheek.x));
+        const faceArea = faceWidth * faceHeight;
+        const noseXRatio = (nose.x - leftEye.x) / eyeDist;
+        const noseYRatio = (nose.y - eyeCenterY) / Math.max(0.001, chin.y - eyeCenterY);
+        const yawScore = Math.abs(noseXRatio - 0.5) * 2;
+        const headDownScore = Math.max(0, noseYRatio - 0.55);
+        const mouthTilt = Math.abs(leftMouth.y - rightMouth.y);
+        const faceTooSmall = faceArea < 0.016 || eyeDist < 0.04;
+
+        const isHeadDown = noseYRatio > (mode === "Study" ? 0.68 : 0.64) || (chin.y > 0.9 && noseYRatio > 0.6);
+        const isLookingAway = noseXRatio < 0.33 || noseXRatio > 0.67 || yawScore > 0.42;
+
+        const instantConfidence = clamp(
+          Math.round(100 - yawScore * 34 - headDownScore * 80 - mouthTilt * 120 - (faceTooSmall ? 26 : 0)),
+          20,
+          100
+        );
+        smoothedConfidenceRef.current = Math.round(smoothedConfidenceRef.current * 0.65 + instantConfidence * 0.35);
+        confidence = smoothedConfidenceRef.current;
         confidenceSumRef.current += confidence;
 
-        const landmarks = result.faceLandmarks[0];
-        const eyeCenterY = (landmarks[33].y + landmarks[263].y) / 2;
-        const relativeNoseY = (landmarks[4].y - eyeCenterY) / (landmarks[152].y - eyeCenterY);
-        const eyeDist = landmarks[263].x - landmarks[33].x;
-        const relativeNoseX = (landmarks[4].x - landmarks[33].x) / eyeDist;
-
-        const IS_HEAD_DOWN = relativeNoseY > 0.75;
-        const IS_LOOKING_AWAY = relativeNoseX < 0.25 || relativeNoseX > 0.75;
-
-        if (IS_HEAD_DOWN) currentRawStatus = "Head Down";
-        else if (IS_LOOKING_AWAY) currentRawStatus = "Looking Away";
+        if (faceTooSmall && confidence < 55) currentRawStatus = "Low Confidence";
+        else if (isHeadDown) currentRawStatus = "Head Down";
+        else if (isLookingAway) currentRawStatus = "Looking Away";
         else currentRawStatus = "Focused";
       } else {
         currentRawStatus = "Away";
         totalAwayTicksRef.current++;
       }
+
+      if (currentRawStatus === rawStatusCandidateRef.current) {
+        rawStatusStreakRef.current++;
+      } else {
+        rawStatusCandidateRef.current = currentRawStatus;
+        rawStatusStreakRef.current = 1;
+      }
+
+      const requiredStableFrames = currentRawStatus === "Focused" ? 1 : currentRawStatus === "Away" ? 2 : 2;
+      if (rawStatusStreakRef.current >= requiredStableFrames) {
+        stableRawStatusRef.current = currentRawStatus;
+      }
+      currentRawStatus = stableRawStatusRef.current;
 
       // ─── State Machine with Mode-Aware Thresholds & Smart Alerts ────────────────
       const now = Date.now();
@@ -683,7 +759,7 @@ function DisciplineRoomContent() {
       const isBypassActive = checkpointBypassTimerRef.current && now < checkpointBypassTimerRef.current;
 
       if (currentRawStatus === "Away") {
-        if (timeInCurrentRawState >= 5) {
+        if (timeInCurrentRawState >= 3) {
           finalStatus = "Away";
           if (!isCurrentlyAwayRef.current) {
             isCurrentlyAwayRef.current = true;
@@ -704,7 +780,7 @@ function DisciplineRoomContent() {
         if (isBypassActive) {
           finalStatus = "Reading/Writing";
         } else if (mode === "Study") {
-          if (timeInCurrentRawState < 60) {
+          if (timeInCurrentRawState < 35) {
             finalStatus = "Reading/Writing";
             if (cameraStatusRef.current !== "Reading/Writing") addTimelineEvent("Reading/Writing");
           } else {
@@ -714,14 +790,14 @@ function DisciplineRoomContent() {
               headDownCountRef.current++;
               addTimelineEvent("Head Down");
             }
-            if (timeInCurrentRawState >= 90) {
+            if (timeInCurrentRawState >= 50) {
               triggerAlert("HEAD_DOWN_STUDY", "Bạn vẫn đang đọc/ghi chép chứ?", "light");
               triggerCheckpoint("Bạn đang làm gì?", ["Đang học bài", "Đang đọc sách", "Tạm nghỉ", "Bỏ qua"]);
             }
           }
         } else {
           // Deep Work
-          if (timeInCurrentRawState < 15) {
+          if (timeInCurrentRawState < 8) {
             finalStatus = "Focused";
           } else {
             finalStatus = "Head Down";
@@ -734,7 +810,7 @@ function DisciplineRoomContent() {
           }
         }
       } else if (currentRawStatus === "Looking Away") {
-        const threshold = mode === "Study" ? 30 : 10;
+        const threshold = mode === "Study" ? 12 : 5;
         if (timeInCurrentRawState < threshold) {
           finalStatus = "Focused";
         } else {
@@ -746,6 +822,11 @@ function DisciplineRoomContent() {
           }
           triggerAlert("LOOKING_AWAY", "Hãy tập trung vào màn hình!", "light");
         }
+      }
+
+      if (currentRawStatus === "Low Confidence") {
+        finalStatus = "Low Confidence";
+        triggerAlert("LOW_CONFIDENCE", "Camera chưa nhìn rõ khuôn mặt. Hãy chỉnh lại ánh sáng hoặc khoảng cách.", "light");
       }
 
       if (currentRawStatus !== lastStatusRef.current) {
@@ -793,13 +874,16 @@ function DisciplineRoomContent() {
       awayCountStateRef.current = nextAwayCount;
       aiConfidenceRef.current = avgConfidence;
 
-      // Focus Score Logic (V2 improved)
+      // Focus Score Logic (V3: faster penalty for repeated distraction, gentler for valid study notes)
       let focus = 100;
       const penalty = 
-        (totalAwaySecondsRef.current * 2) + 
-        (totalLookingAwaySecondsRef.current * 0.5) + 
-        (totalHeadDownSecondsRef.current * (mode === "Deep Work" ? 1 : 0.2)) +
-        (awayCountRef.current * 5);
+        (totalAwaySecondsRef.current * 2.4) + 
+        (totalLookingAwaySecondsRef.current * 0.9) + 
+        (totalHeadDownSecondsRef.current * (mode === "Deep Work" ? 1.35 : 0.35)) +
+        (lowConfidenceSecondsRef.current * 0.25) +
+        (awayCountRef.current * 7) +
+        (lookingAwayCountRef.current * 2) +
+        (headDownCountRef.current * (mode === "Deep Work" ? 3 : 1));
       
       focus = 100 - (penalty / totalTicksRef.current * 100);
       const nextFocusScore = Math.max(0, Math.min(100, Math.round(focus)));
@@ -811,10 +895,11 @@ function DisciplineRoomContent() {
   };
 
   const handleEndSession = async () => {
+    const partnerMetrics = partnerMetricsRef.current;
     setReportPartnerName(partnerName);
-    setReportPartnerFocusScore(partnerFocusScore);
-    setReportPartnerPresenceScore(partnerPresenceScore);
-    setReportPartnerAwayCount(partnerAwayCount);
+    setReportPartnerFocusScore(partnerMetrics?.focusScore ?? null);
+    setReportPartnerPresenceScore(partnerMetrics?.presenceScore ?? null);
+    setReportPartnerAwayCount(partnerMetrics?.awayCount ?? null);
     setReportPartnerGoal(partnerGoal);
 
     cleanupSession();
@@ -2178,6 +2263,7 @@ function DisciplineRoomContent() {
     const partnerScore = reportPartnerFocusScore ?? 0;
     const myWins = myScore > partnerScore;
     const tied = myScore === partnerScore;
+    const clampPercent = (value: number) => Math.max(0, Math.min(100, Math.round(value || 0)));
 
     return (
       <div className="max-w-5xl mx-auto mt-4 space-y-4 pb-12">
@@ -2384,9 +2470,13 @@ function DisciplineRoomContent() {
                         <span className="text-blue-500 font-black">{reportPartnerName || "Partner"}: {partnerScore}%</span>
                       </div>
                     </div>
-                    <div className="h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden flex">
-                      <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${(myScore / (myScore + partnerScore || 1)) * 100}%` }} />
-                      <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600" style={{ width: `${(partnerScore / (myScore + partnerScore || 1)) * 100}%` }} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${clampPercent(myScore)}%` }} />
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600" style={{ width: `${clampPercent(partnerScore)}%` }} />
+                      </div>
                     </div>
                   </div>
 
@@ -2401,9 +2491,13 @@ function DisciplineRoomContent() {
                           <span className="text-blue-500 font-black">{reportPartnerName || "Partner"}: {reportPartnerPresenceScore}%</span>
                         </div>
                       </div>
-                      <div className="h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden flex">
-                        <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${(report.presence_score / (report.presence_score + reportPartnerPresenceScore || 1)) * 100}%` }} />
-                        <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600" style={{ width: `${(reportPartnerPresenceScore / (report.presence_score + reportPartnerPresenceScore || 1)) * 100}%` }} />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${clampPercent(report.presence_score)}%` }} />
+                        </div>
+                        <div className="h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600" style={{ width: `${clampPercent(reportPartnerPresenceScore)}%` }} />
+                        </div>
                       </div>
                     </div>
                   )}
